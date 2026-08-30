@@ -408,7 +408,10 @@
       <div class="field">
         <label>สถานะ</label>
         <select id="pStatus">
-          <option>ร่าง</option><option>รออนุมัติ</option><option>อนุมัติแล้ว</option><option>เผยแพร่แล้ว</option>
+          <option value="DRAFT">ร่าง</option>
+          <option value="REVIEW">รออนุมัติ</option>
+          <option value="APPROVED">อนุมัติแล้ว</option>
+          <option value="PUBLISHED">เผยแพร่แล้ว</option>
         </select>
       </div>
       <div class="field">
@@ -520,6 +523,10 @@
   };
 
   var MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  // ค่าสถานะที่เก็บจริงเป็นภาษาอังกฤษ (ตรงกับข้อมูลเดิมในชีต) — นี่คือป้ายกำกับภาษาไทยสำหรับแสดงผลเท่านั้น
+  var STATUS_LABELS = {DRAFT:'ร่าง', REVIEW:'รออนุมัติ', APPROVED:'อนุมัติแล้ว', PUBLISHED:'เผยแพร่แล้ว'};
+  function statusLabel(status){ return STATUS_LABELS[status] || status || 'ร่าง'; }
 
   document.addEventListener('DOMContentLoaded', function(){
     bindEvents();
@@ -675,7 +682,7 @@
     return (STATE.data.posts || []).filter(function(p){
       var d = parseDate(p.date);
       if (range.start && (!d || d < range.start || d > range.end)) return false;
-      if (channel && p.channel !== channel) return false;
+      if (channel && csvTags(p.channel).indexOf(channel) === -1) return false;
 
       if (q) {
         var hay = [p.title,p.caption,p.tags,p.owner,p.channel].join(' ').toLowerCase();
@@ -800,7 +807,7 @@
   }
 
   function renderPending(posts){
-    var rows = posts.filter(function(p){ return p.status === 'รออนุมัติ'; })
+    var rows = posts.filter(function(p){ return p.status === 'REVIEW'; })
       .sort(sortPostDate);
 
     var el = document.getElementById('pendingApprovals');
@@ -825,7 +832,7 @@
     var now = new Date();
     var rows = posts.filter(function(p){
       var d = postDateTime(p);
-      return d && d >= now && p.status !== 'เผยแพร่แล้ว';
+      return d && d >= now && p.status !== 'PUBLISHED';
     }).sort(sortPostDate).slice(0,6);
 
     var el = document.getElementById('publishQueue');
@@ -908,13 +915,13 @@
 
   function renderBoard(){
     var posts = filteredPosts();
-    var statuses = ['ร่าง','รออนุมัติ','อนุมัติแล้ว','เผยแพร่แล้ว'];
+    var statuses = ['DRAFT','REVIEW','APPROVED','PUBLISHED'];
 
     document.getElementById('kanban').innerHTML = statuses.map(function(status){
       var items = posts.filter(function(p){ return p.status === status; }).sort(sortPostDate);
 
       return '<div class="kanban-col">' +
-        '<div class="kanban-title">'+esc(status)+' <span class="num">('+items.length+')</span></div>' +
+        '<div class="kanban-title">'+esc(statusLabel(status))+' <span class="num">('+items.length+')</span></div>' +
         (items.length ? items.map(taskCard).join('') : empty('ไม่มีงาน')) +
       '</div>';
     }).join('');
@@ -1068,7 +1075,7 @@
     document.getElementById('pTime').value='09:00';
     document.getElementById('pChannel').value='Facebook';
     document.getElementById('pFormat').value='ภาพ';
-    document.getElementById('pStatus').value='ร่าง';
+    document.getElementById('pStatus').value='DRAFT';
     document.getElementById('pPostUrl').value='';
     document.getElementById('pSrcLink').value='';
     document.getElementById('pFinalLink').value='';
@@ -1094,7 +1101,7 @@
     document.getElementById('pTime').value=(p.time||'09:00').slice(0,5);
     document.getElementById('pChannel').value=p.channel||'Facebook';
     document.getElementById('pFormat').value=p.format||'ภาพ';
-    document.getElementById('pStatus').value=p.status||'ร่าง';
+    document.getElementById('pStatus').value=p.status||'DRAFT';
     document.getElementById('pPostUrl').value=p.post_url||'';
     document.getElementById('pSrcLink').value=p.src_link||'';
     document.getElementById('pFinalLink').value=p.final_link||'';
@@ -1110,7 +1117,7 @@
     }
 
     document.getElementById('approveBtn').style.display =
-      (STATE.data.role==='editor' && p.status!=='อนุมัติแล้ว' && p.status!=='เผยแพร่แล้ว') ? '' : 'none';
+      (STATE.data.role==='editor' && p.status!=='APPROVED' && p.status!=='PUBLISHED') ? '' : 'none';
 
     renderPostTagButtons();
     openModal('postModal');
@@ -1193,14 +1200,14 @@
   }
 
   function statusClass(status){
-    if(status==='รออนุมัติ') return 'pending';
-    if(status==='อนุมัติแล้ว') return 'approved';
-    if(status==='เผยแพร่แล้ว') return 'published';
+    if(status==='REVIEW') return 'pending';
+    if(status==='APPROVED') return 'approved';
+    if(status==='PUBLISHED') return 'published';
     return 'draft';
   }
 
   function statusBadge(status){
-    return '<span class="badge '+statusClass(status)+'">'+esc(status||'ร่าง')+'</span>';
+    return '<span class="badge '+statusClass(status)+'">'+esc(statusLabel(status))+'</span>';
   }
 
   function linkCell(url){

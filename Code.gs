@@ -23,7 +23,16 @@ var APP = {
     Targets: ['key','label','target','period'],
     Log: ['at','who','post_id','action','from','to','comment']
   },
-  POST_STATUS: ['ร่าง','รออนุมัติ','อนุมัติแล้ว','เผยแพร่แล้ว'],
+  // ค่าตรงกับสถานะที่มีอยู่แล้วในชีต Posts (Marketing_Content_2026) — อย่าเปลี่ยนกลับเป็นภาษาไทย
+  // มิฉะนั้นโพสต์เก่าทั้งหมดจะไม่ขึ้นในบอร์ดคิวงาน
+  POST_STATUS: ['DRAFT','REVIEW','APPROVED','PUBLISHED'],
+  // ป้ายกำกับภาษาไทยสำหรับแสดงผลเท่านั้น ค่าที่เก็บจริงยังเป็นภาษาอังกฤษตาม POST_STATUS
+  POST_STATUS_LABELS: {
+    DRAFT: 'ร่าง',
+    REVIEW: 'รออนุมัติ',
+    APPROVED: 'อนุมัติแล้ว',
+    PUBLISHED: 'เผยแพร่แล้ว'
+  },
   FORMATS: ['ภาพ','วิดีโอ'],
   CHANNELS: ['Facebook','Instagram','TikTok','LINE OA','YouTube']
 };
@@ -181,7 +190,7 @@ function apiSavePost(post) {
     if (String(before.status || '') !== String(next.status || '')) {
       log_(next.id, 'STATUS_CHANGE', before.status || '', next.status || '', post.comment || '', who);
 
-      if (next.status === 'รออนุมัติ') {
+      if (next.status === 'REVIEW') {
         notifyEditorsPending_(next);
       }
     } else if (post.comment) {
@@ -209,7 +218,7 @@ function apiNewPost(o) {
       channel: o.channel || 'Facebook',
       title: o.title || 'คอนเทนต์ใหม่',
       format: o.format || 'ภาพ',
-      status: o.status || 'ร่าง',
+      status: o.status || 'DRAFT',
       owner: o.owner || currentEmail_(),
       caption: o.caption || '',
       tags: o.tags || '',
@@ -260,14 +269,14 @@ function apiApprove(row) {
     var before = found.data;
     var who = currentEmail_();
     var next = merge_(before, {
-      status: 'อนุมัติแล้ว',
+      status: 'APPROVED',
       approved_by: who,
       approved_at: new Date()
     });
 
     next = normalizePost_(next, false);
     updateObjectAtRow_(sh, found.row, next);
-    log_(next.id, 'APPROVE', before.status || '', 'อนุมัติแล้ว', '', who);
+    log_(next.id, 'APPROVE', before.status || '', 'APPROVED', '', who);
 
     return apiBootstrap();
   } catch (err) {
@@ -295,7 +304,7 @@ function apiPromoteIdea(o) {
       channel: o.channel || 'Facebook',
       title: o.title || idea.title || 'คอนเทนต์ใหม่',
       format: o.format || 'ภาพ',
-      status: 'ร่าง',
+      status: 'DRAFT',
       owner: o.owner || currentEmail_(),
       caption: '',
       tags: o.tags || idea.category || '',
@@ -308,7 +317,7 @@ function apiPromoteIdea(o) {
 
     appendObject_(postSh, post);
     updateObjectAtRow_(ideaSh, found.row, merge_(idea, {promoted_post_id:post.id}));
-    log_(post.id, 'PROMOTE_IDEA', '', 'ร่าง', idea.title || '', currentEmail_());
+    log_(post.id, 'PROMOTE_IDEA', '', 'DRAFT', idea.title || '', currentEmail_());
 
     return apiBootstrap();
   } catch (err) {
@@ -484,7 +493,7 @@ function remindPending() {
   ensureSheets();
 
   var posts = sheetObjects_(db_().getSheetByName('Posts'))
-    .filter(function(p) { return p.status === 'รออนุมัติ'; });
+    .filter(function(p) { return p.status === 'REVIEW'; });
 
   if (!posts.length) return;
 
@@ -537,7 +546,7 @@ function weeklyDigest() {
     return d && d >= start && d <= now;
   }).length;
 
-  var pending = posts.filter(function(p) { return p.status === 'รออนุมัติ'; }).length;
+  var pending = posts.filter(function(p) { return p.status === 'REVIEW'; }).length;
   var recipients = notificationEmails_();
   if (!recipients.length) return;
 
@@ -683,9 +692,11 @@ function findByField_(sh, field, value) {
 function normalizePost_(p, isNew) {
   p = p || {};
 
-  var status = APP.POST_STATUS.indexOf(String(p.status || '')) !== -1 ? String(p.status) : 'ร่าง';
+  var status = APP.POST_STATUS.indexOf(String(p.status || '')) !== -1 ? String(p.status) : 'DRAFT';
   var format = APP.FORMATS.indexOf(String(p.format || '')) !== -1 ? String(p.format) : 'ภาพ';
-  var channel = APP.CHANNELS.indexOf(String(p.channel || '')) !== -1 ? String(p.channel) : 'Facebook';
+  // ข้อมูลเก่าบางแถวมีหลายช่องทางรวมกัน เช่น "Facebook, TikTok" — เก็บทุกช่องทางที่รู้จักไว้แทน
+  // การบังคับให้เหลือค่าเดียว เพื่อไม่ให้ข้อมูลเดิมหายไปตอนแก้ไข/บันทึกโพสต์นั้นซ้ำ
+  var channel = normalizeChannel_(p.channel);
 
   return {
     id: String(p.id || (isNew ? newId_('P') : '')),
@@ -832,6 +843,19 @@ function normalizeTime_(v) {
   if (!m) return s;
 
   return ('0' + m[1]).slice(-2) + ':' + m[2];
+}
+
+/**
+ * รองรับทั้งค่าช่องทางเดียว ("Facebook") และหลายช่องทางคั่นด้วยจุลภาค
+ * ("Facebook, TikTok") ที่มีอยู่แล้วในข้อมูลเก่า — เก็บทุกค่าที่รู้จักไว้
+ * แทนการบังคับเหลือค่าเดียว เพื่อไม่ให้ช่องทางเดิมหายไปเวลาบันทึกซ้ำ
+ */
+function normalizeChannel_(v) {
+  var known = csvTags_(v).filter(function(c) {
+    return APP.CHANNELS.indexOf(c) !== -1;
+  });
+  if (known.length) return known.join(', ');
+  return 'Facebook';
 }
 
 function normalizeDateText_(v) {
