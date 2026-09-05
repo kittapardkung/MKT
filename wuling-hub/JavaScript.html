@@ -1,0 +1,1147 @@
+<script>
+'use strict';
+
+/* ════════════════════════ constants & date helpers ════════════════════════ */
+var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var DOW = ["อา","จ","อ","พ","พฤ","ศ","ส"];
+var TH_DOW = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+var TH_MON = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+var D = function(s){ return new Date(s+"T00:00:00"); };
+var startOfDay = function(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+var TODAY = startOfDay(new Date());
+var thaiDate = function(d){ return "วัน"+TH_DOW[d.getDay()]+"ที่ "+d.getDate()+" "+TH_MON[d.getMonth()]+" "+d.getFullYear(); };
+var weekOfMonth = function(d){ return Math.ceil((d.getDate()+new Date(d.getFullYear(),d.getMonth(),1).getDay())/7); };
+var addDays = function(d,n){ return new Date(d.getTime()+n*86400000); };
+var mondayOf = function(d){ var k=d.getDay(); return addDays(startOfDay(d), k===0?-6:1-k); };
+var fmt = function(s){ if(!s) return ""; var d=D(s); return d.getDate()+" "+MON[d.getMonth()]; };
+var fmtFull = function(s){ if(!s) return ""; var d=D(s); return d.getDate()+" "+MON[d.getMonth()]+" "+d.getFullYear(); };
+var diffDays = function(a,b){ return Math.round((b-a)/86400000); };
+var iso = function(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+var baht = function(n){ return (n||0).toLocaleString("en-US"); };
+var pctFn = function(a,b){ return b ? Math.round((a/b)*100) : 0; };
+var esc = function(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+
+var isOpenT = function(t){ return ["COMPLETED","CANCELLED"].indexOf(t.status) < 0; };
+var isOverdue = function(t){ return isOpenT(t) && diffDays(TODAY, D(t.due)) < 0; };
+var overdueDays = function(t){ return -diffDays(TODAY, D(t.due)); };
+var dueIn = function(t){ return diffDays(TODAY, D(t.due)); };
+
+var NAV = [
+  {id:"dashboard", label:"Dashboard", icon:"layout-dashboard"},
+  {id:"today", label:"Today", icon:"sun"},
+  {id:"weekly", label:"Weekly TODO", icon:"list-checks"},
+  {id:"mytasks", label:"My Tasks", icon:"check-square"},
+  {id:"projects", label:"Projects", icon:"folder-kanban"},
+  {id:"timeline", label:"Timeline", icon:"gantt-chart-square"},
+  {id:"calendar", label:"Calendar", icon:"calendar-days"},
+  {id:"kanban", label:"Kanban", icon:"columns-3"},
+  {id:"team", label:"Team", icon:"users"},
+  {id:"reports", label:"Reports", icon:"bar-chart-3"},
+  {id:"management", label:"Management", icon:"target"},
+  {id:"settings", label:"Settings", icon:"settings"},
+];
+
+/* ════════════════════════════════ state ════════════════════════════════ */
+var DATA = { users:[], projects:[], tasks:[], milestones:[], activity:[], notifications:[], options:{} };
+var UI = {
+  view: "dashboard", openProjectId: null, openTaskId: null, currentUserId: null,
+  searchQuery: "", showSearchResults: false, showBell: false, showCreateMenu: false,
+  modal: null, confirmDel: null,
+  filters: {dept:"ทั้งหมด", category:"ทั้งหมด", status:"ทั้งหมด", priority:"ทั้งหมด", owner:"ทั้งหมด"},
+  projSort: "priority", showPrioPanel: false, projectTab: "overview", ganttMode: "Day",
+  timelineMode: "Week", kanbanScope: "ทุก Project",
+  calCursor: iso(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)),
+  weekOffset: 0, weekScope: "ทั้งทีม", commentDraft: "",
+  projectForm: null, taskForm: null, milestoneForm: null,
+};
+var BUSY = false;
+
+/* ════════════════════════════ derived lookups ════════════════════════════ */
+function userById(id){ return DATA.users.find(function(u){return u.id===id;}) || {name:"—", tone:"var(--color-neutral-500)", role:"", dept:""}; }
+function projById(id){ return DATA.projects.find(function(p){return p.id===id;}); }
+function taskOf(pid){ return DATA.tasks.filter(function(t){return t.projectId===pid;}); }
+function autoProgress(p){
+  if (p.manual != null) return p.manual;
+  var ts = taskOf(p.id).filter(function(t){return t.status!=="CANCELLED";});
+  if (!ts.length) return 0;
+  return Math.round(ts.reduce(function(s,t){return s+t.progress;},0)/ts.length);
+}
+function health(p){
+  if (p.status === "COMPLETED") return "GREEN";
+  var ts = taskOf(p.id);
+  var od = ts.filter(isOverdue).length;
+  if (od >= 2 || diffDays(TODAY, D(p.due)) < 0) return "RED";
+  var soon = ts.filter(function(t){return isOpenT(t) && dueIn(t) <= 3;}).length;
+  if (od === 1 || soon >= 2) return "YELLOW";
+  return "GREEN";
+}
+function healthLabel(h){ return h==="RED"?"🔺 DELAYED":h==="YELLOW"?"◆ AT RISK":"● ON TRACK"; }
+function healthStyle(h){ return h==="RED"?"background:var(--color-accent-100);color:var(--color-accent-800)":h==="YELLOW"?"border:1px solid var(--color-accent);color:var(--color-accent-700)":"background:var(--color-accent-2-100);color:var(--color-accent-2-800)"; }
+function statusStyle(st){
+  return ({TODO:"background:var(--color-neutral-100);color:var(--color-neutral-800)","IN PROGRESS":"background:var(--color-accent-100);color:var(--color-accent-800)",REVIEW:"border:1px solid var(--color-accent);color:var(--color-accent-700)",BLOCKED:"background:var(--color-accent-100);color:var(--color-accent-800)",COMPLETED:"background:var(--color-accent-2-100);color:var(--color-accent-2-800)",CANCELLED:"background:var(--color-neutral-100);color:var(--color-neutral-600)",PLANNING:"border:1px solid var(--color-accent-2);color:var(--color-accent-2-700)","ON HOLD":"background:var(--color-neutral-200);color:var(--color-neutral-700)"})[st] || "";
+}
+function prioStyle(pr){
+  return ({LOW:"background:var(--color-neutral-100);color:var(--color-neutral-700)",MEDIUM:"border:1px solid var(--color-accent-2);color:var(--color-accent-2-700)",HIGH:"background:var(--color-accent-100);color:var(--color-accent-800)",URGENT:"background:var(--color-accent-700);color:#fff"})[pr] || "";
+}
+function taskRow(t, orderCtx){
+  var p = projById(t.projectId); var od = isOverdue(t);
+  return { id:t.id, name:t.name, projectName: p?p.name:"", dept:t.dept,
+    dueLabel: od?("OVERDUE "+overdueDays(t)+" วัน"):fmt(t.due), overdueStyle: od?"color:var(--color-accent-700);font-weight:700":"opacity:0.6",
+    ownerInitials: userById(t.ownerId).name.slice(0,2), ownerTone: userById(t.ownerId).tone,
+    priority:t.priority, progress:t.progress, barColor: od?"var(--color-accent-700)":"var(--color-accent)",
+    completed: t.status==="COMPLETED", orderCtx: orderCtx||null };
+}
+
+/* ═══════════════════════════════ bootstrap ═══════════════════════════════ */
+function boot(){
+  google.script.run.withSuccessHandler(function(data){
+    DATA = data;
+    if (!UI.currentUserId && DATA.users.length) UI.currentUserId = DATA.users[0].id;
+    render();
+    setInterval(refreshQuiet, 45000); // soft multi-user sync
+    setInterval(function(){ var c = document.getElementById("liveClock"); if (c) c.textContent = clockLabel(); }, 30000);
+  }).withFailureHandler(function(err){
+    document.getElementById("app").innerHTML = "<div style='padding:40px;font-family:var(--font-body)'><h3>โหลดข้อมูลไม่สำเร็จ</h3><p>"+esc(err.message||err)+"</p></div>";
+  }).getAllData();
+}
+function refreshQuiet(){
+  // Skip the background sync while a modal is open or the user is mid-typing —
+  // a full re-render would drop focus and any keystrokes not yet committed.
+  var ae = document.activeElement;
+  if (UI.modal || (ae && ["INPUT","TEXTAREA","SELECT"].indexOf(ae.tagName) >= 0)) return;
+  google.script.run.withSuccessHandler(function(data){
+    DATA = data; render();
+  }).withFailureHandler(function(){}).getAllData();
+}
+function refreshData(cb){
+  BUSY = true;
+  google.script.run.withSuccessHandler(function(data){
+    DATA = data; BUSY = false; render(); if (cb) cb();
+  }).withFailureHandler(function(err){
+    BUSY = false; alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err));
+    render();
+  }).getAllData();
+}
+function clockLabel(){
+  var n = new Date();
+  return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0")+" น.";
+}
+
+/* ══════════════════════════════ mutations ══════════════════════════════ */
+function call(fnName, args, after){
+  BUSY = true; render();
+  var run = google.script.run.withSuccessHandler(function(){
+    refreshData(after);
+  }).withFailureHandler(function(err){
+    BUSY = false; alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err)); render();
+  });
+  run[fnName].apply(run, args);
+}
+
+/* ════════════════════════════════ actions ════════════════════════════════ */
+var ACTIONS = {
+  go: function(d){ UI.view = d.view; UI.openProjectId = null; UI.showSearchResults=false; UI.showBell=false; UI.showCreateMenu=false; render(); },
+  toggleSidebar: function(){ var s=document.querySelector('.sidebar'); if(s) s.classList.toggle('open'); },
+  switchUser: function(){
+    var ids = DATA.users.map(function(u){return u.id;});
+    var i = ids.indexOf(UI.currentUserId);
+    UI.currentUserId = ids[(i+1)%ids.length]; render();
+  },
+  toggleBell: function(){ UI.showBell=!UI.showBell; UI.showCreateMenu=false; render(); },
+  toggleCreateMenu: function(){ UI.showCreateMenu=!UI.showCreateMenu; UI.showBell=false; render(); },
+  markAllRead: function(){ call("markAllNotificationsRead", []); },
+  openProject: function(d){ UI.openProjectId=d.id; UI.view="projects"; UI.showSearchResults=false; UI.searchQuery=""; render(); },
+  openTask: function(d){ UI.openTaskId=d.id; render(); },
+  closeDrawer: function(){ UI.openTaskId=null; UI.commentDraft=""; render(); },
+  closeProjectDetail: function(){ UI.openProjectId=null; render(); },
+  stop: function(){}, // no-op for stopPropagation targets
+
+  openNewProject: function(){
+    UI.showCreateMenu=false;
+    UI.projectForm = { name:"", category:"Website", dept:"Marketing", ownerId: UI.currentUserId || (DATA.users[0]&&DATA.users[0].id), priority:"MEDIUM", start: iso(TODAY), due: iso(addDays(TODAY,30)), budget:0, desc:"" };
+    UI.modal = {type:"project"}; render();
+  },
+  openNewTask: function(d){
+    UI.showCreateMenu=false;
+    var pid = (d&&d.pid) || UI.openProjectId || (DATA.projects[0] && DATA.projects[0].id);
+    UI.taskForm = { projectId: pid, name:"", ownerId: UI.currentUserId || (DATA.users[0]&&DATA.users[0].id), dept:"Marketing", priority:"MEDIUM", start: iso(TODAY), due: iso(addDays(TODAY,7)), estCost:0 };
+    UI.modal = {type:"task"}; render();
+  },
+  openNewMilestone: function(d){
+    UI.showCreateMenu=false;
+    var pid = (d&&d.pid) || UI.openProjectId || (DATA.projects[0] && DATA.projects[0].id);
+    UI.milestoneForm = { projectId: pid, name:"", date: iso(addDays(TODAY,14)) };
+    UI.modal = {type:"milestone"}; render();
+  },
+  closeModal: function(){ UI.modal=null; render(); },
+  submitProject: function(){
+    var f = UI.projectForm; if (!f.name.trim()) { alert("กรอกชื่อโครงการ"); return; }
+    UI.modal=null;
+    call("createProject", [f], function(){ });
+  },
+  submitTask: function(){
+    var f = UI.taskForm; if (!f.name.trim() || !f.projectId) { alert("กรอกชื่องานและเลือกโครงการ"); return; }
+    UI.modal=null; call("createTask", [f]);
+  },
+  submitMilestone: function(){
+    var f = UI.milestoneForm; if (!f.name.trim() || !f.projectId) { alert("กรอกชื่อ Milestone"); return; }
+    UI.modal=null; call("createMilestone", [f]);
+  },
+
+  toggleDone: function(d){
+    var t = DATA.tasks.find(function(x){return x.id===d.id;});
+    call("updateTask", [d.id, {status: t.status==="COMPLETED" ? "IN PROGRESS" : "COMPLETED"}]);
+  },
+  askDeleteTask: function(d){
+    var t = DATA.tasks.find(function(x){return x.id===d.id;});
+    UI.confirmDel = {kind:"task", id:t.id, name:t.name, label:"Task"}; render();
+  },
+  askDeleteProject: function(d){
+    var p = DATA.projects.find(function(x){return x.id===d.id;});
+    UI.confirmDel = {kind:"project", id:p.id, name:p.name, label:"โครงการ", note:"Task "+taskOf(p.id).length+" รายการ, Milestone และ Activity Log ทั้งหมดของโครงการนี้จะถูกลบไปด้วย"}; render();
+  },
+  askDeleteUser: function(d){
+    var u = DATA.users.find(function(x){return x.id===d.id;});
+    UI.confirmDel = {kind:"user", id:u.id, name:u.name, label:"สมาชิก", note:u.name+" ยังถืองานอยู่ "+DATA.tasks.filter(function(t){return t.ownerId===u.id;}).length+" รายการ — ควรย้ายงานให้คนอื่นก่อนลบ"}; render();
+  },
+  askDeleteMilestone: function(d){
+    var m = DATA.milestones.find(function(x){return x.id===d.id;});
+    UI.confirmDel = {kind:"milestone", id:m.id, name:m.name, label:"Milestone"}; render();
+  },
+  cancelDelete: function(){ UI.confirmDel=null; render(); },
+  confirmDoDelete: function(){
+    var c = UI.confirmDel; if (!c) return; UI.confirmDel=null;
+    if (c.kind==="task") { if (UI.openTaskId===c.id) UI.openTaskId=null; call("deleteTask", [c.id]); }
+    if (c.kind==="project") { if (UI.openProjectId===c.id) UI.openProjectId=null; call("deleteProject", [c.id]); }
+    if (c.kind==="user") call("deleteUser", [c.id]);
+    if (c.kind==="milestone") call("deleteMilestone", [c.id, UI.currentUserId]);
+  },
+
+  toggleSubtask: function(d){ call("toggleSubtask", [d.tid, d.sid]); },
+  deleteSubtask: function(d){ call("deleteSubtask", [d.tid, d.sid]); },
+  addSubtask: function(d, ev){
+    if (ev.key !== "Enter" || !ev.target.value.trim()) return;
+    var val = ev.target.value.trim(); ev.target.value="";
+    call("addSubtask", [d.tid, val]);
+  },
+  sendComment: function(){
+    var text = (UI.commentDraft||"").trim(); if (!text) return;
+    var tid = UI.openTaskId; UI.commentDraft="";
+    call("addComment", [tid, UI.currentUserId, text]);
+  },
+
+  goWeekly: function(){ UI.view="weekly"; render(); },
+  goProjects: function(){ UI.view="projects"; render(); },
+  weekScopeTeam: function(){ UI.weekScope="ทั้งทีม"; render(); },
+  weekScopeMe: function(){ UI.weekScope="เฉพาะฉัน"; render(); },
+  weekPrev: function(){ UI.weekOffset--; render(); },
+  weekNext: function(){ UI.weekOffset++; render(); },
+  weekThis: function(){ UI.weekOffset=0; render(); },
+  weekJump: function(d){ UI.weekOffset = +d.i; render(); },
+
+  setProjSort: function(d,ev){ UI.projSort = ev.target.value; render(); },
+  togglePrioPanel: function(){ UI.showPrioPanel = !UI.showPrioPanel; render(); },
+  setFilter: function(d,ev){ UI.filters[d.key] = ev.target.value; render(); },
+  clearFilters: function(){ UI.filters = {dept:"ทั้งหมด",category:"ทั้งหมด",status:"ทั้งหมด",priority:"ทั้งหมด",owner:"ทั้งหมด"}; render(); },
+  setProjectPriority: function(d){ call("updateProject", [d.id, {priority:d.val}, UI.currentUserId, "เปลี่ยน Priority ของโครงการเป็น "+d.val]); },
+
+  pdSetTab: function(d){ UI.projectTab = d.tab; render(); },
+  pdAddTask: function(){ ACTIONS.openNewTask({pid: UI.openProjectId}); },
+  pdAddMilestone: function(){ ACTIONS.openNewMilestone({pid: UI.openProjectId}); },
+  pdDelete: function(){ ACTIONS.askDeleteProject({id: UI.openProjectId}); },
+  pdToggleTeam: function(d){ call("toggleProjectTeam", [UI.openProjectId, d.uid]); },
+  pdToggleMilestone: function(d){ call("toggleMilestone", [d.id]); },
+  setGanttMode: function(d){ UI.ganttMode = d.mode; render(); },
+  setTimelineMode: function(d){ UI.timelineMode = d.mode; render(); },
+
+  calPrev: function(){ var c=D(UI.calCursor); UI.calCursor = iso(new Date(c.getFullYear(), c.getMonth()-1, 1)); render(); },
+  calNext: function(){ var c=D(UI.calCursor); UI.calCursor = iso(new Date(c.getFullYear(), c.getMonth()+1, 1)); render(); },
+
+  setKanbanScope: function(d,ev){ UI.kanbanScope = ev.target.value; render(); },
+  kanbanDrop: function(d){
+    if (!window._dragTaskId) return;
+    call("updateTask", [window._dragTaskId, {status:d.status}]); window._dragTaskId=null;
+  },
+
+  addUser: function(){ call("createUser", []); },
+
+  patchProject: function(d,ev){
+    var patch = {}; patch[d.field] = ev.target.type==="number" ? (+ev.target.value||0) : ev.target.value;
+    var msgMap = {category:"เปลี่ยน Category เป็น ", dept:"เปลี่ยนแผนกเป็น ", priority:"เปลี่ยน Priority เป็น ", status:"เปลี่ยนสถานะโครงการเป็น ", due:"เปลี่ยน Deadline เป็น "};
+    var msg = msgMap[d.field] ? msgMap[d.field] + (d.field==="due"?fmt(ev.target.value):ev.target.value) : null;
+    if (d.field === "ownerId") {
+      var p = projById(UI.openProjectId);
+      call("updateProject", [UI.openProjectId, {ownerId: ev.target.value}, UI.currentUserId, "เปลี่ยน Owner เป็น "+userById(ev.target.value).name]);
+      if (p && p.team.indexOf(ev.target.value) < 0) call("toggleProjectTeam", [UI.openProjectId, ev.target.value]);
+      return;
+    }
+    call("updateProject", [UI.openProjectId, patch, UI.currentUserId, msg]);
+  },
+  patchTask: function(d,ev){
+    var patch = {}; var val = ev.target.value;
+    if (["progress","estCost","actualCost"].indexOf(d.field) >= 0) val = +val || 0;
+    patch[d.field] = val;
+    call("updateTask", [UI.openTaskId, patch]);
+  },
+
+  formBind: function(d,ev){
+    var target = d.form === "pf" ? UI.projectForm : d.form === "tf" ? UI.taskForm : UI.milestoneForm;
+    var val = ev.target.type === "number" ? (+ev.target.value||0) : ev.target.value;
+    target[d.field] = val;
+  },
+  searchChange: function(d,ev){ UI.searchQuery = ev.target.value; UI.showSearchResults = ev.target.value.length>0; render(); },
+  commentChange: function(d,ev){ UI.commentDraft = ev.target.value; },
+  commentKeydown: function(d,ev){ if (ev.key==="Enter") ACTIONS.sendComment(); },
+  userField: function(d,ev){ var patch={}; patch[d.field]=ev.target.value; call("updateUser", [d.id, patch]); },
+};
+
+/* ══════════════════════════ event delegation ══════════════════════════ */
+document.addEventListener("DOMContentLoaded", function(){
+  boot();
+  document.addEventListener("click", function(ev){
+    var el = ev.target.closest("[data-act]");
+    if (!el) return;
+    if (el.dataset.stop) ev.stopPropagation();
+    var fn = ACTIONS[el.dataset.act];
+    if (fn) { ev.preventDefault(); fn(JSON.parse(el.dataset.arg||"{}"), ev); }
+  });
+  document.addEventListener("change", function(ev){
+    var el = ev.target.closest("[data-change]");
+    if (!el) return;
+    var fn = ACTIONS[el.dataset.change];
+    if (fn) fn(JSON.parse(el.dataset.arg||"{}"), ev);
+  });
+  document.addEventListener("input", function(ev){
+    var el = ev.target.closest("[data-input]");
+    if (!el) return;
+    var fn = ACTIONS[el.dataset.input];
+    if (fn) fn(JSON.parse(el.dataset.arg||"{}"), ev);
+  });
+  document.addEventListener("keydown", function(ev){
+    var el = ev.target.closest("[data-keydown]");
+    if (!el) return;
+    var fn = ACTIONS[el.dataset.keydown];
+    if (fn) fn(JSON.parse(el.dataset.arg||"{}"), ev);
+  });
+  document.addEventListener("dragover", function(ev){
+    if (ev.target.closest("[data-dropzone]")) ev.preventDefault();
+  });
+  document.addEventListener("drop", function(ev){
+    var el = ev.target.closest("[data-dropzone]");
+    if (!el) return; ev.preventDefault();
+    ACTIONS.kanbanDrop(JSON.parse(el.dataset.arg||"{}"));
+  });
+  document.addEventListener("dragstart", function(ev){
+    var el = ev.target.closest("[data-drag-task]");
+    if (el) window._dragTaskId = el.dataset.dragTask;
+  });
+});
+
+function act(name, arg){ return 'data-act="'+name+'" data-arg=\''+esc(JSON.stringify(arg||{})).replace(/'/g,"&#39;")+'\''; }
+function chg(name, arg){ return 'data-change="'+name+'" data-arg=\''+esc(JSON.stringify(arg||{})).replace(/'/g,"&#39;")+'\''; }
+function inp(name, arg){ return 'data-input="'+name+'" data-arg=\''+esc(JSON.stringify(arg||{})).replace(/'/g,"&#39;")+'\''; }
+function kd(name, arg){ return 'data-keydown="'+name+'" data-arg=\''+esc(JSON.stringify(arg||{})).replace(/'/g,"&#39;")+'\''; }
+
+/* ═══════════════════════════════ render root ═══════════════════════════════ */
+function render(){
+  var app = document.getElementById("app");
+  app.innerHTML = renderSidebar() + renderMain();
+  var overlays = renderModals() + renderDrawer() + renderConfirm();
+  app.insertAdjacentHTML("beforeend", overlays);
+  if (window.lucide) lucide.createIcons();
+  if (BUSY) document.body.style.cursor = "progress"; else document.body.style.cursor = "";
+}
+
+function renderSidebar(){
+  var me = userById(UI.currentUserId);
+  return '<aside class="sidebar">'
+    + '<div class="brand"><span class="brand-mark">W</span><div><p class="brand-name">WULING HUB</p><p class="brand-sub">Project Workspace</p></div></div>'
+    + NAV.map(function(n){
+        return '<button class="navbtn'+(UI.view===n.id?' active':'')+'" '+act("go",{view:n.id})+'><i data-lucide="'+n.icon+'" class="ic"></i>'+n.label+'</button>';
+      }).join("")
+    + '<div class="sidebar-foot"><button class="me-chip" '+act("switchUser")+'>'
+    + '<span class="me-avatar">'+esc(me.name.slice(0,2))+'</span>'
+    + '<span><span class="me-name">'+esc(me.name)+'</span><span class="me-role">'+esc(me.role)+'</span></span></button></div>'
+    + '</aside>';
+}
+
+function renderMain(){
+  return '<div class="main">' + renderTopbar() + '<div class="content">' + renderView() + '</div></div>';
+}
+
+function renderTopbar(){
+  var q = UI.searchQuery.trim().toLowerCase();
+  var results = [];
+  if (q) {
+    DATA.projects.filter(function(p){return p.name.toLowerCase().indexOf(q)>=0;}).slice(0,4).forEach(function(p){
+      results.push({title:p.name, sub:"Project · "+p.id, act: act("openProject",{id:p.id})});
+    });
+    DATA.tasks.filter(function(t){return t.name.toLowerCase().indexOf(q)>=0;}).slice(0,4).forEach(function(t){
+      var p = projById(t.projectId);
+      results.push({title:t.name, sub:"Task · "+(p?p.name:""), act: act("openTask",{id:t.id})});
+    });
+  }
+  var unread = DATA.notifications.some(function(n){return !n.read;});
+  return '<header class="topbar">'
+    + '<div class="search-wrap"><i data-lucide="search" class="ic"></i>'
+    + '<input class="input" placeholder="ค้นหาโปรเจกต์หรืองาน..." value="'+esc(UI.searchQuery)+'" '+inp("searchChange")+'>'
+    + (UI.showSearchResults ? (
+        '<div class="popover" style="top:40px;left:0;right:0;max-height:300px;overflow-y:auto">'
+        + (results.length ? results.map(function(r){
+            return '<button class="row-btn" style="border-radius:10px;padding:8px 10px" '+r.act+'>'
+              + '<span style="font-size:13px;font-weight:600;display:block">'+esc(r.title)+'</span>'
+              + '<span style="display:block;font-size:11px;opacity:0.6">'+esc(r.sub)+'</span></button>';
+          }).join("") : '<p style="font-size:13px;opacity:0.6;padding:8px;margin:0">ไม่พบผลลัพธ์</p>')
+        + '</div>'
+      ) : '')
+    + '</div>'
+    + '<div style="margin-left:auto;display:flex;align-items:center;gap:10px">'
+    + '<div style="display:flex;align-items:center;gap:8px;background:var(--color-surface);border-radius:999px;padding:7px 14px;font-size:12px">'
+    + '<i data-lucide="calendar-days" class="ic" style="color:var(--color-accent)"></i>'
+    + '<span style="font-weight:600">'+TODAY.getDate()+' '+TH_MON[TODAY.getMonth()].slice(0,3)+' '+TODAY.getFullYear()+'</span>'
+    + '<span class="muted" id="liveClock">· '+clockLabel()+'</span></div>'
+    + '<div style="position:relative">'
+    + '<button class="btn btn-secondary btn-icon" '+act("toggleBell")+'><i data-lucide="bell" class="ic"></i>'
+    + (unread ? '<span style="position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--color-accent)"></span>' : '')
+    + '</button>'
+    + (UI.showBell ? renderNotifPanel() : '')
+    + '</div>'
+    + '<div style="position:relative">'
+    + '<button class="btn btn-primary" '+act("toggleCreateMenu")+'><i data-lucide="plus" class="ic"></i>สร้างใหม่</button>'
+    + (UI.showCreateMenu ? (
+        '<div class="popover" style="right:0;top:42px;width:190px;display:flex;flex-direction:column;gap:2px">'
+        + '<button class="navbtn" '+act("openNewProject")+'><i data-lucide="folder-plus" class="ic"></i>Project ใหม่</button>'
+        + '<button class="navbtn" '+act("openNewTask")+'><i data-lucide="square-plus" class="ic"></i>Task ใหม่</button>'
+        + '<button class="navbtn" '+act("openNewMilestone")+'><i data-lucide="flag" class="ic"></i>Milestone ใหม่</button>'
+        + '</div>'
+      ) : '')
+    + '</div></div></header>';
+}
+function renderNotifPanel(){
+  return '<div class="popover" style="right:0;top:42px;width:300px">'
+    + '<div class="flex-between" style="padding:2px 4px 8px"><h5 style="margin:0">การแจ้งเตือน</h5><button class="btn btn-ghost" style="font-size:12px;padding:0" '+act("markAllRead")+'>อ่านทั้งหมด</button></div>'
+    + '<div style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">'
+    + DATA.notifications.map(function(n){
+        return '<div style="padding:8px 10px;border-radius:10px;background:'+(n.read?"transparent":"var(--color-accent-100)")+'">'
+          + '<p style="margin:0;font-size:12.5px">'+esc(n.text)+'</p>'
+          + '<p style="margin:2px 0 0;font-size:10.5px;opacity:0.55">'+esc(n.at)+'</p></div>';
+      }).join("")
+    + '</div></div>';
+}
+
+function renderView(){
+  switch (UI.view) {
+    case "dashboard": return viewDashboard();
+    case "today": return viewToday();
+    case "weekly": return viewWeekly();
+    case "mytasks": return viewMyTasks();
+    case "projects": return UI.openProjectId ? viewProjectDetail() : viewProjectsGrid();
+    case "timeline": return viewTimeline();
+    case "calendar": return viewCalendar();
+    case "kanban": return viewKanban();
+    case "team": return viewTeam();
+    case "reports": return viewReports();
+    case "management": return viewManagement();
+    case "settings": return viewSettings();
+    default: return "";
+  }
+}
+
+/* ═══════════════════════════════ shared bits ═══════════════════════════════ */
+function taskRowHtml(row){
+  return '<div class="task-row">'
+    + '<button class="task-check" data-stop="1" style="background:'+(row.completed?"var(--color-accent-2)":"transparent")+'" '+act("toggleDone",{id:row.id})+'>'+(row.completed?"✓":"")+'</button>'
+    + '<button class="row-btn" style="flex:1;min-width:0" '+act("openTask",{id:row.id})+'>'
+    + '<p class="ellip" style="margin:0;font-size:13px;'+(row.completed?"text-decoration:line-through;opacity:0.5":"")+'">'+esc(row.name)+'</p>'
+    + '<p style="margin:2px 0 0;font-size:11px;opacity:0.6">'+esc(row.projectName)+(row.dept?(' · '+esc(row.dept)):'')+'</p>'
+    + '</button>'
+    + '<span class="avatar avatar-sm" style="background:'+row.ownerTone+'">'+esc(row.ownerInitials)+'</span>'
+    + '<span class="task-bar-mini progress-track"><span class="progress-fill" style="width:'+row.progress+'%;background:'+row.barColor+'"></span></span>'
+    + '<span style="font-size:11px;width:88px;text-align:right;'+row.overdueStyle+'">'+esc(row.dueLabel)+'</span>'
+    + (row.orderCtx ? (
+        '<span class="task-order" data-stop="1">'
+        + '<button '+act("reorderUp",{})+'>▲</button><button '+act("reorderDown",{})+'>▼</button></span>'
+      ) : '')
+    + '<button class="btn btn-ghost" data-stop="1" style="color:var(--color-accent-700)" '+act("askDeleteTask",{id:row.id})+'><i data-lucide="trash-2" class="ic"></i></button>'
+    + '</div>';
+}
+function statCard(label, value, sub, color){
+  return '<div class="card elev"><span class="kicker">'+esc(label)+'</span><span class="stat-value" style="color:'+(color||"inherit")+'">'+value+'</span><span class="stat-sub">'+esc(sub||"")+'</span></div>';
+}
+function emptyMsg(text){ return '<p style="font-size:13px;opacity:0.55;text-align:center;padding:16px 0">'+esc(text)+'</p>'; }
+
+/* ═══════════════════════════════ Dashboard ═══════════════════════════════ */
+function viewDashboard(){
+  var me = userById(UI.currentUserId);
+  var open = DATA.tasks.filter(isOpenT);
+  var stats = { today: open.filter(function(t){return t.due===iso(TODAY);}).length, overdue: DATA.tasks.filter(isOverdue).length };
+  var mon = mondayOf(TODAY), sun = addDays(mon,6);
+  var wk = DATA.tasks.filter(function(t){ return D(t.due)>=mon && D(t.due)<=sun && t.status!=="CANCELLED"; });
+  var wkDone = wk.filter(function(t){return t.status==="COMPLETED";}).length;
+
+  var dashProjects = DATA.projects.filter(function(p){return p.status!=="COMPLETED";}).map(function(p){
+    var h = health(p);
+    return '<button class="row-btn" '+act("openProject",{id:p.id})+'>'
+      + '<div class="flex-between" style="font-size:13.5px"><span style="font-weight:600">'+esc(p.name)+'</span><span>'+autoProgress(p)+'%</span></div>'
+      + '<div class="progress-track" style="margin-top:4px"><div class="progress-fill" style="width:'+autoProgress(p)+'%;background:'+(h==="RED"?"var(--color-accent-700)":h==="YELLOW"?"var(--color-neutral-600)":"var(--color-accent-2)")+'"></div></div>'
+      + '<p style="margin:4px 0 0;font-size:11px;opacity:0.6">'+healthLabel(h)+' · Deadline '+fmt(p.due)+' · '+esc(userById(p.ownerId).name)+'</p></button>';
+  }).join("") || emptyMsg("ยังไม่มีโครงการ");
+
+  var upcoming = DATA.tasks.filter(function(t){return isOpenT(t) && dueIn(t)>=0;}).sort(function(a,b){return D(a.due)-D(b.due);}).slice(0,6).map(function(t){
+    var d = D(t.due);
+    return '<button class="row-btn" style="display:flex;gap:10px" '+act("openTask",{id:t.id})+'>'
+      + '<div style="width:42px;flex:none;text-align:center;background:var(--color-neutral-200);border-radius:10px;padding:4px 0">'
+      + '<div style="font-weight:700;font-size:13px">'+d.getDate()+'</div><div style="font-size:10px;opacity:0.6">'+MON[d.getMonth()]+'</div></div>'
+      + '<div style="min-width:0"><p class="ellip" style="margin:0;font-size:13px">'+esc(t.name)+'</p>'
+      + '<p style="margin:2px 0 0;font-size:11px;opacity:0.6">'+esc(userById(t.ownerId).name)+' · '+esc(t.dept)+'</p></div></button>';
+  }).join("") || emptyMsg("ไม่มีงานใกล้ครบกำหนด");
+
+  var overdueList = DATA.tasks.filter(isOverdue).map(function(t){ return taskRowHtml(taskRow(t)); }).join("");
+
+  return '<div style="display:flex;flex-direction:column;gap:16px">'
+    + '<div><h2>สวัสดี '+esc(me.name)+'</h2><p class="muted">'+thaiDate(TODAY)+' — มี '+stats.today+' งานครบกำหนดวันนี้ และ '+stats.overdue+' งานเลยกำหนด</p></div>'
+    + '<div class="grid-cards">'
+    + statCard("Active Projects", DATA.projects.filter(function(p){return p.status==="IN PROGRESS";}).length, "จาก "+DATA.projects.length+" โครงการ")
+    + statCard("Projects Completed", DATA.projects.filter(function(p){return p.status==="COMPLETED";}).length, "", "var(--color-accent-2)")
+    + statCard("Projects Delayed", DATA.projects.filter(function(p){return health(p)==="RED" && p.status!=="COMPLETED";}).length, "ต้องการการช่วยเหลือ", "var(--color-accent-700)")
+    + statCard("Tasks ทั้งหมด", DATA.tasks.length, "เสร็จแล้ว "+DATA.tasks.filter(function(t){return t.status==="COMPLETED";}).length)
+    + '</div>'
+    + '<div class="card elev" style="flex-direction:row;align-items:center;gap:16px;flex-wrap:wrap">'
+    + '<i data-lucide="list-checks" class="ic" style="width:20px;height:20px;color:var(--color-accent)"></i>'
+    + '<div style="flex:1;min-width:200px"><p style="margin:0;font-weight:700;font-size:14px">TODO สัปดาห์นี้ · '+mon.getDate()+' – '+sun.getDate()+' '+TH_MON[sun.getMonth()]+'</p>'
+    + '<p style="margin:2px 0 0;font-size:12px;opacity:0.65">ต้องปิดจบ '+wk.length+' งาน · เสร็จแล้ว '+wkDone+' · เหลือ '+(wk.length-wkDone)+'</p></div>'
+    + '<div style="width:150px" class="progress-track"><div class="progress-fill" style="width:'+pctFn(wkDone,wk.length)+'%;background:var(--color-accent-2)"></div></div>'
+    + '<button class="btn btn-secondary" '+act("goWeekly")+'>เปิด Weekly TODO</button></div>'
+    + '<div class="grid-2">'
+    + '<div class="card elev"><div class="flex-between"><h5>Project Progress</h5><button class="btn btn-ghost" '+act("goProjects")+'>ดูทั้งหมด</button></div>'+dashProjects+'</div>'
+    + '<div class="card elev"><h5>Upcoming Deadline</h5>'+upcoming+'</div>'
+    + '</div>'
+    + '<div class="card elev"><div class="flex-between"><h5>งานที่เลยกำหนด</h5><span class="tag tag-accent">'+stats.overdue+' รายการ</span></div>'
+    + (overdueList ? '<div style="border:1px solid var(--color-divider);border-radius:14px;overflow:hidden">'+overdueList+'</div>' : emptyMsg("ไม่มีงานค้าง ทีมทำงานตามแผนทั้งหมด"))
+    + '</div></div>';
+}
+
+/* ═══════════════════════════════ Today ═══════════════════════════════ */
+function viewToday(){
+  var me = userById(UI.currentUserId);
+  var mine = DATA.tasks.filter(function(t){return t.ownerId===UI.currentUserId;});
+  var open = mine.filter(isOpenT);
+  var todayList = open.filter(function(t){return t.due===iso(TODAY);});
+  var lateList = mine.filter(isOverdue);
+  var soonList = open.filter(function(t){return dueIn(t)>0 && dueIn(t)<=5;});
+  var myProjects = DATA.projects.filter(function(p){return p.team.indexOf(UI.currentUserId)>=0 && p.status!=="COMPLETED";});
+  var followUps = DATA.tasks.filter(function(t){return t.name.toLowerCase().indexOf("follow")>=0 || t.status==="REVIEW" || t.status==="BLOCKED";});
+
+  function section(title, count, list, emptyText){
+    return '<div class="flex-between" style="margin-top:8px"><h5 style="margin:0">'+title+'</h5><span style="font-size:11.5px;opacity:0.6">'+count+' งาน</span></div>'
+      + (list.length ? '<div style="border:1px solid var(--color-divider);border-radius:14px;overflow:hidden">'+list.map(function(t){return taskRowHtml(taskRow(t));}).join("")+'</div>' : emptyMsg(emptyText));
+  }
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<div><h2>TODAY — '+thaiDate(TODAY)+'</h2><p class="muted">งานประจำวันของ '+esc(me.name)+' · '+esc(me.dept)+'</p></div>'
+    + '<div class="grid-2">'
+    + '<div class="card elev">'
+    + section("งานวันนี้", todayList.length, todayList, "วันนี้ไม่มีงานครบกำหนด")
+    + section("งานค้าง", lateList.length, lateList, "ไม่มีงานค้าง")
+    + section("ใกล้ Deadline (5 วัน)", soonList.length, soonList, "ยังไม่มีงานที่ใกล้ครบกำหนด")
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="card elev"><h5>Project ที่รับผิดชอบ</h5>'
+    + (myProjects.length ? myProjects.map(function(p){
+        return '<button class="row-btn" '+act("openProject",{id:p.id})+'><p class="ellip" style="margin:0;font-size:13px;font-weight:600">'+esc(p.name)+'</p>'
+          + '<div class="progress-track" style="margin-top:4px"><div class="progress-fill" style="width:'+autoProgress(p)+'%;background:var(--color-accent)"></div></div>'
+          + '<p style="margin:4px 0 0;font-size:11px;opacity:0.6">'+healthLabel(health(p))+' · '+fmt(p.due)+'</p></button>';
+      }).join("") : emptyMsg("ไม่มีโครงการที่รับผิดชอบ"))
+    + '</div>'
+    + '<div class="card elev"><h5>ต้อง Follow-up</h5>'
+    + (followUps.length ? followUps.map(function(t){
+        return '<button class="row-btn" style="display:flex;align-items:center;gap:8px" '+act("openTask",{id:t.id})+'>'
+          + '<span class="tag" style="'+(t.status==="BLOCKED"?"background:var(--color-accent-100);color:var(--color-accent-800)":"background:var(--color-neutral-100);color:var(--color-neutral-800)")+'">'+t.status+'</span>'
+          + '<span class="ellip" style="font-size:12.5px">'+esc(t.name)+'</span></button>';
+      }).join("") : emptyMsg("ไม่มีงานต้องติดตาม"))
+    + '</div></div></div></div>';
+}
+
+/* ═══════════════════════════════ Weekly TODO ═══════════════════════════════ */
+function viewWeekly(){
+  var offset = UI.weekOffset;
+  var mon = addDays(mondayOf(TODAY), offset*7), sun = addDays(mon,6);
+  var days = []; for (var i=0;i<7;i++) days.push(addDays(mon,i));
+  function inWeek(ds){ var d=D(ds); return d>=mon && d<=sun; }
+  var pool = DATA.tasks.filter(function(t){ return (UI.weekScope==="ทั้งทีม" || t.ownerId===UI.currentUserId) && t.status!=="CANCELLED"; });
+  var finish = pool.filter(function(t){return inWeek(t.due);});
+  var startOnly = pool.filter(function(t){return inWeek(t.start) && !inWeek(t.due) && D(t.due)>sun;});
+  var bothInWeek = finish.filter(function(t){return inWeek(t.start);});
+  var carryList = pool.filter(function(t){return isOpenT(t) && D(t.due)<mon;});
+  var doneCount = finish.filter(function(t){return t.status==="COMPLETED";}).length;
+  var msWeek = DATA.milestones.filter(function(m){return inWeek(m.date);});
+  var label = offset===0?"สัปดาห์นี้":offset===1?"สัปดาห์หน้า":offset===-1?"สัปดาห์ที่แล้ว":("อีก "+offset+" สัปดาห์");
+
+  var outlook = [0,1,2,3].map(function(i){
+    var a = addDays(mondayOf(TODAY), i*7), b = addDays(a,6);
+    var list = pool.filter(function(t){ var d=D(t.due); return d>=a && d<=b; });
+    var done = list.filter(function(t){return t.status==="COMPLETED";}).length;
+    return '<button class="row-btn" style="'+(offset===i?"font-weight:700;color:var(--color-accent-700)":"")+'" '+act("weekJump",{i:i})+'>'
+      + (i===0?"สัปดาห์นี้":"สัปดาห์ +"+i)+' · '+a.getDate()+'–'+b.getDate()+' '+TH_MON[b.getMonth()]+' — '+done+'/'+list.length+'</button>';
+  }).join("");
+
+  var weekDays = days.map(function(d){
+    var ds = iso(d);
+    var items = [];
+    msWeek.filter(function(m){return m.date===ds;}).forEach(function(m){ items.push('<div class="tag" style="background:var(--color-neutral-800);color:#fff;display:block;margin-bottom:3px">◆ '+esc(m.name)+'</div>'); });
+    finish.filter(function(t){return t.due===ds;}).forEach(function(t){
+      items.push('<button class="row-btn" style="background:'+(t.status==="COMPLETED"?"var(--color-accent-2-100)":isOverdue(t)?"var(--color-accent-100)":"var(--color-bg)")+';border-radius:8px;padding:4px 6px;margin-bottom:3px;font-size:11px;'+(t.status==="COMPLETED"?"text-decoration:line-through;opacity:0.6":"")+'" '+act("openTask",{id:t.id})+'>'+esc(t.name)+'</button>');
+    });
+    pool.filter(function(t){return t.start===ds && t.due!==ds;}).forEach(function(t){
+      items.push('<button class="row-btn" style="background:var(--color-accent-2-100);color:var(--color-accent-2-800);border-radius:8px;padding:4px 6px;margin-bottom:3px;font-size:11px" '+act("openTask",{id:t.id})+'>เริ่ม: '+esc(t.name)+'</button>');
+    });
+    return '<div style="background:'+(ds===iso(TODAY)?"var(--color-accent-100)":(d.getDay()===0||d.getDay()===6)?"var(--color-neutral-100)":"var(--color-surface)")+';border-radius:12px;padding:8px;min-height:120px">'
+      + '<p style="margin:0 0 6px;font-size:11px;font-weight:700">'+TH_DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]+'</p>'
+      + (items.join("") || '<p style="font-size:10.5px;opacity:0.4;margin:0">—</p>') + '</div>';
+  }).join("");
+
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<div class="flex-between wrap gap-8"><div><h2>Weekly TODO</h2><p class="muted">'+label+' · สัปดาห์ที่ '+weekOfMonth(mon)+' ของ'+TH_MON[mon.getMonth()]+' · '+mon.getDate()+' '+TH_MON[mon.getMonth()]+' – '+sun.getDate()+' '+TH_MON[sun.getMonth()]+' '+sun.getFullYear()+'</p></div>'
+    + '<div class="flex gap-8">'
+    + '<div class="seg" style="display:flex;border:1px solid var(--color-divider);border-radius:999px;overflow:hidden">'
+    + '<button class="btn" style="border-radius:0;'+(UI.weekScope==="ทั้งทีม"?"background:var(--color-accent);color:#fff":"")+'" '+act("weekScopeTeam")+'>ทั้งทีม</button>'
+    + '<button class="btn" style="border-radius:0;'+(UI.weekScope==="เฉพาะฉัน"?"background:var(--color-accent);color:#fff":"")+'" '+act("weekScopeMe")+'>เฉพาะฉัน</button></div>'
+    + '<button class="btn btn-secondary" '+act("weekPrev")+'>‹</button><button class="btn btn-secondary" '+act("weekThis")+'>วันนี้</button><button class="btn btn-secondary" '+act("weekNext")+'>›</button>'
+    + '</div></div>'
+    + '<div class="grid-cards">'
+    + statCard("ต้องปิดจบ", finish.length, "")
+    + statCard("เกิดและจบในสัปดาห์นี้", bothInWeek.length, "", "var(--color-accent-700)")
+    + statCard("เริ่มสัปดาห์นี้", startOnly.length, "", "var(--color-accent-2-700)")
+    + statCard("เสร็จแล้ว", doneCount, "", "var(--color-accent-2)")
+    + statCard("ค้างยกมา", carryList.length, "", "var(--color-accent-700)")
+    + '</div>'
+    + (carryList.length ? ('<div class="card elev"><h5 style="color:var(--color-accent-700)">งานค้างยกมา ('+carryList.length+')</h5>'+carryList.map(function(t){return taskRowHtml(taskRow(t));}).join("")+'</div>') : '')
+    + '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px" class="wk-cal">'+weekDays+'</div>'
+    + '<div class="card elev"><h5>แนวโน้ม 4 สัปดาห์</h5>'+outlook+'</div>'
+    + '</div>';
+}
+
+/* ═══════════════════════════════ My Tasks ═══════════════════════════════ */
+function viewMyTasks(){
+  var mine = DATA.tasks.filter(function(t){return t.ownerId===UI.currentUserId;});
+  function group(label, list){
+    return '<div class="card elev"><div class="flex-between"><h5>'+label+'</h5><span class="tag tag-neutral">'+list.length+'</span></div>'
+      + (list.length ? list.map(function(t){return taskRowHtml(taskRow(t));}).join("") : emptyMsg("ไม่มีรายการ")) + '</div>';
+  }
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<div class="flex-between"><div><h2>My Tasks</h2><p class="muted">งานทั้งหมดของฉัน · '+mine.length+' รายการ</p></div>'
+    + '<button class="btn btn-primary" '+act("openNewTask",{})+'><i data-lucide="plus" class="ic"></i>Task ใหม่</button></div>'
+    + group("TODAY", mine.filter(function(t){return isOpenT(t) && t.due===iso(TODAY);}))
+    + group("OVERDUE", mine.filter(isOverdue))
+    + group("THIS WEEK", mine.filter(function(t){return isOpenT(t) && dueIn(t)>0 && dueIn(t)<=7;}))
+    + group("UPCOMING", mine.filter(function(t){return isOpenT(t) && dueIn(t)>7;}))
+    + group("COMPLETED", mine.filter(function(t){return t.status==="COMPLETED";}))
+    + '</div>';
+}
+
+/* ═══════════════════════════════ Projects grid ═══════════════════════════════ */
+function filteredProjects(){
+  return DATA.projects.filter(function(p){
+    return (UI.filters.dept==="ทั้งหมด"||p.dept===UI.filters.dept)
+      && (UI.filters.category==="ทั้งหมด"||p.category===UI.filters.category)
+      && (UI.filters.status==="ทั้งหมด"||p.status===UI.filters.status)
+      && (UI.filters.priority==="ทั้งหมด"||p.priority===UI.filters.priority)
+      && (UI.filters.owner==="ทั้งหมด"||p.ownerId===UI.filters.owner);
+  });
+}
+function selectHtml(opts, cur, changeFn, arg){
+  return '<select class="input" '+chg(changeFn, arg)+'>' + opts.map(function(o){
+    var v = typeof o === "string" ? o : o.id, l = typeof o === "string" ? o : o.name;
+    return '<option value="'+esc(v)+'" '+(v===cur?"selected":"")+'>'+esc(l)+'</option>';
+  }).join("") + '</select>';
+}
+function viewProjectsGrid(){
+  var filtered = filteredProjects();
+  var PRIO_ORDER = {URGENT:0,HIGH:1,MEDIUM:2,LOW:3};
+  var sorted = filtered.slice().sort(function(a,b){
+    if (UI.projSort==="priority") return (PRIO_ORDER[a.priority]-PRIO_ORDER[b.priority]) || (D(a.due)-D(b.due));
+    if (UI.projSort==="due") return D(a.due)-D(b.due);
+    if (UI.projSort==="progress") return autoProgress(b)-autoProgress(a);
+    return a.name.localeCompare(b.name,"th");
+  });
+  var cards = sorted.map(function(p){
+    var h = health(p); var ts = taskOf(p.id); var prog = autoProgress(p);
+    return '<div class="card elev" style="cursor:pointer" '+act("openProject",{id:p.id})+'>'
+      + '<div class="flex-between"><span class="tag tag-outline">'+esc(p.category)+'</span>'
+      + '<button class="btn btn-ghost" data-stop="1" style="color:var(--color-accent-700)" '+act("askDeleteProject",{id:p.id})+'><i data-lucide="trash-2" class="ic"></i></button></div>'
+      + '<h4 class="ellip">'+esc(p.name)+'</h4>'
+      + '<div class="flex gap-8 wrap"><span class="tag" style="'+statusStyle(p.status)+'">'+p.status+'</span><span class="tag" style="'+healthStyle(h)+'">'+healthLabel(h)+'</span></div>'
+      + '<div class="progress-track"><div class="progress-fill" style="width:'+prog+'%;background:'+(h==="RED"?"var(--color-accent-700)":h==="YELLOW"?"var(--color-accent-600)":"var(--color-accent-2)")+'"></div></div>'
+      + '<div class="flex-between" style="font-size:11px;opacity:0.7"><span style="'+(diffDays(TODAY,D(p.due))<0 && p.status!=="COMPLETED"?"color:var(--color-accent-700)":"")+'">Deadline '+fmt(p.due)+'</span><span>'+ts.filter(function(t){return t.status==="COMPLETED";}).length+'/'+ts.length+' Task เสร็จแล้ว</span></div>'
+      + '<p style="margin:0;font-size:11.5px;opacity:0.7">Owner: '+esc(userById(p.ownerId).name)+'</p>'
+      + '</div>';
+  }).join("") || emptyMsg("ไม่พบโครงการตามเงื่อนไข");
+
+  var prioPanel = UI.showPrioPanel ? (
+    '<div class="popover" style="right:0;top:44px;width:320px;max-height:340px;overflow-y:auto">'
+    + DATA.projects.map(function(p){
+        return '<div style="padding:6px 8px;border-bottom:1px solid var(--color-divider)"><p style="margin:0;font-size:12.5px;font-weight:600" class="ellip">'+esc(p.name)+'</p>'
+          + '<div class="flex gap-8" style="margin-top:4px">' + PRIORITY_BTNS(p) + '</div></div>';
+      }).join("") + '</div>'
+  ) : "";
+
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<div class="flex-between wrap gap-8"><div><h2>Projects</h2><p class="muted">ทั้งหมด '+filtered.length+' โครงการ</p></div>'
+    + '<div class="flex gap-8" style="position:relative">'
+    + selectHtml([{id:"priority",name:"เรียงตาม Priority"},{id:"due",name:"เรียงตาม Deadline"},{id:"progress",name:"เรียงตามความคืบหน้า"},{id:"name",name:"เรียงตามชื่อ"}], UI.projSort, "setProjSort")
+    + '<button class="btn btn-secondary" '+act("togglePrioPanel")+'>ปรับ Priority</button>'
+    + prioPanel
+    + '<button class="btn btn-primary" '+act("openNewProject")+'><i data-lucide="plus" class="ic"></i>Project ใหม่</button>'
+    + '</div></div>'
+    + '<div class="card elev"><div class="flex wrap gap-8">'
+    + filterSelect("dept", DATA.options.departments)
+    + filterSelect("category", DATA.options.categories)
+    + filterSelect("status", DATA.options.pstatusOptions)
+    + filterSelect("priority", DATA.options.priorityOptions)
+    + filterSelect("owner", DATA.users)
+    + '<button class="btn btn-ghost" '+act("clearFilters")+'>ล้างตัวกรอง</button>'
+    + '</div></div>'
+    + '<div class="grid-cards" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">'+cards+'</div>'
+    + '</div>';
+}
+function PRIORITY_BTNS(p){
+  return ["LOW","MEDIUM","HIGH","URGENT"].map(function(pr){
+    return '<button class="btn" style="font-size:11px;padding:4px 10px;'+(p.priority===pr?"background:var(--color-accent);color:#fff":"border:1px solid var(--color-divider)")+'" '+act("setProjectPriority",{id:p.id, val:pr})+'>'+pr+'</button>';
+  }).join("");
+}
+function filterSelect(key, list){
+  var opts = ["ทั้งหมด"].concat(key==="owner" ? list.map(function(u){return u.id;}) : list);
+  var labelOf = function(v){ return key==="owner" ? (v==="ทั้งหมด"?"ทั้งหมด":userById(v).name) : v; };
+  return '<select class="input" style="width:auto" '+chg("setFilter",{key:key})+'>' + opts.map(function(v){
+    return '<option value="'+esc(v)+'" '+(UI.filters[key]===v?"selected":"")+'>'+esc(labelOf(v))+'</option>';
+  }).join("") + '</select>';
+}
+
+/* ═══════════════════════════════ Project detail ═══════════════════════════════ */
+function viewProjectDetail(){
+  var p = projById(UI.openProjectId);
+  if (!p) { UI.openProjectId=null; return viewProjectsGrid(); }
+  var h = health(p); var ts = taskOf(p.id); var ms = DATA.milestones.filter(function(m){return m.projectId===p.id;});
+  var acts = DATA.activity.filter(function(a){return a.projectId===p.id;});
+  var prog = autoProgress(p); var left = diffDays(TODAY, D(p.due)); var spent = p.actualCost||0;
+  var TABS = [["overview","ภาพรวม"],["tasks","Task ("+ts.length+")"],["timeline","Timeline"],["milestone","Milestone ("+ms.length+")"],["activity","Activity"],["budget","Budget"]];
+  var tab = UI.projectTab;
+
+  var tabsHtml = TABS.map(function(tt){
+    return '<button class="btn" style="border-radius:0;border-bottom:2px solid '+(tab===tt[0]?"var(--color-accent)":"transparent")+';color:'+(tab===tt[0]?"var(--color-accent-700)":"var(--color-text)")+'" '+act("pdSetTab",{tab:tt[0]})+'>'+tt[1]+'</button>';
+  }).join("");
+
+  var body = "";
+  if (tab === "overview") body = pdOverview(p,h,ts,ms,prog,left);
+  else if (tab === "tasks") body = pdTasks(p, ts);
+  else if (tab === "timeline") body = pdTimeline(p, ts);
+  else if (tab === "milestone") body = pdMilestones(p, ms);
+  else if (tab === "activity") body = pdActivity(acts);
+  else if (tab === "budget") body = pdBudget(p, ts, spent);
+
+  return '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<button class="btn btn-ghost" '+act("closeProjectDetail")+'><i data-lucide="arrow-left" class="ic"></i>กลับไปหน้า Projects</button>'
+    + '<div class="card elev">'
+    + '<div class="flex-between wrap gap-8">'
+    + '<div style="flex:1;min-width:220px">'
+    + '<input class="input" style="font-family:var(--font-heading);font-size:20px;border:none;background:transparent;padding:0" value="'+esc(p.name)+'" '+chg("patchProject",{field:"name"})+'>'
+    + '<p style="margin:4px 0 0;font-size:11px;opacity:0.6">'+esc(p.id)+'</p>'
+    + '</div>'
+    + '<div class="flex gap-8 wrap">'
+    + '<span class="tag" style="'+statusStyle(p.status)+'">'+p.status+'</span>'
+    + '<span class="tag" style="'+healthStyle(h)+'">'+healthLabel(h)+'</span>'
+    + '<button class="btn btn-ghost" style="color:var(--color-accent-700)" '+act("pdDelete")+'><i data-lucide="trash-2" class="ic"></i>ลบโครงการ</button>'
+    + '</div></div>'
+    + '<textarea class="input" style="margin-top:8px" '+chg("patchProject",{field:"desc"})+'>'+esc(p.desc)+'</textarea>'
+    + '</div>'
+    + '<div class="flex gap-8 wrap" style="border-bottom:1px solid var(--color-divider)">'+tabsHtml+'</div>'
+    + body
+    + '</div>';
+}
+function fieldSelectInline(label, val, opts, field){
+  return '<div class="field"><label>'+label+'</label>' + selectHtml(opts, val, "patchProject", {field:field}) + '</div>';
+}
+function pdOverview(p,h,ts,ms,prog,left){
+  var doneCount = ts.filter(function(t){return t.status==="COMPLETED";}).length;
+  return '<div class="grid-2">'
+    + '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="card elev">'
+    + '<div class="grid-cards">'
+    + statCard("ความคืบหน้า", prog+"%", doneCount+"/"+ts.length+" Task เสร็จ", h==="RED"?"var(--color-accent-700)":h==="YELLOW"?"var(--color-accent-600)":"var(--color-accent-2)")
+    + statCard("วันคงเหลือ", left>=0?left:("-"+(-left)), left>=0?"วัน ถึง Deadline":"เกินกำหนด", left<0?"var(--color-accent-700)":"inherit")
+    + statCard("งบประมาณ", "฿"+baht(p.budget), "ใช้ไป ฿"+baht(p.actualCost))
+    + statCard("ทีมงาน", p.team.length, "คนในโครงการ")
+    + '</div></div>'
+    + '<div class="card elev"><h5>Task ล่าสุด</h5>' + (ts.slice(0,6).map(function(t){return taskRowHtml(taskRow(t));}).join("") || emptyMsg("ยังไม่มี Task")) + '</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="card elev">'
+    + fieldSelectInline("Category", p.category, DATA.options.categories, "category")
+    + fieldSelectInline("แผนก", p.dept, DATA.options.departments, "dept")
+    + fieldSelectInline("Priority", p.priority, DATA.options.priorityOptions, "priority")
+    + fieldSelectInline("สถานะ", p.status, DATA.options.pstatusOptions, "status")
+    + fieldSelectInline("Owner", p.ownerId, DATA.users, "ownerId")
+    + '<div class="field"><label>เริ่มต้น</label><input class="input" type="date" value="'+p.start+'" '+chg("patchProject",{field:"start"})+'></div>'
+    + '<div class="field"><label>Deadline</label><input class="input" type="date" value="'+p.due+'" '+chg("patchProject",{field:"due"})+'></div>'
+    + '<div class="field"><label>งบประมาณ</label><input class="input" type="number" value="'+p.budget+'" '+chg("patchProject",{field:"budget"})+'></div>'
+    + '<div class="field"><label>ใช้ไปจริง</label><input class="input" type="number" value="'+p.actualCost+'" '+chg("patchProject",{field:"actualCost"})+'></div>'
+    + '<div class="field"><label>โน้ต</label><textarea class="input" '+chg("patchProject",{field:"note"})+'>'+esc(p.note||"")+'</textarea></div>'
+    + '</div>'
+    + '<div class="card elev"><h5>ทีมงาน</h5><div class="flex gap-8 wrap">' + DATA.users.map(function(u){
+        var inTeam = p.team.indexOf(u.id)>=0;
+        return '<button class="btn" style="'+(inTeam?"background:var(--color-accent-100);color:var(--color-accent-800)":"border:1px solid var(--color-divider)")+'" '+act("pdToggleTeam",{uid:u.id})+'>'+esc(u.name)+(u.id===p.ownerId?" (Owner)":"")+'</button>';
+      }).join("") + '</div></div>'
+    + '<div class="card elev"><div class="flex-between"><h5>Milestone ที่ใกล้ถึง</h5></div>' + (ms.filter(function(m){return !m.done;}).slice(0,3).map(function(m){
+        return '<p style="margin:4px 0;font-size:12.5px">◆ '+esc(m.name)+' — '+fmt(m.date)+'</p>';
+      }).join("") || emptyMsg("ไม่มี Milestone ที่ค้าง")) + '</div>'
+    + '</div></div>';
+}
+function pdTasks(p, ts){
+  return '<div style="display:flex;flex-direction:column;gap:10px">'
+    + '<div class="flex-between"><h5 style="margin:0">Task ทั้งหมด</h5><button class="btn btn-primary" '+act("pdAddTask")+'><i data-lucide="plus" class="ic"></i>Task ใหม่</button></div>'
+    + '<div class="card elev" style="padding:0;overflow:hidden">' + (ts.length ? ts.map(function(t){return taskRowHtml(taskRow(t));}).join("") : emptyMsg("ยังไม่มี Task ในโครงการนี้")) + '</div>'
+    + '</div>';
+}
+function pdTimeline(p, ts){
+  if (!ts.length) return emptyMsg("ยังไม่มี Task สำหรับแสดง Timeline");
+  var gStart = new Date(Math.min.apply(null, ts.map(function(t){return D(t.start).getTime();})));
+  var gEnd = new Date(Math.max.apply(null, ts.map(function(t){return D(t.due).getTime();})));
+  var span = Math.max(1, diffDays(gStart,gEnd)+2);
+  return '<div class="card elev">' + ts.map(function(t){
+    var od = isOverdue(t);
+    var left = (diffDays(gStart, D(t.start))/span)*100;
+    var width = Math.max(3, ((diffDays(D(t.start),D(t.due))+1)/span)*100);
+    var color = od?"var(--color-accent-700)":t.status==="COMPLETED"?"var(--color-accent-2)":t.status==="TODO"?"var(--color-neutral-400)":"var(--color-accent)";
+    return '<div class="gantt-row"><button class="row-btn ellip" '+act("openTask",{id:t.id})+'>'+esc(t.name)+'</button>'
+      + '<div class="gantt-track"><div class="gantt-bar" style="left:'+left+'%;width:'+width+'%;background:'+color+'" title="'+fmt(t.start)+'–'+fmt(t.due)+'"></div></div></div>';
+  }).join("") + '</div>';
+}
+function pdMilestones(p, ms){
+  return '<div style="display:flex;flex-direction:column;gap:10px">'
+    + '<div class="flex-between"><h5 style="margin:0">Milestone</h5><button class="btn btn-primary" '+act("pdAddMilestone")+'><i data-lucide="plus" class="ic"></i>Milestone ใหม่</button></div>'
+    + '<div class="card elev">' + (ms.length ? ms.map(function(m){
+        return '<div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--color-divider)">'
+          + '<button class="row-btn" style="display:flex;align-items:center;gap:8px;flex:1" '+act("pdToggleMilestone",{id:m.id})+'>'
+          + '<span style="width:14px;height:14px;border-radius:50%;border:1.5px solid var(--color-neutral-400);background:'+(m.done?"var(--color-accent-2)":"transparent")+'"></span>'
+          + '<span style="'+(m.done?"text-decoration:line-through;opacity:0.5":"")+'">'+esc(m.name)+' — '+fmtFull(m.date)+'</span></button>'
+          + '<button class="btn btn-ghost" style="color:var(--color-accent-700)" '+act("askDeleteMilestone",{id:m.id})+'><i data-lucide="trash-2" class="ic"></i></button></div>';
+      }).join("") : emptyMsg("ยังไม่มี Milestone")) + '</div></div>';
+}
+function pdActivity(acts){
+  return '<div class="card elev">' + (acts.length ? acts.map(function(a){
+    var u = userById(a.userId);
+    return '<div class="flex" style="gap:8px;padding:8px 0;border-bottom:1px solid var(--color-divider)">'
+      + '<span class="avatar avatar-sm" style="background:'+u.tone+'">'+esc(u.name.slice(0,2))+'</span>'
+      + '<div><p style="margin:0;font-size:12.5px"><b>'+esc(u.name)+'</b> '+esc(a.text)+'</p><p style="margin:2px 0 0;font-size:10.5px;opacity:0.55">'+esc(a.at)+'</p></div></div>';
+  }).join("") : emptyMsg("ยังไม่มีความเคลื่อนไหว")) + '</div>';
+}
+function pdBudget(p, ts, spent){
+  var planned = ts.reduce(function(s,t){return s+t.estCost;},0);
+  var usedPct = pctFn(spent, p.budget);
+  return '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="grid-cards">'
+    + statCard("งบประมาณ", "฿"+baht(p.budget), "")
+    + statCard("แผนใช้จ่าย", "฿"+baht(planned), "")
+    + statCard("ใช้ไปจริง", "฿"+baht(spent), usedPct+"%", usedPct>90?"var(--color-accent-700)":"var(--color-accent-2)")
+    + statCard("คงเหลือ", "฿"+baht(p.budget-spent), "", (p.budget-spent)<0?"var(--color-accent-700)":"var(--color-accent-2-700)")
+    + '</div>'
+    + '<div class="progress-track" style="height:10px"><div class="progress-fill" style="width:'+Math.min(100,usedPct)+'%;background:'+(usedPct>90?"var(--color-accent-700)":"var(--color-accent-2)")+'"></div></div>'
+    + '<div class="card elev"><h5>ค่าใช้จ่ายรายงาน</h5><table class="simple"><thead><tr><th>Task</th><th>แผน</th><th>ใช้จริง</th></tr></thead><tbody>'
+    + ts.filter(function(t){return t.estCost||t.actualCost;}).map(function(t){
+        return '<tr><td>'+esc(t.name)+'</td><td>฿'+baht(t.estCost)+'</td><td>฿'+baht(t.actualCost)+'</td></tr>';
+      }).join("") + '</tbody></table></div></div>';
+}
+
+/* ═══════════════════════════════ Timeline (all projects) ═══════════════════════════════ */
+function viewTimeline(){
+  var filtered = filteredProjects();
+  if (!filtered.length) return '<h2>Timeline</h2>' + emptyMsg("ไม่มีโครงการ");
+  var gStart = new Date(Math.min.apply(null, filtered.map(function(p){return D(p.start).getTime();})));
+  var gEnd = new Date(Math.max.apply(null, filtered.map(function(p){return D(p.due).getTime();})));
+  var span = Math.max(1, diffDays(gStart,gEnd)+2);
+  var rows = filtered.map(function(p){
+    var h = health(p); var prog = autoProgress(p);
+    var left = (diffDays(gStart, D(p.start))/span)*100;
+    var width = Math.max(4, ((diffDays(D(p.start),D(p.due))+1)/span)*100);
+    var color = h==="RED"?"var(--color-accent-700)":h==="YELLOW"?"var(--color-accent-600)":p.status==="COMPLETED"?"var(--color-accent-2)":"var(--color-accent)";
+    return '<div class="gantt-row"><button class="row-btn ellip" '+act("openProject",{id:p.id})+'>'+esc(p.name)+'</button>'
+      + '<div class="gantt-track"><div class="gantt-bar" style="left:'+left+'%;width:'+width+'%;background:'+color+'" title="'+fmt(p.start)+'–'+fmt(p.due)+' · '+prog+'%"></div></div></div>';
+  }).join("");
+  return '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<h2>Timeline</h2><p class="muted">'+TH_MON[TODAY.getMonth()]+' '+TODAY.getFullYear()+' · วันนี้ '+TODAY.getDate()+' '+MON[TODAY.getMonth()]+'</p>'
+    + '<div class="card elev">'+rows+'</div></div>';
+}
+
+/* ═══════════════════════════════ Calendar ═══════════════════════════════ */
+function viewCalendar(){
+  var cursor = D(UI.calCursor); var y = cursor.getFullYear(), m = cursor.getMonth();
+  var first = new Date(y,m,1); var lastDay = new Date(y,m+1,0).getDate();
+  function eventsOn(date){
+    var ds = iso(date); var out = [];
+    DATA.projects.filter(function(p){return p.start===ds;}).forEach(function(p){ out.push({label:"เริ่ม: "+p.name, bg:"var(--color-accent-2-100)", fg:"var(--color-accent-2-800)", pid:p.id}); });
+    DATA.projects.filter(function(p){return p.due===ds;}).forEach(function(p){ out.push({label:"ส่ง: "+p.name, bg:"var(--color-accent-100)", fg:"var(--color-accent-800)", pid:p.id}); });
+    DATA.milestones.filter(function(x){return x.date===ds;}).forEach(function(x){ out.push({label:"◆ "+x.name, bg:"var(--color-neutral-800)", fg:"#fff"}); });
+    DATA.tasks.filter(function(t){return t.due===ds;}).forEach(function(t){ out.push({label:t.name, bg:t.status==="COMPLETED"?"var(--color-accent-2-100)":"var(--color-neutral-100)", fg:t.status==="COMPLETED"?"var(--color-accent-2-800)":"var(--color-text)", tid:t.id}); });
+    return out;
+  }
+  var cells = "";
+  for (var i=0;i<first.getDay();i++) cells += '<div class="cal-cell" style="background:transparent"></div>';
+  for (var d=1; d<=lastDay; d++) {
+    var date = new Date(y,m,d); var isToday = iso(date)===iso(TODAY);
+    var ev = eventsOn(date).slice(0,3);
+    cells += '<div class="cal-cell" style="background:'+(isToday?"var(--color-accent-100)":"var(--color-surface)")+'">'
+      + '<div style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:'+(isToday?"var(--color-accent)":"transparent")+';color:'+(isToday?"#fff":"var(--color-text)")+'">'+d+'</div>'
+      + ev.map(function(e){ return '<button class="row-btn ellip" style="background:'+e.bg+';color:'+e.fg+';border-radius:6px;padding:2px 4px;margin-top:2px;font-size:9.5px" '+(e.tid?act("openTask",{id:e.tid}):e.pid?act("openProject",{id:e.pid}):act("stop")) +'>'+esc(e.label)+'</button>'; }).join("")
+      + '</div>';
+  }
+  return '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="flex-between"><h2>Calendar</h2><div class="flex gap-8"><button class="btn btn-secondary" '+act("calPrev")+'>‹</button><span style="font-weight:700">'+MON[m]+' '+y+'</span><button class="btn btn-secondary" '+act("calNext")+'>›</button></div></div>'
+    + '<div class="cal-grid">' + DOW.map(function(d){return '<div class="cal-dow">'+d+'</div>';}).join("") + cells + '</div>'
+    + '</div>';
+}
+
+/* ═══════════════════════════════ Kanban ═══════════════════════════════ */
+function viewKanban(){
+  var cols = ["TODO","IN PROGRESS","REVIEW","BLOCKED","COMPLETED"];
+  var list = DATA.tasks.filter(function(t){ return UI.kanbanScope==="ทุก Project" || t.projectId===UI.kanbanScope; });
+  var colsHtml = cols.map(function(c){
+    var items = list.filter(function(t){return t.status===c;});
+    return '<div class="kanban-col" data-dropzone="1" data-arg=\'{"status":"'+c+'"}\'>'
+      + '<div class="flex-between" style="margin-bottom:6px"><h6 style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">'+c+'</h6><span class="tag tag-neutral">'+items.length+'</span></div>'
+      + items.map(function(t){
+          var od = isOverdue(t); var p = projById(t.projectId);
+          return '<div class="kanban-card" draggable="true" data-drag-task="'+t.id+'" '+act("openTask",{id:t.id})+'>'
+            + '<p class="ellip" style="margin:0;font-size:12.5px;font-weight:600">'+esc(t.name)+'</p>'
+            + '<p class="ellip" style="margin:2px 0 6px;font-size:10.5px;opacity:0.6">'+esc(p?p.name:"")+'</p>'
+            + '<div class="progress-track"><div class="progress-fill" style="width:'+t.progress+'%;background:'+(od?"var(--color-accent-700)":"var(--color-accent)")+'"></div></div>'
+            + '<div class="flex-between" style="margin-top:6px"><span class="avatar avatar-sm" style="background:'+userById(t.ownerId).tone+'">'+esc(userById(t.ownerId).name.slice(0,2))+'</span>'
+            + '<span style="font-size:10.5px;'+(od?"color:var(--color-accent-700);font-weight:700":"opacity:0.6")+'">'+(od?("เกิน "+overdueDays(t)+"วัน"):fmt(t.due))+'</span></div></div>';
+        }).join("") || emptyMsg("ไม่มีงาน")
+      + '</div>';
+  }).join("");
+  return '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="flex-between"><h2>Kanban</h2>' + selectHtml([{id:"ทุก Project",name:"ทุก Project"}].concat(DATA.projects), UI.kanbanScope, "setKanbanScope") + '</div>'
+    + '<div class="kanban-cols">'+colsHtml+'</div></div>';
+}
+/* ═══════════════════════════════ Team ═══════════════════════════════ */
+function viewTeam(){
+  var cards = DATA.users.map(function(u){
+    var ts = DATA.tasks.filter(function(t){return t.ownerId===u.id;});
+    var done = ts.filter(function(t){return t.status==="COMPLETED";}).length;
+    var prog = ts.filter(function(t){return t.status==="IN PROGRESS";}).length;
+    var od = ts.filter(isOverdue).length; var load = ts.filter(isOpenT).length;
+    var loadLabel = load>=6?"งานหนัก":load>=3?"งานพอดี":"รับงานได้";
+    var loadStyle = load>=6?"background:var(--color-accent-100);color:var(--color-accent-800)":load>=3?"border:1px solid var(--color-accent);color:var(--color-accent-700)":"background:var(--color-accent-2-100);color:var(--color-accent-2-800)";
+    return '<div class="card elev">'
+      + '<div class="flex" style="gap:10px;align-items:center">'
+      + '<span class="avatar avatar-md" style="background:'+u.tone+'">'+esc(u.name.slice(0,2))+'</span>'
+      + '<div style="flex:1"><input class="input" style="border:none;background:transparent;padding:0;font-weight:700" value="'+esc(u.name)+'" '+chg("userField",{id:u.id, field:"name"})+'></div>'
+      + '<button class="btn btn-ghost" style="color:var(--color-accent-700)" '+act("askDeleteUser",{id:u.id})+'><i data-lucide="trash-2" class="ic"></i></button>'
+      + '</div>'
+      + '<div class="flex gap-8 wrap">'
+      + selectHtml(DATA.options.roleOptions, u.role, "userField", {id:u.id, field:"role"})
+      + selectHtml(DATA.options.departments, u.dept, "userField", {id:u.id, field:"dept"})
+      + '</div>'
+      + '<span class="tag" style="'+loadStyle+'align-self:flex-start">'+loadLabel+'</span>'
+      + '<div class="grid-cards" style="grid-template-columns:repeat(4,1fr)">'
+      + statCard("Tasks", ts.length, "") + statCard("เสร็จ", done, "", "var(--color-accent-2)") + statCard("ทำอยู่", prog, "", "var(--color-accent)") + statCard("เกิน", od, "", "var(--color-accent-700)")
+      + '</div></div>';
+  }).join("");
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<div class="flex-between"><h2>Team</h2><button class="btn btn-primary" '+act("addUser")+'><i data-lucide="user-plus" class="ic"></i>เพิ่มสมาชิก</button></div>'
+    + '<div class="grid-cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">'+cards+'</div></div>';
+}
+
+/* ═══════════════════════════════ Reports ═══════════════════════════════ */
+function viewReports(){
+  var total = DATA.tasks.length, done = DATA.tasks.filter(function(t){return t.status==="COMPLETED";}).length;
+  var statusBreakdown = ["TODO","IN PROGRESS","REVIEW","BLOCKED","COMPLETED","CANCELLED"].map(function(st){
+    var c = DATA.tasks.filter(function(t){return t.status===st;}).length;
+    var color = st==="COMPLETED"?"var(--color-accent-2)":st==="BLOCKED"?"var(--color-accent-700)":"var(--color-accent)";
+    return '<div style="margin-bottom:6px"><div class="flex-between" style="font-size:12px"><span>'+st+'</span><span>'+c+'</span></div>'
+      + '<div class="progress-track"><div class="progress-fill" style="width:'+pctFn(c,total)+'%;background:'+color+'"></div></div></div>';
+  }).join("");
+  var budgetBreakdown = DATA.projects.map(function(p){
+    var pct = pctFn(p.actualCost,p.budget);
+    return '<div style="margin-bottom:6px"><div class="flex-between" style="font-size:12px"><span class="ellip">'+esc(p.name)+'</span><span>฿'+baht(p.actualCost)+' / ฿'+baht(p.budget)+'</span></div>'
+      + '<div class="progress-track"><div class="progress-fill" style="width:'+Math.min(100,pct)+'%;background:'+(pct>90?"var(--color-accent-700)":"var(--color-accent-2)")+'"></div></div></div>';
+  }).join("");
+  var memberReport = DATA.users.map(function(u){
+    var ts = DATA.tasks.filter(function(t){return t.ownerId===u.id;});
+    var d = ts.filter(function(t){return t.status==="COMPLETED";}).length; var od = ts.filter(isOverdue).length;
+    return '<tr><td>'+esc(u.name)+'</td><td>'+ts.length+'</td><td>'+d+'</td><td style="'+(od>0?"color:var(--color-accent-700);font-weight:700":"")+'">'+od+'</td><td>'+pctFn(d,ts.length)+'%</td></tr>';
+  }).join("");
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<h2>Reports</h2>'
+    + '<div class="grid-cards">'
+    + statCard("Task ทั้งหมด", total, "") + statCard("เสร็จแล้ว", done, "", "var(--color-accent-2)")
+    + statCard("อัตราสำเร็จ", pctFn(done,total)+"%", "", "var(--color-accent)")
+    + statCard("งบใช้ไปรวม", "฿"+baht(DATA.projects.reduce(function(a,p){return a+p.actualCost;},0)), "")
+    + '</div>'
+    + '<div class="grid-2">'
+    + '<div class="card elev"><h5>สถานะ Task</h5>'+statusBreakdown+'</div>'
+    + '<div class="card elev"><h5>งบประมาณต่อโครงการ</h5>'+budgetBreakdown+'</div>'
+    + '</div>'
+    + '<div class="card elev"><h5>รายงานตามสมาชิก</h5><table class="simple"><thead><tr><th>ชื่อ</th><th>Task</th><th>เสร็จ</th><th>เกิน</th><th>อัตรา</th></tr></thead><tbody>'+memberReport+'</tbody></table></div>'
+    + '</div>';
+}
+
+/* ═══════════════════════════════ Management ═══════════════════════════════ */
+function viewManagement(){
+  var rows = DATA.projects.map(function(p){
+    var h = health(p);
+    var prioStyleV = p.priority==="URGENT"?"background:var(--color-accent-700);color:#fff":p.priority==="HIGH"?"background:var(--color-accent-100);color:var(--color-accent-800)":"background:var(--color-neutral-100);color:var(--color-neutral-700)";
+    return '<tr><td class="ellip" style="max-width:220px">'+esc(p.name)+'</td><td>'+esc(userById(p.ownerId).name)+'</td>'
+      + '<td><span class="tag" style="'+prioStyleV+'">'+p.priority+'</span></td>'
+      + '<td>'+autoProgress(p)+'%</td>'
+      + '<td><span class="tag" style="'+healthStyle(h)+'">'+healthLabel(h)+'</span></td>'
+      + '<td>'+pctFn(p.actualCost,p.budget)+'%</td></tr>';
+  }).join("");
+  var riskList = DATA.projects.filter(function(p){return health(p)!=="GREEN";});
+  var totalBudget = DATA.projects.reduce(function(a,p){return a+p.budget;},0), usedBudget = DATA.projects.reduce(function(a,p){return a+p.actualCost;},0);
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<h2>Management</h2>'
+    + '<div class="grid-2">'
+    + '<div class="card elev"><h5>ภาพรวมทุกโครงการ</h5><table class="simple"><thead><tr><th>โครงการ</th><th>Owner</th><th>Priority</th><th>คืบหน้า</th><th>สถานะ</th><th>งบ %</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    + '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="card elev"><h5>โครงการที่ต้องเฝ้าระวัง</h5>' + (riskList.length ? riskList.map(function(p){
+        var h = health(p);
+        return '<button class="row-btn" '+act("openProject",{id:p.id})+'><span class="tag" style="'+(h==="RED"?"background:var(--color-accent-700);color:#fff":"border:1px solid var(--color-accent);color:var(--color-accent-700)")+'">'+(h==="RED"?"DELAYED":"AT RISK")+'</span> '+esc(p.name)+'</button>';
+      }).join("") : emptyMsg("ไม่มีโครงการเสี่ยงในตอนนี้")) + '</div>'
+    + '<div class="card elev"><h5>งบประมาณรวม</h5><p style="margin:0;font-size:13px">ใช้ไป ฿'+baht(usedBudget)+' จาก ฿'+baht(totalBudget)+'</p>'
+    + '<div class="progress-track"><div class="progress-fill" style="width:'+pctFn(usedBudget,totalBudget)+'%;background:var(--color-accent)"></div></div></div>'
+    + '</div></div></div>';
+}
+
+/* ═══════════════════════════════ Settings ═══════════════════════════════ */
+function viewSettings(){
+  var changelog = [
+    ["v1.0","ย้ายระบบมาใช้ Google Sheets เป็นฐานข้อมูลผ่าน Google Apps Script"],
+  ];
+  return '<div style="display:flex;flex-direction:column;gap:14px">'
+    + '<h2>Settings</h2>'
+    + '<div class="card elev"><h5>สลับผู้ใช้ปัจจุบัน (จำลอง)</h5><div class="flex gap-8 wrap">' + DATA.users.map(function(u){
+        var cur = UI.currentUserId===u.id;
+        return '<button class="btn" style="'+(cur?"background:var(--color-accent-100);color:var(--color-accent-800);border:1px solid var(--color-accent)":"border:1px solid var(--color-divider)")+'" '+act("setCurrentUser",{id:u.id})+'>'+esc(u.name)+' ('+u.role+')</button>';
+      }).join("") + '</div></div>'
+    + '<div class="card elev"><h5>เกี่ยวกับระบบ</h5><p style="font-size:13px">WULING HUB Project Workspace · v1.0 · ฐานข้อมูล Google Sheets</p>'
+    + changelog.map(function(c){ return '<p style="font-size:12.5px;margin:4px 0"><b>'+c[0]+'</b> — '+c[1]+'</p>'; }).join("")
+    + '</div></div>';
+}
+ACTIONS.setCurrentUser = function(d){ UI.currentUserId = d.id; render(); };
+
+/* ═══════════════════════════════ Modals ═══════════════════════════════ */
+function renderModals(){
+  if (!UI.modal) return "";
+  if (UI.modal.type === "project") return modalProject();
+  if (UI.modal.type === "task") return modalTask();
+  if (UI.modal.type === "milestone") return modalMilestone();
+  return "";
+}
+function modalProject(){
+  var f = UI.projectForm;
+  return '<div class="overlay" '+act("closeModal")+'><div class="dialog" '+act("stop")+' data-stop="1">'
+    + '<h3>สร้าง Project ใหม่</h3>'
+    + field("ชื่อโครงการ", '<input class="input" value="'+esc(f.name)+'" '+inp("formBind",{form:"pf",field:"name"})+'>')
+    + field("Category", selectHtml(DATA.options.categories, f.category, "formBind", {form:"pf",field:"category"}))
+    + field("แผนก", selectHtml(DATA.options.departments, f.dept, "formBind", {form:"pf",field:"dept"}))
+    + field("Owner", selectHtml(DATA.users, f.ownerId, "formBind", {form:"pf",field:"ownerId"}))
+    + field("Priority", selectHtml(DATA.options.priorityOptions, f.priority, "formBind", {form:"pf",field:"priority"}))
+    + '<div class="grid-2">' + field("เริ่มต้น", '<input class="input" type="date" value="'+f.start+'" '+chg("formBind",{form:"pf",field:"start"})+'>')
+    + field("Deadline", '<input class="input" type="date" value="'+f.due+'" '+chg("formBind",{form:"pf",field:"due"})+'>') + '</div>'
+    + field("งบประมาณ", '<input class="input" type="number" value="'+f.budget+'" '+inp("formBind",{form:"pf",field:"budget"})+'>')
+    + field("รายละเอียด", '<textarea class="input" '+inp("formBind",{form:"pf",field:"desc"})+'>'+esc(f.desc)+'</textarea>')
+    + '<div class="dialog-actions"><button class="btn btn-secondary" '+act("closeModal")+'>ยกเลิก</button><button class="btn btn-primary" '+act("submitProject")+'>สร้าง Project</button></div>'
+    + '</div></div>';
+}
+function modalTask(){
+  var f = UI.taskForm;
+  return '<div class="overlay" '+act("closeModal")+'><div class="dialog" '+act("stop")+' data-stop="1">'
+    + '<h3>สร้าง Task ใหม่</h3>'
+    + field("โครงการ", selectHtml(DATA.projects, f.projectId, "formBind", {form:"tf",field:"projectId"}))
+    + field("ชื่องาน", '<input class="input" value="'+esc(f.name)+'" '+inp("formBind",{form:"tf",field:"name"})+'>')
+    + field("ผู้รับผิดชอบ", selectHtml(DATA.users, f.ownerId, "formBind", {form:"tf",field:"ownerId"}))
+    + field("แผนก", selectHtml(DATA.options.departments, f.dept, "formBind", {form:"tf",field:"dept"}))
+    + field("Priority", selectHtml(DATA.options.priorityOptions, f.priority, "formBind", {form:"tf",field:"priority"}))
+    + '<div class="grid-2">' + field("เริ่มต้น", '<input class="input" type="date" value="'+f.start+'" '+chg("formBind",{form:"tf",field:"start"})+'>')
+    + field("Deadline", '<input class="input" type="date" value="'+f.due+'" '+chg("formBind",{form:"tf",field:"due"})+'>') + '</div>'
+    + field("งบประมาณ (ประมาณการ)", '<input class="input" type="number" value="'+f.estCost+'" '+inp("formBind",{form:"tf",field:"estCost"})+'>')
+    + '<div class="dialog-actions"><button class="btn btn-secondary" '+act("closeModal")+'>ยกเลิก</button><button class="btn btn-primary" '+act("submitTask")+'>สร้าง Task</button></div>'
+    + '</div></div>';
+}
+function modalMilestone(){
+  var f = UI.milestoneForm;
+  return '<div class="overlay" '+act("closeModal")+'><div class="dialog" '+act("stop")+' data-stop="1">'
+    + '<h3>สร้าง Milestone ใหม่</h3>'
+    + field("โครงการ", selectHtml(DATA.projects, f.projectId, "formBind", {form:"mf",field:"projectId"}))
+    + field("ชื่อ Milestone", '<input class="input" value="'+esc(f.name)+'" '+inp("formBind",{form:"mf",field:"name"})+'>')
+    + field("วันที่", '<input class="input" type="date" value="'+f.date+'" '+chg("formBind",{form:"mf",field:"date"})+'>')
+    + '<div class="dialog-actions"><button class="btn btn-secondary" '+act("closeModal")+'>ยกเลิก</button><button class="btn btn-primary" '+act("submitMilestone")+'>สร้าง Milestone</button></div>'
+    + '</div></div>';
+}
+function field(label, inner){ return '<div class="field"><label>'+label+'</label>'+inner+'</div>'; }
+
+/* ═══════════════════════════════ Confirm delete ═══════════════════════════════ */
+function renderConfirm(){
+  if (!UI.confirmDel) return "";
+  var c = UI.confirmDel;
+  return '<div class="overlay"><div class="dialog">'
+    + '<h3>ลบ'+c.label+'นี้?</h3>'
+    + '<p style="font-size:13.5px">คุณกำลังจะลบ "'+esc(c.name)+'" การกระทำนี้ไม่สามารถย้อนกลับได้'+(c.note?('<br><span class="muted">'+esc(c.note)+'</span>'):'')+'</p>'
+    + '<div class="dialog-actions"><button class="btn btn-secondary" '+act("cancelDelete")+'>ยกเลิก</button><button class="btn btn-danger" '+act("confirmDoDelete")+'>ลบเลย</button></div>'
+    + '</div></div>';
+}
+
+/* ═══════════════════════════════ Task drawer ═══════════════════════════════ */
+function renderDrawer(){
+  if (!UI.openTaskId) return "";
+  var t = DATA.tasks.find(function(x){return x.id===UI.openTaskId;});
+  if (!t) return "";
+  var p = projById(t.projectId); var od = isOverdue(t);
+  var subDone = t.subtasks.filter(function(s){return s.done;}).length;
+  return '<div class="drawer-backdrop" '+act("closeDrawer")+'></div>'
+    + '<div class="drawer">'
+    + '<div class="flex-between"><h4 style="margin:0">รายละเอียดงาน</h4><button class="btn btn-ghost" '+act("closeDrawer")+'><i data-lucide="x" class="ic"></i></button></div>'
+    + '<input class="input" style="font-weight:700;margin:8px 0" value="'+esc(t.name)+'" '+chg("patchTask",{field:"name"})+'>'
+    + '<p class="muted" style="font-size:12px">'+esc(p?p.name:"")+(od?(' · <span style="color:var(--color-accent-700);font-weight:700">OVERDUE '+overdueDays(t)+' วัน</span>'):'')+'</p>'
+    + '<div class="grid-2">'
+    + field("สถานะ", selectHtml(DATA.options.statusOptions, t.status, "patchTask", {field:"status"}))
+    + field("Priority", selectHtml(DATA.options.priorityOptions, t.priority, "patchTask", {field:"priority"}))
+    + '</div>'
+    + '<div class="grid-2">'
+    + field("ผู้รับผิดชอบ", selectHtml(DATA.users, t.ownerId, "patchTask", {field:"ownerId"}))
+    + field("แผนก", selectHtml(DATA.options.departments, t.dept, "patchTask", {field:"dept"}))
+    + '</div>'
+    + '<div class="grid-2">'
+    + field("เริ่มต้น", '<input class="input" type="date" value="'+t.start+'" '+chg("patchTask",{field:"start"})+'>')
+    + field("Deadline", '<input class="input" type="date" value="'+t.due+'" '+chg("patchTask",{field:"due"})+'>')
+    + '</div>'
+    + field("ความคืบหน้า ("+t.progress+"%)", '<input class="input" type="range" min="0" max="100" value="'+t.progress+'" '+chg("patchTask",{field:"progress"})+'>')
+    + '<div class="grid-2">'
+    + field("งบประมาณ", '<input class="input" type="number" value="'+t.estCost+'" '+chg("patchTask",{field:"estCost"})+'>')
+    + field("ใช้จริง", '<input class="input" type="number" value="'+t.actualCost+'" '+chg("patchTask",{field:"actualCost"})+'>')
+    + '</div>'
+    + field("รายละเอียด", '<textarea class="input" '+chg("patchTask",{field:"desc"})+'>'+esc(t.desc||"")+'</textarea>')
+    + '<div class="hr"></div>'
+    + '<div class="flex-between"><h5 style="margin:0">Subtasks ('+subDone+'/'+t.subtasks.length+')</h5></div>'
+    + t.subtasks.map(function(s){
+        return '<div class="flex-between" style="padding:4px 0">'
+          + '<button class="row-btn" style="display:flex;align-items:center;gap:8px;flex:1" '+act("toggleSubtask",{tid:t.id, sid:s.id})+'>'
+          + '<span style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--color-neutral-400);background:'+(s.done?"var(--color-accent-2)":"transparent")+'"></span>'
+          + '<span style="font-size:13px;'+(s.done?"text-decoration:line-through;opacity:0.5":"")+'">'+esc(s.name)+'</span></button>'
+          + '<button class="btn btn-ghost" '+act("deleteSubtask",{tid:t.id, sid:s.id})+'><i data-lucide="x" class="ic"></i></button></div>';
+      }).join("")
+    + '<input class="input" placeholder="เพิ่ม subtask แล้วกด Enter" '+kd("addSubtask",{tid:t.id})+'>'
+    + '<div class="hr"></div>'
+    + '<h5>Comments</h5>'
+    + t.comments.map(function(c){
+        var u = userById(c.userId);
+        return '<div class="flex" style="gap:8px;margin-bottom:8px"><span class="avatar avatar-sm" style="background:'+u.tone+'">'+esc(u.name.slice(0,2))+'</span>'
+          + '<div><p style="margin:0;font-size:12.5px"><b>'+esc(u.name)+'</b> '+esc(c.text)+'</p><p style="margin:0;font-size:10px;opacity:0.5">'+esc(c.at)+'</p></div></div>';
+      }).join("") || emptyMsg("ยังไม่มีความคิดเห็น")
+    + '<div class="flex gap-8"><input class="input" placeholder="แสดงความคิดเห็น... (@ชื่อ เพื่อ mention)" value="'+esc(UI.commentDraft)+'" '+inp("commentChange")+' '+kd("commentKeydown")+'>'
+    + '<button class="btn btn-primary" '+act("sendComment")+'>ส่ง</button></div>'
+    + '<div class="hr"></div>'
+    + '<button class="btn btn-danger" style="width:100%" '+act("askDeleteTask",{id:t.id})+'><i data-lucide="trash-2" class="ic"></i>ลบ Task นี้</button>'
+    + '</div>';
+}
+</script>
