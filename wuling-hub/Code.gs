@@ -249,15 +249,29 @@ function getAllData() {
   };
 }
 
+// เดิมนับจาก "จำนวนแถวปัจจุบัน + 1" ซึ่งถ้ามีการลบไปก่อนหน้า จำนวนแถวจะถอยกลับ
+// ทำให้สุ่มได้ id ซ้ำกับของเดิมที่ยังอยู่ในชีต (เช่นลบ Task ที่ 10 จาก 44 อัน แถวเหลือ 43
+// แถว → Task ใหม่จะได้เลข 44 ซ้ำกับ Task เดิมที่ยังอยู่) พอ id ซ้ำ ทุกฟังก์ชันที่ค้นหา/แก้ไข
+// ด้วย id จะไปเจอแถวแรกที่ id ตรงกันซึ่งอาจเป็นคนละ Project กับที่ผู้ใช้ต้องการ ทำให้ดูเหมือน
+// "บันทึก Task ไม่ตรงกับ Project" หรือแก้ไข/เปลี่ยนสถานะแล้วไม่เป็นผลตามที่คาด — จึงต้องหาเลข
+// รันสูงสุดที่เคยใช้จริงจาก id ทั้งหมด (ไม่สนใจว่าแถวนั้นถูกลบไปแล้วหรือยัง) แล้วบวก 1 แทน
 function nextProjectId_() {
   var year = new Date().getFullYear();
-  var n = readAll_(SHEETS.PROJECTS).length + 1;
-  return 'PRJ-' + year + '-' + String(n).padStart(4, '0');
+  var max = 0;
+  readAll_(SHEETS.PROJECTS).forEach(function (p) {
+    var m = /^PRJ-\d{4}-(\d+)$/.exec(p.id);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'PRJ-' + year + '-' + String(max + 1).padStart(4, '0');
 }
 function nextTaskId_() {
   var year = new Date().getFullYear();
-  var n = readAll_(SHEETS.TASKS).length + 1;
-  return 'TSK-' + year + '-' + String(n).padStart(6, '0');
+  var max = 0;
+  readAll_(SHEETS.TASKS).forEach(function (t) {
+    var m = /^TSK-\d{4}-(\d+)$/.exec(t.id);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'TSK-' + year + '-' + String(max + 1).padStart(6, '0');
 }
 function nextUserId_() {
   var users = readAll_(SHEETS.USERS);
@@ -281,14 +295,23 @@ function userName_(id) {
 
 // — Projects —
 function createProject(form) {
-  var id = nextProjectId_();
-  var p = {
-    id: id, name: form.name, category: form.category, dept: form.dept, desc: form.desc || '',
-    ownerId: form.ownerId, team: [form.ownerId], priority: form.priority, status: 'PLANNING',
-    start: form.start, due: form.due, budget: Number(form.budget) || 0, actualCost: 0,
-    manual: null, tags: [], note: '',
-  };
-  appendObj_(SHEETS.PROJECTS, p);
+  // ล็อกครอบช่วง "คิดเลข id ถัดไป + เขียนแถวใหม่" ทั้งคู่ ไม่งั้นถ้ามีคนกดสร้างพร้อมกัน
+  // สองคน อาจคำนวณ id ถัดไปได้ค่าเดียวกันก่อนที่ใครจะเขียนแถวเสร็จ กลายเป็น id ซ้ำอีกแบบหนึ่ง
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var id, p;
+  try {
+    id = nextProjectId_();
+    p = {
+      id: id, name: form.name, category: form.category, dept: form.dept, desc: form.desc || '',
+      ownerId: form.ownerId, team: [form.ownerId], priority: form.priority, status: 'PLANNING',
+      start: form.start, due: form.due, budget: Number(form.budget) || 0, actualCost: 0,
+      manual: null, tags: [], note: '',
+    };
+    appendObj_(SHEETS.PROJECTS, p);
+  } finally {
+    lock.releaseLock();
+  }
   logActivity_(id, form.ownerId, 'สร้าง Project "' + p.name + '"');
   notify_('สร้าง Project ใหม่ "' + p.name + '"');
   return p;
@@ -317,13 +340,20 @@ function toggleProjectTeam(projectId, userId) {
 
 // — Tasks —
 function createTask(form) {
-  var id = nextTaskId_();
-  var t = {
-    id: id, projectId: form.projectId, name: form.name, ownerId: form.ownerId, dept: form.dept,
-    status: 'TODO', start: form.start, due: form.due, priority: form.priority, progress: 0,
-    estCost: Number(form.estCost) || 0, actualCost: 0, subtasks: [], comments: [], desc: '',
-  };
-  appendObj_(SHEETS.TASKS, t);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var t;
+  try {
+    var id = nextTaskId_();
+    t = {
+      id: id, projectId: form.projectId, name: form.name, ownerId: form.ownerId, dept: form.dept,
+      status: 'TODO', start: form.start, due: form.due, priority: form.priority, progress: 0,
+      estCost: Number(form.estCost) || 0, actualCost: 0, subtasks: [], comments: [], desc: '',
+    };
+    appendObj_(SHEETS.TASKS, t);
+  } finally {
+    lock.releaseLock();
+  }
   logActivity_(form.projectId, form.ownerId, 'เพิ่ม Task "' + t.name + '"');
   notify_('Task ใหม่ "' + t.name + '" มอบให้ ' + userName_(t.ownerId));
   return t;
@@ -402,12 +432,19 @@ function deleteMilestone(id, userId) {
 
 // — Users / Team —
 function createUser() {
-  var id = nextUserId_();
-  var tones = ['var(--color-accent)', 'var(--color-accent-2)', 'var(--color-neutral-800)',
-    'var(--color-accent-600)', 'var(--color-accent-2-700)', 'var(--color-accent-800)'];
-  var n = parseInt(id.slice(1), 10);
-  var u = { id: id, name: 'สมาชิกใหม่ ' + n, dept: 'Sales', role: 'TEAM MEMBER', tone: tones[(n - 1) % tones.length] };
-  appendObj_(SHEETS.USERS, u);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var u;
+  try {
+    var id = nextUserId_();
+    var tones = ['var(--color-accent)', 'var(--color-accent-2)', 'var(--color-neutral-800)',
+      'var(--color-accent-600)', 'var(--color-accent-2-700)', 'var(--color-accent-800)'];
+    var n = parseInt(id.slice(1), 10);
+    u = { id: id, name: 'สมาชิกใหม่ ' + n, dept: 'Sales', role: 'TEAM MEMBER', tone: tones[(n - 1) % tones.length] };
+    appendObj_(SHEETS.USERS, u);
+  } finally {
+    lock.releaseLock();
+  }
   notify_('เพิ่มสมาชิกใหม่ในทีม — แก้ชื่อได้ที่หน้า Team');
   return u;
 }

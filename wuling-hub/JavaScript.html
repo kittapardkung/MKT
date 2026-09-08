@@ -114,11 +114,11 @@ function refreshQuiet(){
   }).withFailureHandler(function(){}).getAllData();
 }
 function refreshData(cb){
-  BUSY = true;
+  setBusy(true);
   google.script.run.withSuccessHandler(function(data){
-    DATA = data; BUSY = false; render(); if (cb) cb();
+    DATA = data; setBusy(false); render(); if (cb) cb();
   }).withFailureHandler(function(err){
-    BUSY = false; alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err));
+    setBusy(false); alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err));
     render();
   }).getAllData();
 }
@@ -128,12 +128,20 @@ function clockLabel(){
 }
 
 /* ══════════════════════════════ mutations ══════════════════════════════ */
+function setBusy(v){
+  BUSY = v;
+  // Just a cursor hint while a save is in flight — NOT a full render(). Re-rendering
+  // here used to rebuild the whole DOM from the still-stale DATA before the server
+  // round-trip returned, so the field you just edited would visibly snap back to its
+  // old value for a moment (and lose focus) on every single edit.
+  document.body.style.cursor = v ? "progress" : "";
+}
 function call(fnName, args, after){
-  BUSY = true; render();
+  setBusy(true);
   var run = google.script.run.withSuccessHandler(function(){
     refreshData(after);
   }).withFailureHandler(function(err){
-    BUSY = false; alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err)); render();
+    setBusy(false); alert("เกิดข้อผิดพลาด: " + (err && err.message ? err.message : err)); render();
   });
   run[fnName].apply(run, args);
 }
