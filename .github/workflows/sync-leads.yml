@@ -1,0 +1,31 @@
+name: Sync leads from Google Sheet
+
+on:
+  schedule:
+    # 09:00 และ 17:00 เวลาไทย (UTC+7) = 02:00 และ 10:00 UTC
+    - cron: '0 2,10 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync-leads:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - run: node scripts/sync-leads.mjs
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          LEADS_SPREADSHEET_ID: ${{ secrets.LEADS_SPREADSHEET_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
