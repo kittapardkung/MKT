@@ -54,6 +54,27 @@ function statusClass(status: string) {
   return 'draft';
 }
 
+function statusDotColor(status: string) {
+  if (status === 'REVIEW') return '#f59e0b';
+  if (status === 'APPROVED') return '#22c55e';
+  if (status === 'PUBLISHED') return '#16a34a';
+  return '#9ca3af';
+}
+
+function channelClass(channel: string) {
+  const c = (channel || '').toLowerCase();
+  if (c.includes('facebook')) return 'channel-facebook';
+  if (c.includes('instagram')) return 'channel-instagram';
+  if (c.includes('tiktok')) return 'channel-tiktok';
+  if (c.includes('youtube')) return 'channel-youtube';
+  if (c.includes('line')) return 'channel-line';
+  return 'channel-default';
+}
+
+function formatChipClass(format: string) {
+  return format === 'วิดีโอ' ? 'chip-video' : 'chip-image';
+}
+
 function attrUrl(url: string) {
   const s = (url || '').trim();
   if (!/^https?:\/\//i.test(s)) return '#';
@@ -533,12 +554,14 @@ function CalendarPage({
           {cells.map((d, i) => {
             const outside = d.getMonth() !== month;
             const key = ymd(d);
+            const isToday = key === ymd(new Date());
             const dayPosts = posts.filter((p) => ymd(parseDate(p.date)) === key).sort(sortPostDate);
             return (
-              <div className={`day ${outside ? 'outside' : ''}`} key={i}>
+              <div className={`day ${outside ? 'outside' : ''} ${isToday ? 'today' : ''}`} key={i}>
                 <div className="daynum">{d.getDate()}</div>
                 {dayPosts.map((p) => (
-                  <div className={`chip ${statusClass(p.status)}`} key={p.id} onClick={() => onOpenPost(p)}>
+                  <div className={`chip ${formatChipClass(p.format)}`} key={p.id} onClick={() => onOpenPost(p)}>
+                    <span className="dot" style={{ background: statusDotColor(p.status) }} />
                     {p.time} {p.title}
                   </div>
                 ))}
@@ -559,13 +582,16 @@ function BoardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post)
         {STATUSES.map((status) => {
           const items = posts.filter((p) => p.status === status).sort(sortPostDate);
           return (
-            <div className="kanban-col" key={status}>
+            <div className={`kanban-col col-${statusClass(status)}`} key={status}>
               <div className="kanban-title">{statusLabel(status)} <span className="num">({items.length})</span></div>
               {items.length ? (
                 items.map((p) => (
                   <div className="task" key={p.id} onClick={() => onOpenPost(p)}>
                     <div className="task-title">{p.title}</div>
-                    <div className="meta">{p.channel} · {displayDate(p.date)} {p.time}</div>
+                    <div className="meta" style={{ marginTop: 4 }}>
+                      <span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span>
+                    </div>
+                    <div className="meta">{displayDate(p.date)} {p.time}</div>
                     <div>{csvTags(p.tags).map((t) => <span className="tag" key={t}>{t}</span>)}</div>
                     <div className="meta" style={{ marginTop: 6 }}>{p.owner}</div>
                   </div>
@@ -603,7 +629,7 @@ function TablePage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post)
               <tr className="clickable" key={p.id} onClick={() => onOpenPost(p)}>
                 <td>{displayDate(p.date)}</td>
                 <td>{p.time}</td>
-                <td>{p.channel}</td>
+                <td><span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span></td>
                 <td>{p.title}</td>
                 <td>{p.format}</td>
                 <td><StatusBadge status={p.status} /></td>
@@ -799,7 +825,7 @@ function PostModal({
         )}
 
         <div className="modal-actions">
-          {canApprove && onApprove && <button className="btn" disabled={saving} onClick={onApprove}>อนุมัติ</button>}
+          {canApprove && onApprove && <button className="btn success" disabled={saving} onClick={onApprove}>อนุมัติ</button>}
           <button className="btn primary" disabled={saving} onClick={onSave}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
         </div>
       </div>
