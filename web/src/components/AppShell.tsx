@@ -7,6 +7,7 @@ import {
   addTag,
   approvePost as approvePostFn,
   createPost,
+  deletePost,
   fetchBootstrap,
   promoteIdea,
   removeTag,
@@ -143,6 +144,7 @@ export default function AppShell() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [calendarStatusFilter, setCalendarStatusFilter] = useState('');
 
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postForm, setPostForm] = useState<PostForm>(() => emptyPostForm(''));
@@ -203,13 +205,14 @@ export default function AppShell() {
     const q = search.trim().toLowerCase();
     return data.posts.filter((p) => {
       if (channelFilter && csvTags(p.channel).indexOf(channelFilter) === -1) return false;
+      if (calendarStatusFilter && p.status !== calendarStatusFilter) return false;
       if (q) {
         const hay = [p.title, p.caption, p.tags, p.owner, p.channel].join(' ').toLowerCase();
         if (hay.indexOf(q) === -1) return false;
       }
       return true;
     });
-  }, [data, search, channelFilter]);
+  }, [data, search, channelFilter, calendarStatusFilter]);
 
   const activeTags = useMemo(() => (data?.tags || []).filter((t) => t.active !== false), [data]);
 
@@ -290,6 +293,11 @@ export default function AppShell() {
   function doApprove(id: string) {
     if (!confirm('ยืนยันอนุมัติคอนเทนต์นี้?')) return;
     runAction(() => approvePostFn(id, data!.role, data?.me || ''));
+  }
+
+  function doDelete(id: string) {
+    if (!confirm('ยืนยันลบคอนเทนต์นี้? การลบไม่สามารถย้อนกลับได้')) return;
+    runAction(() => deletePost(id, data?.me || ''));
   }
 
   function openPromoteIdea(idea: Idea) {
@@ -433,6 +441,8 @@ export default function AppShell() {
               onMove={moveCalendar}
               onToday={calendarToday}
               onOpenPost={openPost}
+              statusFilter={calendarStatusFilter}
+              onStatusFilterChange={setCalendarStatusFilter}
             />
           )}
 
@@ -469,6 +479,7 @@ export default function AppShell() {
           onClose={() => setPostModalOpen(false)}
           onSave={submitPost}
           onApprove={editingPost ? () => doApprove(editingPost.id) : undefined}
+          onDelete={editingPost ? () => doDelete(editingPost.id) : undefined}
         />
       )}
 
@@ -555,9 +566,9 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
   }, [posts]);
 
   const maxTotal = niceMax(Math.max(...months.map((m) => m.total), 0));
-  const chartH = 160;
-  const barW = 40;
-  const gap = 28;
+  const chartH = 120;
+  const barW = 30;
+  const gap = 20;
   const chartW = months.length * (barW + gap) + gap;
 
   return (
@@ -571,7 +582,7 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
           </span>
         ))}
       </div>
-      <svg viewBox={`0 0 ${chartW} ${chartH + 34}`} width="100%" style={{ overflow: 'visible' }}>
+      <svg viewBox={`0 0 ${chartW} ${chartH + 34}`} width={chartW} style={{ maxWidth: '100%', height: 'auto', overflow: 'visible' }}>
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
           <line
             key={t}
@@ -784,12 +795,16 @@ function CalendarPage({
   onMove,
   onToday,
   onOpenPost,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   posts: Post[];
   cursor: Date;
   onMove: (d: number) => void;
   onToday: () => void;
   onOpenPost: (p: Post) => void;
+  statusFilter: string;
+  onStatusFilterChange: (v: string) => void;
 }) {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -813,6 +828,10 @@ function CalendarPage({
           <div className="meta">{MONTHS_TH[month]} {year + 543}</div>
         </div>
         <div className="calendar-actions">
+          <select className="control" value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}>
+            <option value="">ทุกสถานะ</option>
+            {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+          </select>
           <button className="btn" onClick={() => onMove(-1)}>ก่อนหน้า</button>
           <button className="btn" onClick={onToday}>เดือนนี้</button>
           <button className="btn" onClick={() => onMove(1)}>ถัดไป</button>
@@ -994,6 +1013,7 @@ function PostModal({
   onClose,
   onSave,
   onApprove,
+  onDelete,
 }: {
   form: PostForm;
   setForm: Dispatch<SetStateAction<PostForm>>;
@@ -1006,6 +1026,7 @@ function PostModal({
   onClose: () => void;
   onSave: () => void;
   onApprove?: () => void;
+  onDelete?: () => void;
 }) {
   const set = <K extends keyof PostForm>(k: K, v: PostForm[K]) => setForm((f) => ({ ...f, [k]: v }));
   const canApprove = role === 'editor' && editingPost && editingPost.status !== 'APPROVED' && editingPost.status !== 'PUBLISHED';
@@ -1095,6 +1116,7 @@ function PostModal({
         )}
 
         <div className="modal-actions">
+          {onDelete && <button className="btn danger" disabled={saving} onClick={onDelete} style={{ marginRight: 'auto' }}>ลบคอนเทนต์</button>}
           {canApprove && onApprove && <button className="btn success" disabled={saving} onClick={onApprove}>อนุมัติ</button>}
           <button className="btn primary" disabled={saving} onClick={onSave}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</button>
         </div>

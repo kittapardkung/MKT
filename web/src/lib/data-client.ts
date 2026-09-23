@@ -144,6 +144,21 @@ export async function approvePost(id: string, role: Role, who: string): Promise<
   await log(id, 'APPROVE', before.status, 'APPROVED', '', who);
 }
 
+export async function deletePost(id: string, who: string): Promise<void> {
+  const supabase = createClient();
+  const { data: before, error: beforeErr } = await supabase
+    .from('posts')
+    .select('status')
+    .eq('id', id)
+    .single();
+  if (beforeErr) throw beforeErr;
+
+  await log(id, 'DELETE', before.status, '', '', who);
+
+  const { error } = await supabase.from('posts').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function addTag(tag: string): Promise<void> {
   const supabase = createClient();
   const { data: existing } = await supabase
