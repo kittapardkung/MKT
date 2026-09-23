@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { Zap } from 'lucide-react';
 import { signInWithMagicLink } from '@/lib/actions/auth';
 
 export default function LoginForm({ initialError }: { initialError: string | null }) {
@@ -12,7 +13,10 @@ export default function LoginForm({ initialError }: { initialError: string | nul
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="brand">MKT Content</div>
+        <div className="brand">
+          <span className="icon"><Zap size={18} fill="currentColor" /></span>
+          MKT Content
+        </div>
         <div className="brand-sub">ระบบจัดการคอนเทนต์การตลาด</div>
 
         {state.sent ? (

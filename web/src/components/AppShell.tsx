@@ -27,6 +27,21 @@ import {
 } from '@/lib/date-utils';
 import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
+import {
+  Zap,
+  LayoutDashboard,
+  CalendarDays,
+  KanbanSquare,
+  Table as TableIcon,
+  Library,
+  Plus,
+  LogOut,
+  PhoneCall,
+  FileText,
+  Car,
+  Video,
+  Image as ImageIcon,
+} from 'lucide-react';
 
 const STATUS_LABELS: Record<PostStatus, string> = {
   DRAFT: 'ร่าง',
@@ -53,11 +68,11 @@ function attrUrl(url: string) {
 }
 
 const NAV = [
-  { id: 'dashboard', label: 'แดชบอร์ด KPI', short: 'KPI' },
-  { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน' },
-  { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน' },
-  { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง' },
-  { id: 'library', label: 'คลัง & แท็ก', short: 'คลัง' },
+  { id: 'dashboard', label: 'แดชบอร์ด KPI', short: 'KPI', icon: LayoutDashboard },
+  { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
+  { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน', icon: KanbanSquare },
+  { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง', icon: TableIcon },
+  { id: 'library', label: 'คลัง & แท็ก', short: 'คลัง', icon: Library },
 ] as const;
 
 type PageId = (typeof NAV)[number]['id'];
@@ -323,7 +338,10 @@ export default function AppShell() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="brand">MKT Content</div>
+        <div className="brand">
+          <span className="icon"><Zap size={18} fill="currentColor" /></span>
+          MKT Content
+        </div>
         <div className="brand-sub">ระบบจัดการคอนเทนต์การตลาด</div>
 
         {NAV.map((n) => (
@@ -332,6 +350,7 @@ export default function AppShell() {
             className={`nav-btn ${page === n.id ? 'active' : ''}`}
             onClick={() => setPage(n.id)}
           >
+            <span className="icon"><n.icon size={17} /></span>
             {n.label}
           </button>
         ))}
@@ -341,7 +360,7 @@ export default function AppShell() {
           <div className="user-role">{data?.role === 'editor' ? 'บรรณาธิการ (editor)' : 'ครีเอทีฟ (creative)'}</div>
           <form action={signOut} style={{ marginTop: 8 }}>
             <button className="btn" type="submit" style={{ width: '100%', minHeight: 34, padding: '4px 8px', fontSize: 12 }}>
-              ออกจากระบบ
+              <LogOut size={14} /> ออกจากระบบ
             </button>
           </form>
         </div>
@@ -355,6 +374,7 @@ export default function AppShell() {
               className={`nav-btn ${page === n.id ? 'active' : ''}`}
               onClick={() => setPage(n.id)}
             >
+              <span className="icon"><n.icon size={16} /></span>
               {n.short}
             </button>
           ))}
@@ -389,7 +409,7 @@ export default function AppShell() {
             ))}
           </select>
 
-          <button className="btn primary" onClick={openNewPost}>+ คอนเทนต์ใหม่</button>
+          <button className="btn primary" onClick={openNewPost}><Plus size={16} /> คอนเทนต์ใหม่</button>
         </div>
 
         <div className="content">
@@ -540,12 +560,21 @@ function DashboardPage({
     .sort(sortPostDate)
     .slice(0, 6);
 
-  function kpiCard(title: string, value: number, targetValue: number, extra?: ReactNode) {
+  function kpiCard(
+    title: string,
+    value: number,
+    targetValue: number,
+    icon: ReactNode,
+    extra?: ReactNode
+  ) {
     const pct = targetValue ? Math.round((value / targetValue) * 100) : 0;
     const bar = Math.min(pct, 100);
     return (
       <div className="card" key={title}>
-        <div className="kpi-title">{title}</div>
+        <div className="kpi-title">
+          {title}
+          <span className="kpi-icon">{icon}</span>
+        </div>
         <div className="kpi-value num">{value} / {targetValue}</div>
         <div className="progress"><span style={{ width: `${bar}%` }} /></div>
         <div className="kpi-foot num">{pct}% ของเป้าหมาย</div>
@@ -554,11 +583,11 @@ function DashboardPage({
     );
   }
 
-  function miniProgress(label: string, value: number, targetValue: number) {
+  function miniProgress(label: string, value: number, targetValue: number, icon: ReactNode) {
     const pct = targetValue ? Math.round((value / targetValue) * 100) : 0;
     return (
       <div className="mini-row" key={label}>
-        <span>{label}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{label}</span>
         <div className="progress"><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>
         <b className="num">{value}</b>
       </div>
@@ -571,17 +600,18 @@ function DashboardPage({
       <div className="period-label">ช่วงข้อมูล: {range.label}</div>
 
       <div className="grid3">
-        {kpiCard('Lead Generation', 0, target('leads', 150))}
+        {kpiCard('Lead Generation', 0, target('leads', 150), <PhoneCall size={17} />)}
         {kpiCard(
           'คอนเทนต์ที่ผลิต',
           posts.length,
           tContent,
+          <FileText size={17} />,
           <div className="mini-progress">
-            {miniProgress('วิดีโอ', video, tVideo)}
-            {miniProgress('ภาพ', image, tImage)}
+            {miniProgress('วิดีโอ', video, tVideo, <Video size={12} />)}
+            {miniProgress('ภาพ', image, tImage, <ImageIcon size={12} />)}
           </div>
         )}
-        {kpiCard('Event Test Drive', filteredEvents.length, tEvents)}
+        {kpiCard('Event Test Drive', filteredEvents.length, tEvents, <Car size={17} />)}
       </div>
 
       <div className="two-col">
