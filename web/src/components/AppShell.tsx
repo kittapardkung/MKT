@@ -566,9 +566,9 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
   }, [posts]);
 
   const maxTotal = niceMax(Math.max(...months.map((m) => m.total), 0));
-  const chartH = 120;
-  const barW = 30;
-  const gap = 20;
+  const chartH = 190;
+  const barW = 44;
+  const gap = 30;
   const chartW = months.length * (barW + gap) + gap;
 
   return (
@@ -629,6 +629,12 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
   );
 }
 
+const FORMATS: Post['format'][] = ['ภาพ', 'วิดีโอ'];
+
+function formatColor(format: string) {
+  return format === 'วิดีโอ' ? '#ef4444' : '#22c55e';
+}
+
 function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; end: Date }) {
   const days = useMemo(() => {
     const list: Date[] = [];
@@ -657,34 +663,57 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
 
   const counts = days.map((d) => (byDay.get(ymd(d)) || []).length);
   const maxCount = niceMax(Math.max(...counts, 0));
-  const chartH = 150;
-  const barW = days.length > 40 ? 8 : 18;
-  const gap = days.length > 40 ? 3 : 8;
-  const chartW = Math.max(days.length * (barW + gap) + gap, 320);
+  const chartH = 170;
+  const marginLeft = 34;
+  const barW = days.length > 40 ? 8 : 20;
+  const gap = days.length > 40 ? 3 : 10;
+  const plotW = Math.max(days.length * (barW + gap) + gap, 280);
+  const chartW = plotW + marginLeft;
   const showLabelEvery = Math.max(1, Math.ceil(days.length / 14));
+  const yTicks = [0, 0.5, 1].map((t) => Math.round(maxCount * t));
 
   return (
     <div className="card">
-      <h2>จำนวนคอนเทนต์ที่ดำเนินการอยู่รายวัน</h2>
+      <h2>จำนวนคอนเทนต์ที่ดำเนินการอยู่รายวัน แยกตามชนิดคอนเทนต์</h2>
+      <div className="chart-legend">
+        {FORMATS.map((f) => (
+          <span className="chart-legend-item" key={f}>
+            <span className="chart-dot" style={{ background: formatColor(f) }} />
+            {f}
+          </span>
+        ))}
+      </div>
       <div className="calendar-wrap">
         <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
-          {[0, 0.5, 1].map((t) => (
-            <line key={t} x1={0} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
+          {[0, 0.5, 1].map((t, i) => (
+            <g key={t}>
+              <line x1={marginLeft} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
+              <text x={marginLeft - 8} y={chartH - chartH * t} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                {yTicks[i]}
+              </text>
+            </g>
           ))}
           {days.map((d, i) => {
             const key = ymd(d);
             const dayPosts = byDay.get(key) || [];
             const v = dayPosts.length;
-            const x = gap + i * (barW + gap);
-            const h = maxCount ? Math.max((v / maxCount) * chartH, v > 0 ? 3 : 0) : 0;
-            const y = chartH - h;
+            const x = marginLeft + gap + i * (barW + gap);
             const titles = dayPosts.slice(0, 5).map((p) => p.title).join(', ');
             const more = dayPosts.length > 5 ? ` +${dayPosts.length - 5} อื่นๆ` : '';
+            let y = chartH;
             return (
               <g key={key}>
-                <rect x={x} y={y} width={barW} height={h} fill="var(--primary)" rx={4}>
-                  <title>{`${displayDate(key)} (${v}): ${titles}${more}`}</title>
-                </rect>
+                {FORMATS.map((f) => {
+                  const fCount = dayPosts.filter((p) => (p.format || 'ภาพ') === f).length;
+                  if (!fCount) return null;
+                  const h = maxCount ? Math.max((fCount / maxCount) * chartH, 3) : 0;
+                  y -= h;
+                  return (
+                    <rect key={f} x={x} y={y} width={barW} height={h} fill={formatColor(f)}>
+                      <title>{`${displayDate(key)} · ${f}: ${fCount} (รวมวันนี้ ${v}: ${titles}${more})`}</title>
+                    </rect>
+                  );
+                })}
                 {i % showLabelEvery === 0 && (
                   <text x={x + barW / 2} y={chartH + 18} textAnchor="middle" className="chart-axis-label">
                     {d.getDate()}/{d.getMonth() + 1}
@@ -726,6 +755,22 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
     return map;
   }, [inRange]);
 
+  const formatCounts = useMemo(() => {
+    const map: Record<string, number> = { ภาพ: 0, วิดีโอ: 0 };
+    inRange.forEach((p) => {
+      const f = p.format || 'ภาพ';
+      map[f] = (map[f] || 0) + 1;
+    });
+    return map;
+  }, [inRange]);
+
+  const channelCount = useMemo(
+    () => new Set(inRange.flatMap((p) => csvTags(p.channel))).size,
+    [inRange]
+  );
+
+  const publishRate = inRange.length ? Math.round((statusCounts.PUBLISHED / inRange.length) * 100) : 0;
+
   return (
     <>
       <div className="calendar-head">
@@ -747,6 +792,15 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
       <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} ชิ้น</div>
 
       <div className="grid3" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 14 }}>
+        <div className="card">
+          <div className="kpi-title">
+            รวมทั้งหมด
+            <span className="kpi-icon" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+              <span className="chart-dot" style={{ background: 'var(--accent)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{inRange.length}</div>
+        </div>
         {STATUSES.map((s) => (
           <div className="card" key={s}>
             <div className="kpi-title">
@@ -758,6 +812,33 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
             <div className="kpi-value">{statusCounts[s]}</div>
           </div>
         ))}
+        <div className="card">
+          <div className="kpi-title">
+            อัตราเผยแพร่
+            <span className="kpi-icon" style={{ background: 'var(--success-soft)', color: 'var(--success-dark)' }}>
+              <span className="chart-dot" style={{ background: 'var(--success-dark)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{publishRate}%</div>
+        </div>
+        <div className="card">
+          <div className="kpi-title">
+            ภาพ / วิดีโอ
+            <span className="kpi-icon" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+              <span className="chart-dot" style={{ background: 'var(--danger)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{formatCounts['ภาพ']} / {formatCounts['วิดีโอ']}</div>
+        </div>
+        <div className="card">
+          <div className="kpi-title">
+            ช่องทางที่ใช้
+            <span className="kpi-icon" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
+              <span className="chart-dot" style={{ background: 'var(--info)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{channelCount}</div>
+        </div>
       </div>
 
       <div className="two-col" style={{ gridTemplateColumns: '1fr', marginTop: 0, gap: 14 }}>
