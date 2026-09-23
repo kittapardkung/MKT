@@ -1,6 +1,7 @@
 export type PostStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED';
 export type Format = 'ภาพ' | 'วิดีโอ';
 export type Role = 'editor' | 'creative';
+export type AgentId = 'SCOUT' | 'COMPASS' | 'SPARK' | 'ALMANAC';
 
 export type Post = {
   id: string;
@@ -32,6 +33,28 @@ export type Idea = {
   note: string;
   score: number;
   promoted_post_id: string | null;
+  agent: AgentId;
+  suggested_date: string | null;
+  suggested_channel: string | null;
+  suggested_format: Format | null;
+};
+
+// บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/COMPASS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
+export type AgentReportData =
+  | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
+  | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
+  | { kind: 'list'; items: string[] };
+
+export type AgentReport = {
+  id: string;
+  agent: AgentId;
+  section: string;
+  title: string;
+  body: string;
+  data: AgentReportData | null;
+  sort_order: number;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 export type EventRow = {
@@ -62,6 +85,7 @@ export type Bootstrap = {
   events: EventRow[];
   targets: Target[];
   leads: Lead[];
+  agentReports: AgentReport[];
   me: string;
   role: Role;
 };

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { Bootstrap, Idea, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
+import type { AgentId, Bootstrap, Idea, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -24,7 +24,7 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
   // TODO(auth-testing-bypass): ยังไม่ได้ล็อกอิน (ปิดบังคับล็อกอินไว้ชั่วคราว) — สมมติเป็น editor เพื่อทดสอบปุ่มอนุมัติได้
   const me = user?.email || 'ทดสอบระบบ (ยังไม่ได้ล็อกอิน)';
 
-  const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes, leadsRes] = await Promise.all([
+  const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes, leadsRes, reportsRes] = await Promise.all([
     user ? getRole(me) : Promise.resolve<Role>('editor'),
     supabase.from('posts').select('*').order('date', { ascending: true }),
     supabase.from('tags').select('tag, active').order('tag'),
@@ -35,6 +35,8 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
     supabase
       .from('leads')
       .select('lead_id, created_date, phone_number, interested_model, source, lead_status'),
+    // ตาราง agent_reports อาจยังไม่ถูกสร้าง (ต้องรัน migrate_agent_workflow.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
+    supabase.from('agent_reports').select('*').order('agent').order('sort_order'),
   ]);
 
   if (postsRes.error) throw postsRes.error;
@@ -52,6 +54,7 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
     events: eventsRes.data || [],
     targets: targetsRes.data || [],
     leads: (leadsRes.data || []) as Lead[],
+    agentReports: (reportsRes.data || []) as Bootstrap['agentReports'],
   };
 }
 
@@ -206,10 +209,22 @@ export async function addIdea(input: {
   category: string;
   note: string;
   score: number;
+  agent?: AgentId;
+  suggested_date?: string | null;
+  suggested_channel?: string | null;
+  suggested_format?: string | null;
 }): Promise<void> {
   const supabase = createClient();
   const id = newId('I');
-  const { error } = await supabase.from('ideas').insert({ id, ...input, promoted_post_id: null });
+  const { error } = await supabase.from('ideas').insert({
+    id,
+    ...input,
+    agent: input.agent || 'SPARK',
+    suggested_date: input.suggested_date || null,
+    suggested_channel: input.suggested_channel || null,
+    suggested_format: input.suggested_format || null,
+    promoted_post_id: null,
+  });
   if (error) throw error;
 }
 
