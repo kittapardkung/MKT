@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { Bootstrap, Idea, Post, PostStatus, Role, Tag } from '@/lib/types';
+import type { Bootstrap, Idea, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -24,13 +24,17 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
   // TODO(auth-testing-bypass): ยังไม่ได้ล็อกอิน (ปิดบังคับล็อกอินไว้ชั่วคราว) — สมมติเป็น editor เพื่อทดสอบปุ่มอนุมัติได้
   const me = user?.email || 'ทดสอบระบบ (ยังไม่ได้ล็อกอิน)';
 
-  const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes] = await Promise.all([
+  const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes, leadsRes] = await Promise.all([
     user ? getRole(me) : Promise.resolve<Role>('editor'),
     supabase.from('posts').select('*').order('date', { ascending: true }),
     supabase.from('tags').select('tag, active').order('tag'),
     supabase.from('ideas').select('*').order('created_at', { ascending: false }),
     supabase.from('events').select('date, name'),
     supabase.from('targets').select('key, label, target, period'),
+    // ตาราง leads อาจยังไม่ถูกสร้าง (ต้องรัน schema_leads.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
+    supabase
+      .from('leads')
+      .select('lead_id, created_date, phone_number, interested_model, source, lead_status'),
   ]);
 
   if (postsRes.error) throw postsRes.error;
@@ -47,6 +51,7 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
     ideas: (ideasRes.data || []) as Idea[],
     events: eventsRes.data || [],
     targets: targetsRes.data || [],
+    leads: (leadsRes.data || []) as Lead[],
   };
 }
 

@@ -46,12 +46,22 @@ export type Target = {
   period: string;
 };
 
+export type Lead = {
+  lead_id: string;
+  created_date: string | null;
+  phone_number: string;
+  interested_model: string | null;
+  source: string | null;
+  lead_status: string | null;
+};
+
 export type Bootstrap = {
   posts: Post[];
   tags: Tag[];
   ideas: Idea[];
   events: EventRow[];
   targets: Target[];
+  leads: Lead[];
   me: string;
   role: Role;
 };

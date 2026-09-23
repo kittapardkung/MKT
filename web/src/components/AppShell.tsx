@@ -25,7 +25,7 @@ import {
   ymd,
   type RangeValue,
 } from '@/lib/date-utils';
-import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
+import type { Bootstrap, Idea, Lead, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
@@ -419,6 +419,7 @@ export default function AppShell() {
             <DashboardPage
               posts={filteredPosts}
               events={data?.events || []}
+              leads={data?.leads || []}
               range={range}
               role={data?.role || 'creative'}
               target={target}
@@ -516,6 +517,7 @@ function LinkCell({ url }: { url: string }) {
 function DashboardPage({
   posts,
   events,
+  leads,
   range,
   role,
   target,
@@ -524,6 +526,7 @@ function DashboardPage({
 }: {
   posts: Post[];
   events: { date: string; name: string }[];
+  leads: Lead[];
   range: { start: Date | null; end: Date | null; label: string };
   role: string;
   target: (key: string, fallback: number) => number;
@@ -542,6 +545,48 @@ function DashboardPage({
     const d = parseDate(e.date);
     return d && (!range.start || (d >= range.start && (!range.end || d <= range.end)));
   });
+
+  // นับลีดไม่ซ้ำเบอร์โทร ภายในช่วงวันที่ที่กรองไว้ (เหมือนระบบเดิม)
+  const seenPhones = new Set<string>();
+  const filteredLeads = leads.filter((l) => {
+    const d = parseDate(l.created_date);
+    if (range.start && (!d || d < range.start || (range.end && d > range.end))) return false;
+    const phone = (l.phone_number || '').trim();
+    if (phone) {
+      if (seenPhones.has(phone)) return false;
+      seenPhones.add(phone);
+    }
+    return true;
+  });
+
+  function countBy(rows: Lead[], key: 'source' | 'interested_model') {
+    const map: Record<string, number> = {};
+    rows.forEach((r) => {
+      const name = (r[key] || '').trim() || '(ไม่ระบุ)';
+      map[name] = (map[name] || 0) + 1;
+    });
+    const total = rows.length;
+    return Object.keys(map)
+      .map((name) => ({ name, count: map[name], pct: total ? Math.round((map[name] / total) * 1000) / 10 : 0 }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  const leadSources = countBy(filteredLeads, 'source');
+  const leadModels = countBy(filteredLeads, 'interested_model').slice(0, 8);
+
+  function countTable(rows: { name: string; count: number; pct: number }[], label: string) {
+    if (!rows.length) return <Empty text="ยังไม่มีข้อมูลในช่วงนี้" />;
+    return (
+      <table>
+        <thead><tr><th>{label}</th><th>จำนวน</th><th>สัดส่วน</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.name}><td>{r.name}</td><td className="num">{r.count}</td><td className="num">{r.pct}%</td></tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
 
   const tagMap: Record<string, number> = {};
   posts.forEach((p) => csvTags(p.tags).forEach((t) => (tagMap[t] = (tagMap[t] || 0) + 1)));
@@ -600,7 +645,7 @@ function DashboardPage({
       <div className="period-label">ช่วงข้อมูล: {range.label}</div>
 
       <div className="grid3">
-        {kpiCard('Lead Generation', 0, target('leads', 150), <PhoneCall size={17} />)}
+        {kpiCard('Lead Generation', filteredLeads.length, target('leads', 150), <PhoneCall size={17} />)}
         {kpiCard(
           'คอนเทนต์ที่ผลิต',
           posts.length,
@@ -612,6 +657,17 @@ function DashboardPage({
           </div>
         )}
         {kpiCard('Event Test Drive', filteredEvents.length, tEvents, <Car size={17} />)}
+      </div>
+
+      <div className="two-col">
+        <div className="card">
+          <h2>แหล่งที่มาของลีด</h2>
+          {countTable(leadSources, 'Source')}
+        </div>
+        <div className="card">
+          <h2>รุ่นที่ลูกค้าสนใจ</h2>
+          {countTable(leadModels, 'รุ่นรถ')}
+        </div>
       </div>
 
       <div className="two-col">

@@ -129,3 +129,10 @@ create policy "log_select_authenticated" on log
 drop policy if exists "log_insert_authenticated" on log;
 create policy "log_insert_authenticated" on log
   for insert to authenticated with check (true);
+
+-- ======================
+-- leads (อ่านอย่างเดียว — ข้อมูลมาจากชีตฝ่ายขาย ไม่มีใครเขียนผ่านแอปนี้)
+-- ======================
+drop policy if exists "leads_select_authenticated" on leads;
+create policy "leads_select_authenticated" on leads
+  for select to authenticated using (true);
