@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { signOut } from '@/lib/actions/auth';
 import {
   addIdea,
@@ -20,27 +20,20 @@ import {
   displayDateTime,
   getRange,
   parseDate,
-  postDateTime,
   sortPostDate,
   ymd,
   type RangeValue,
 } from '@/lib/date-utils';
-import type { Bootstrap, Idea, Lead, Post, PostStatus } from '@/lib/types';
+import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
-  LayoutDashboard,
   CalendarDays,
   KanbanSquare,
   Table as TableIcon,
   Library,
   Plus,
   LogOut,
-  PhoneCall,
-  FileText,
-  Car,
-  Video,
-  Image as ImageIcon,
 } from 'lucide-react';
 
 const STATUS_LABELS: Record<PostStatus, string> = {
@@ -68,7 +61,6 @@ function attrUrl(url: string) {
 }
 
 const NAV = [
-  { id: 'dashboard', label: 'แดชบอร์ด KPI', short: 'KPI', icon: LayoutDashboard },
   { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
   { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน', icon: KanbanSquare },
   { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง', icon: TableIcon },
@@ -116,7 +108,7 @@ export default function AppShell() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [page, setPage] = useState<PageId>('dashboard');
+  const [page, setPage] = useState<PageId>('calendarPage');
 
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
@@ -197,12 +189,6 @@ export default function AppShell() {
   }, [data, search, channelFilter]);
 
   const activeTags = useMemo(() => (data?.tags || []).filter((t) => t.active !== false), [data]);
-
-  function target(key: string, fallback: number): number {
-    const row = data?.targets.find((t) => t.key === key);
-    const n = row ? Number(row.target) : fallback;
-    return isNaN(n) ? fallback : n;
-  }
 
   async function runAction(fn: () => Promise<void>) {
     setSaving(true);
@@ -415,19 +401,6 @@ export default function AppShell() {
         <div className="content">
           {error && <div className="error show">{error}</div>}
 
-          {page === 'dashboard' && (
-            <DashboardPage
-              posts={filteredPosts}
-              events={data?.events || []}
-              leads={data?.leads || []}
-              range={range}
-              role={data?.role || 'creative'}
-              target={target}
-              onOpenPost={openPost}
-              onApprove={doApprove}
-            />
-          )}
-
           {page === 'calendarPage' && (
             <CalendarPage
               posts={calendarPosts}
@@ -511,218 +484,6 @@ function LinkCell({ url }: { url: string }) {
     <a href={attrUrl(url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
       เปิด
     </a>
-  );
-}
-
-function DashboardPage({
-  posts,
-  events,
-  leads,
-  range,
-  role,
-  target,
-  onOpenPost,
-  onApprove,
-}: {
-  posts: Post[];
-  events: { date: string; name: string }[];
-  leads: Lead[];
-  range: { start: Date | null; end: Date | null; label: string };
-  role: string;
-  target: (key: string, fallback: number) => number;
-  onOpenPost: (p: Post) => void;
-  onApprove: (id: string) => void;
-}) {
-  const tContent = target('content', 20);
-  const tVideo = target('video', 20);
-  const tImage = target('image', 20);
-  const tEvents = target('events', 2);
-
-  const video = posts.filter((p) => p.format === 'วิดีโอ').length;
-  const image = posts.filter((p) => p.format === 'ภาพ').length;
-
-  const filteredEvents = events.filter((e) => {
-    const d = parseDate(e.date);
-    return d && (!range.start || (d >= range.start && (!range.end || d <= range.end)));
-  });
-
-  // นับลีดไม่ซ้ำเบอร์โทร ภายในช่วงวันที่ที่กรองไว้ (เหมือนระบบเดิม)
-  const seenPhones = new Set<string>();
-  const filteredLeads = leads.filter((l) => {
-    const d = parseDate(l.created_date);
-    if (range.start && (!d || d < range.start || (range.end && d > range.end))) return false;
-    const phone = (l.phone_number || '').trim();
-    if (phone) {
-      if (seenPhones.has(phone)) return false;
-      seenPhones.add(phone);
-    }
-    return true;
-  });
-
-  function countBy(rows: Lead[], key: 'source' | 'interested_model') {
-    const map: Record<string, number> = {};
-    rows.forEach((r) => {
-      const name = (r[key] || '').trim() || '(ไม่ระบุ)';
-      map[name] = (map[name] || 0) + 1;
-    });
-    const total = rows.length;
-    return Object.keys(map)
-      .map((name) => ({ name, count: map[name], pct: total ? Math.round((map[name] / total) * 1000) / 10 : 0 }))
-      .sort((a, b) => b.count - a.count);
-  }
-
-  const leadSources = countBy(filteredLeads, 'source');
-  const leadModels = countBy(filteredLeads, 'interested_model').slice(0, 8);
-
-  function countTable(rows: { name: string; count: number; pct: number }[], label: string) {
-    if (!rows.length) return <Empty text="ยังไม่มีข้อมูลในช่วงนี้" />;
-    return (
-      <table>
-        <thead><tr><th>{label}</th><th>จำนวน</th><th>สัดส่วน</th></tr></thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.name}><td>{r.name}</td><td className="num">{r.count}</td><td className="num">{r.pct}%</td></tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
-  const tagMap: Record<string, number> = {};
-  posts.forEach((p) => csvTags(p.tags).forEach((t) => (tagMap[t] = (tagMap[t] || 0) + 1)));
-  const totalTagUses = Object.values(tagMap).reduce((s, n) => s + n, 0);
-  const tagRows = Object.keys(tagMap)
-    .map((name) => ({ name, count: tagMap[name], pct: totalTagUses ? Math.round((tagMap[name] / totalTagUses) * 1000) / 10 : 0 }))
-    .sort((a, b) => b.count - a.count);
-
-  const pending = posts.filter((p) => p.status === 'REVIEW').sort(sortPostDate);
-  const now = new Date();
-  const queue = posts
-    .filter((p) => {
-      const d = postDateTime(p);
-      return d && d >= now && p.status !== 'PUBLISHED';
-    })
-    .sort(sortPostDate)
-    .slice(0, 6);
-
-  function kpiCard(
-    title: string,
-    value: number,
-    targetValue: number,
-    icon: ReactNode,
-    extra?: ReactNode
-  ) {
-    const pct = targetValue ? Math.round((value / targetValue) * 100) : 0;
-    const bar = Math.min(pct, 100);
-    return (
-      <div className="card" key={title}>
-        <div className="kpi-title">
-          {title}
-          <span className="kpi-icon">{icon}</span>
-        </div>
-        <div className="kpi-value num">{value} / {targetValue}</div>
-        <div className="progress"><span style={{ width: `${bar}%` }} /></div>
-        <div className="kpi-foot num">{pct}% ของเป้าหมาย</div>
-        {extra}
-      </div>
-    );
-  }
-
-  function miniProgress(label: string, value: number, targetValue: number, icon: ReactNode) {
-    const pct = targetValue ? Math.round((value / targetValue) * 100) : 0;
-    return (
-      <div className="mini-row" key={label}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{icon}{label}</span>
-        <div className="progress"><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>
-        <b className="num">{value}</b>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <h1>แดชบอร์ด KPI</h1>
-      <div className="period-label">ช่วงข้อมูล: {range.label}</div>
-
-      <div className="grid3">
-        {kpiCard('Lead Generation', filteredLeads.length, target('leads', 150), <PhoneCall size={17} />)}
-        {kpiCard(
-          'คอนเทนต์ที่ผลิต',
-          posts.length,
-          tContent,
-          <FileText size={17} />,
-          <div className="mini-progress">
-            {miniProgress('วิดีโอ', video, tVideo, <Video size={12} />)}
-            {miniProgress('ภาพ', image, tImage, <ImageIcon size={12} />)}
-          </div>
-        )}
-        {kpiCard('Event Test Drive', filteredEvents.length, tEvents, <Car size={17} />)}
-      </div>
-
-      <div className="two-col">
-        <div className="card">
-          <h2>แหล่งที่มาของลีด</h2>
-          {countTable(leadSources, 'Source')}
-        </div>
-        <div className="card">
-          <h2>รุ่นที่ลูกค้าสนใจ</h2>
-          {countTable(leadModels, 'รุ่นรถ')}
-        </div>
-      </div>
-
-      <div className="two-col">
-        <div className="card">
-          <h2>คอนเทนต์แยกตามแท็ก</h2>
-          {tagRows.length ? (
-            <table>
-              <thead><tr><th>แท็ก</th><th>จำนวน</th><th>สัดส่วน</th></tr></thead>
-              <tbody>
-                {tagRows.map((r) => (
-                  <tr key={r.name}><td>{r.name}</td><td className="num">{r.count}</td><td className="num">{r.pct}%</td></tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <Empty text="ยังไม่มีข้อมูลในช่วงนี้" />
-          )}
-        </div>
-        <div className="card">
-          <h2>งานรออนุมัติ</h2>
-          {pending.length ? (
-            pending.map((p) => (
-              <div className="queue-item" key={p.id} onClick={() => onOpenPost(p)}>
-                <div>
-                  <div className="queue-title">{p.title}</div>
-                  <div className="meta">{p.channel} · {displayDate(p.date)} {p.time} · {p.owner}</div>
-                </div>
-                {role === 'editor' && (
-                  <button className="btn" onClick={(e) => { e.stopPropagation(); onApprove(p.id); }}>อนุมัติ</button>
-                )}
-              </div>
-            ))
-          ) : (
-            <Empty text="ไม่มีงานรออนุมัติ" />
-          )}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 14 }}>
-        <h2>คิวเผยแพร่ 6 รายการถัดไป</h2>
-        {queue.length ? (
-          queue.map((p) => (
-            <div className="queue-item" key={p.id} onClick={() => onOpenPost(p)}>
-              <div>
-                <div className="queue-title">{displayDate(p.date)} · {p.time} — {p.title}</div>
-                <div className="meta">{p.channel} · {p.owner}</div>
-              </div>
-              <StatusBadge status={p.status} />
-            </div>
-          ))
-        ) : (
-          <Empty text="ไม่มีคิวเผยแพร่ในช่วงนี้" />
-        )}
-      </div>
-    </>
   );
 }
 
