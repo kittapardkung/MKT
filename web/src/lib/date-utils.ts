@@ -77,7 +77,7 @@ export const MONTHS_TH = [
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
 ];
 
-export type RangeValue = 'today' | 'week' | 'month' | 'next15' | 'next30' | 'custom';
+export type RangeValue = 'today' | 'week' | 'month' | 'lastMonth' | 'next15' | 'next30' | 'custom';
 
 export function getRange(
   preset: RangeValue,
@@ -96,6 +96,9 @@ export function getRange(
     const diff = dow === 0 ? -6 : 1 - dow;
     start = addDays(now, diff);
     end = addDays(start, 6);
+  } else if (preset === 'lastMonth') {
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
   } else if (preset === 'next15') {
     start = new Date(now);
     end = addDays(now, 14);

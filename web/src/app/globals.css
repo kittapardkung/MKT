@@ -117,6 +117,13 @@ h3{font-size:14px;margin:0 0 8px}
 .mini-progress{margin-top:10px}
 .mini-row{display:grid;grid-template-columns:65px 1fr 40px;align-items:center;gap:8px;font-size:11px;margin-top:6px}
 
+.chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px}
+.chart-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:600}
+.chart-dot{display:inline-block;width:8px;height:8px;border-radius:999px;flex-shrink:0}
+.chart-grid{stroke:var(--line);stroke-width:1}
+.chart-value{font-size:11px;font-weight:700;fill:var(--navy)}
+.chart-axis-label{font-size:10px;fill:var(--muted)}
+
 table{width:100%;border-collapse:collapse}
 thead th{background:var(--gray-soft);position:sticky;top:0}
 th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;vertical-align:top}

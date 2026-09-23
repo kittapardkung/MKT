@@ -28,6 +28,7 @@ import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
+  LayoutDashboard,
   CalendarDays,
   KanbanSquare,
   Table as TableIcon,
@@ -82,6 +83,7 @@ function attrUrl(url: string) {
 }
 
 const NAV = [
+  { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
   { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
   { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน', icon: KanbanSquare },
   { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง', icon: TableIcon },
@@ -422,6 +424,8 @@ export default function AppShell() {
         <div className="content">
           {error && <div className="error show">{error}</div>}
 
+          {page === 'dashboard' && <DashboardPage posts={data?.posts || []} onOpenPost={openPost} />}
+
           {page === 'calendarPage' && (
             <CalendarPage
               posts={calendarPosts}
@@ -505,6 +509,272 @@ function LinkCell({ url }: { url: string }) {
     <a href={attrUrl(url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
       เปิด
     </a>
+  );
+}
+
+const MONTHS_TH_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+];
+
+function monthKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function niceMax(n: number) {
+  if (n <= 0) return 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(n)));
+  const step = pow <= 1 ? 1 : pow / 2;
+  return Math.ceil(n / step) * step;
+}
+
+function MonthlyStatusChart({ posts }: { posts: Post[] }) {
+  const months = useMemo(() => {
+    const now = new Date();
+    const list: { key: string; label: string; counts: Record<PostStatus, number>; total: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      list.push({
+        key: monthKey(d),
+        label: `${MONTHS_TH_SHORT[d.getMonth()]} ${String(d.getFullYear() + 543).slice(-2)}`,
+        counts: { DRAFT: 0, REVIEW: 0, APPROVED: 0, PUBLISHED: 0 },
+        total: 0,
+      });
+    }
+    const byKey = Object.fromEntries(list.map((m) => [m.key, m]));
+    posts.forEach((p) => {
+      const d = parseDate(p.date);
+      if (!d) return;
+      const m = byKey[monthKey(d)];
+      if (!m) return;
+      const s = (p.status || 'DRAFT') as PostStatus;
+      m.counts[s] = (m.counts[s] || 0) + 1;
+      m.total += 1;
+    });
+    return list;
+  }, [posts]);
+
+  const maxTotal = niceMax(Math.max(...months.map((m) => m.total), 0));
+  const chartH = 160;
+  const barW = 40;
+  const gap = 28;
+  const chartW = months.length * (barW + gap) + gap;
+
+  return (
+    <div className="card">
+      <h2>จำนวนคอนเทนต์ที่ลงในแต่ละเดือน (6 เดือนล่าสุด)</h2>
+      <div className="chart-legend">
+        {STATUSES.map((s) => (
+          <span className="chart-legend-item" key={s}>
+            <span className="chart-dot" style={{ background: statusDotColor(s) }} />
+            {statusLabel(s)}
+          </span>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${chartW} ${chartH + 34}`} width="100%" style={{ overflow: 'visible' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+          <line
+            key={t}
+            x1={0} x2={chartW}
+            y1={chartH - chartH * t} y2={chartH - chartH * t}
+            className="chart-grid"
+          />
+        ))}
+        {months.map((m, i) => {
+          const x = gap + i * (barW + gap);
+          let y = chartH;
+          return (
+            <g key={m.key}>
+              {STATUSES.map((s, si) => {
+                const v = m.counts[s];
+                if (!v) return null;
+                const h = Math.max((v / maxTotal) * chartH - 2, 0);
+                y -= h + 2;
+                const isTop = STATUSES.slice(si + 1).every((later) => !m.counts[later]);
+                return (
+                  <rect
+                    key={s}
+                    x={x} y={y} width={barW} height={h}
+                    fill={statusDotColor(s)}
+                    rx={isTop ? 4 : 0}
+                  >
+                    <title>{`${m.label} · ${statusLabel(s)}: ${v}`}</title>
+                  </rect>
+                );
+              })}
+              {m.total > 0 && (
+                <text x={x + barW / 2} y={chartH - (m.total / maxTotal) * chartH - 8} textAnchor="middle" className="chart-value">
+                  {m.total}
+                </text>
+              )}
+              <text x={x + barW / 2} y={chartH + 20} textAnchor="middle" className="chart-axis-label">
+                {m.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; end: Date }) {
+  const days = useMemo(() => {
+    const list: Date[] = [];
+    let cur = stripTimeLocal(start);
+    const last = stripTimeLocal(end);
+    let guard = 0;
+    while (cur <= last && guard < 400) {
+      list.push(cur);
+      cur = addDays(cur, 1);
+      guard += 1;
+    }
+    return list;
+  }, [start, end]);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, Post[]>();
+    posts.forEach((p) => {
+      const d = parseDate(p.date);
+      if (!d) return;
+      const key = ymd(d);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    });
+    return map;
+  }, [posts]);
+
+  const counts = days.map((d) => (byDay.get(ymd(d)) || []).length);
+  const maxCount = niceMax(Math.max(...counts, 0));
+  const chartH = 150;
+  const barW = days.length > 40 ? 8 : 18;
+  const gap = days.length > 40 ? 3 : 8;
+  const chartW = Math.max(days.length * (barW + gap) + gap, 320);
+  const showLabelEvery = Math.max(1, Math.ceil(days.length / 14));
+
+  return (
+    <div className="card">
+      <h2>จำนวนคอนเทนต์ที่ดำเนินการอยู่รายวัน</h2>
+      <div className="calendar-wrap">
+        <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+          {[0, 0.5, 1].map((t) => (
+            <line key={t} x1={0} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
+          ))}
+          {days.map((d, i) => {
+            const key = ymd(d);
+            const dayPosts = byDay.get(key) || [];
+            const v = dayPosts.length;
+            const x = gap + i * (barW + gap);
+            const h = maxCount ? Math.max((v / maxCount) * chartH, v > 0 ? 3 : 0) : 0;
+            const y = chartH - h;
+            const titles = dayPosts.slice(0, 5).map((p) => p.title).join(', ');
+            const more = dayPosts.length > 5 ? ` +${dayPosts.length - 5} อื่นๆ` : '';
+            return (
+              <g key={key}>
+                <rect x={x} y={y} width={barW} height={h} fill="var(--primary)" rx={4}>
+                  <title>{`${displayDate(key)} (${v}): ${titles}${more}`}</title>
+                </rect>
+                {i % showLabelEvery === 0 && (
+                  <text x={x + barW / 2} y={chartH + 18} textAnchor="middle" className="chart-axis-label">
+                    {d.getDate()}/{d.getMonth() + 1}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function stripTimeLocal(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post) => void }) {
+  const [preset, setPreset] = useState<RangeValue>('month');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const range = useMemo(() => getRange(preset, from, to), [preset, from, to]);
+
+  const inRange = useMemo(() => {
+    if (!range.start || !range.end) return [];
+    return posts.filter((p) => {
+      const d = parseDate(p.date);
+      return d && d >= range.start! && d <= range.end!;
+    });
+  }, [posts, range]);
+
+  const statusCounts = useMemo(() => {
+    const map: Record<PostStatus, number> = { DRAFT: 0, REVIEW: 0, APPROVED: 0, PUBLISHED: 0 };
+    inRange.forEach((p) => {
+      const s = (p.status || 'DRAFT') as PostStatus;
+      map[s] = (map[s] || 0) + 1;
+    });
+    return map;
+  }, [inRange]);
+
+  return (
+    <>
+      <div className="calendar-head">
+        <h1 style={{ marginBottom: 0 }}>แดชบอร์ดคอนเทนต์</h1>
+        <div className="calendar-actions">
+          <select className="control" value={preset} onChange={(e) => setPreset(e.target.value as RangeValue)}>
+            <option value="month">เดือนนี้</option>
+            <option value="lastMonth">เดือนที่แล้ว</option>
+            <option value="custom">กำหนดเอง</option>
+          </select>
+          {preset === 'custom' && (
+            <div className="custom-range show">
+              <input type="date" className="control" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <input type="date" className="control" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} ชิ้น</div>
+
+      <div className="grid3" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 14 }}>
+        {STATUSES.map((s) => (
+          <div className="card" key={s}>
+            <div className="kpi-title">
+              {statusLabel(s)}
+              <span className="kpi-icon" style={{ background: statusDotColor(s) + '22', color: statusDotColor(s) }}>
+                <span className="chart-dot" style={{ background: statusDotColor(s) }} />
+              </span>
+            </div>
+            <div className="kpi-value">{statusCounts[s]}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="two-col" style={{ gridTemplateColumns: '1fr', marginTop: 0, gap: 14 }}>
+        <MonthlyStatusChart posts={posts} />
+        {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
+      </div>
+
+      {inRange.length > 0 && (
+        <div className="card" style={{ marginTop: 14, overflow: 'auto' }}>
+          <h2>คอนเทนต์ในช่วงที่เลือก</h2>
+          <table>
+            <thead>
+              <tr><th>วันที่</th><th>หัวเรื่อง</th><th>ช่องทาง</th><th>สถานะ</th></tr>
+            </thead>
+            <tbody>
+              {[...inRange].sort(sortPostDate).map((p) => (
+                <tr className="clickable" key={p.id} onClick={() => onOpenPost(p)}>
+                  <td>{displayDate(p.date)}</td>
+                  <td>{p.title}</td>
+                  <td><span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span></td>
+                  <td><StatusBadge status={p.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
