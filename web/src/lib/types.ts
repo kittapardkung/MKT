@@ -1,0 +1,57 @@
+export type PostStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED';
+export type Format = 'ภาพ' | 'วิดีโอ';
+export type Role = 'editor' | 'creative';
+
+export type Post = {
+  id: string;
+  date: string; // yyyy-mm-dd
+  time: string; // HH:mm
+  channel: string;
+  title: string;
+  format: Format;
+  status: PostStatus;
+  owner: string;
+  caption: string;
+  tags: string;
+  src_link: string;
+  final_link: string;
+  approved_by: string;
+  approved_at: string | null;
+  post_url: string;
+};
+
+export type Tag = {
+  tag: string;
+  active: boolean;
+};
+
+export type Idea = {
+  id: string;
+  title: string;
+  category: string;
+  note: string;
+  score: number;
+  promoted_post_id: string | null;
+};
+
+export type EventRow = {
+  date: string;
+  name: string;
+};
+
+export type Target = {
+  key: string;
+  label: string;
+  target: number;
+  period: string;
+};
+
+export type Bootstrap = {
+  posts: Post[];
+  tags: Tag[];
+  ideas: Idea[];
+  events: EventRow[];
+  targets: Target[];
+  me: string;
+  role: Role;
+};
