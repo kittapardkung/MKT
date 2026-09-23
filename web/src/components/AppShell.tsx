@@ -26,6 +26,7 @@ import {
   type RangeValue,
 } from '@/lib/date-utils';
 import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
+import { errMsg } from '@/lib/err';
 
 const STATUS_LABELS: Record<PostStatus, string> = {
   DRAFT: 'ร่าง',
@@ -138,7 +139,7 @@ export default function AppShell() {
       setData(boot);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     } finally {
       setLoading(false);
     }
@@ -166,6 +167,20 @@ export default function AppShell() {
     });
   }, [data, search, channelFilter, range]);
 
+  // ปฏิทินเลื่อนดูเดือนอื่นได้อิสระ ไม่ผูกกับตัวกรองช่วงวันที่ที่ topbar (กรองแค่ค้นหา/ช่องทาง)
+  const calendarPosts = useMemo(() => {
+    if (!data) return [];
+    const q = search.trim().toLowerCase();
+    return data.posts.filter((p) => {
+      if (channelFilter && csvTags(p.channel).indexOf(channelFilter) === -1) return false;
+      if (q) {
+        const hay = [p.title, p.caption, p.tags, p.owner, p.channel].join(' ').toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }, [data, search, channelFilter]);
+
   const activeTags = useMemo(() => (data?.tags || []).filter((t) => t.active !== false), [data]);
 
   function target(key: string, fallback: number): number {
@@ -184,7 +199,7 @@ export default function AppShell() {
       setPromoteModalOpen(false);
       setIdeaModalOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     } finally {
       setSaving(false);
     }
@@ -394,7 +409,7 @@ export default function AppShell() {
 
           {page === 'calendarPage' && (
             <CalendarPage
-              posts={filteredPosts}
+              posts={calendarPosts}
               cursor={calendarCursor}
               onMove={moveCalendar}
               onToday={calendarToday}
