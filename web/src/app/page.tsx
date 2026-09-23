@@ -1,5 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/server";
 
+// อ่านข้อมูลจริงทุกครั้งที่มีคนเข้าเว็บ แทนที่จะ build เป็น static page ครั้งเดียว
+// (หน้านี้จะกลายเป็นแดชบอร์ดที่ต้องแสดงข้อมูลสดจริงในอนาคต)
+export const dynamic = "force-dynamic";
+
 type Target = {
   key: string;
   label: string;
