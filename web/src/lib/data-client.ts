@@ -88,11 +88,12 @@ export type PostInput = {
 export async function createPost(input: PostInput, who: string): Promise<void> {
   const supabase = createClient();
   const id = newId('P');
+  const { comment, ...fields } = input;
 
-  const { error } = await supabase.from('posts').insert({ id, ...input });
+  const { error } = await supabase.from('posts').insert({ id, ...fields });
   if (error) throw error;
 
-  await log(id, 'CREATE', '', input.status, input.comment || '', who);
+  await log(id, 'CREATE', '', input.status, comment || '', who);
 }
 
 export async function savePost(id: string, input: PostInput, who: string): Promise<void> {
