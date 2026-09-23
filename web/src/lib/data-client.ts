@@ -21,10 +21,11 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const me = user?.email || '';
+  // TODO(auth-testing-bypass): ยังไม่ได้ล็อกอิน (ปิดบังคับล็อกอินไว้ชั่วคราว) — สมมติเป็น editor เพื่อทดสอบปุ่มอนุมัติได้
+  const me = user?.email || 'ทดสอบระบบ (ยังไม่ได้ล็อกอิน)';
 
   const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes] = await Promise.all([
-    getRole(me),
+    user ? getRole(me) : Promise.resolve<Role>('editor'),
     supabase.from('posts').select('*').order('date', { ascending: true }),
     supabase.from('tags').select('tag, active').order('tag'),
     supabase.from('ideas').select('*').order('created_at', { ascending: false }),

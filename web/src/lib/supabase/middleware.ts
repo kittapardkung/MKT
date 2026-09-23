@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// TODO(auth-testing-bypass): ปิดการบังคับล็อกอินไว้ชั่วคราวเพื่อทดสอบฟีเจอร์ก่อน
+// เอา `false &&` ด้านล่างออกเมื่อพร้อมใช้งานจริง แล้ว RLS ต้องกลับไปใช้ policies.sql (to authenticated)
+// ไม่ใช่ policies_testing_open.sql (to anon, authenticated) ด้วย — ดู README
+const REQUIRE_LOGIN = false;
+
 /**
  * รีเฟรช session ของ Supabase ทุก request (ต้องทำใน proxy.ts เพราะ Server Component
  * เขียน cookie ไม่ได้) แล้ว redirect ไปหน้า /login ถ้ายังไม่ได้ล็อกอิน
@@ -35,7 +40,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth');
 
-  if (!user && !isPublicPath) {
+  if (REQUIRE_LOGIN && !user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
