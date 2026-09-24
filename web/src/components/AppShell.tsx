@@ -1029,6 +1029,66 @@ function LeadsStatusBreakdownCard({
   );
 }
 
+const LEAD_MONTHLY_TARGET = 100;
+
+function LeadsTargetCard({ leads }: { leads: Lead[] }) {
+  const now = useMemo(() => new Date(), []);
+  const thisMonthLeads = useMemo(
+    () =>
+      leads.filter((l) => {
+        const d = parseDate(l.created_date || '');
+        return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }),
+    [leads, now]
+  );
+
+  const actual = thisMonthLeads.length;
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const expectedByNow = Math.round((LEAD_MONTHLY_TARGET * dayOfMonth) / daysInMonth);
+  const pct = Math.min(100, Math.round((actual / LEAD_MONTHLY_TARGET) * 100));
+  const onPace = actual >= expectedByNow;
+  const remainingDays = daysInMonth - dayOfMonth;
+  const remainingTarget = Math.max(LEAD_MONTHLY_TARGET - actual, 0);
+  const neededPerDay = remainingDays > 0 ? Math.ceil(remainingTarget / remainingDays) : remainingTarget;
+  const goalReached = actual >= LEAD_MONTHLY_TARGET;
+
+  return (
+    <div className="card lead-target-card">
+      <div className="lead-target-head">
+        <div>
+          <div className="lead-target-label">เป้าหมายหลัก · Lead Generation</div>
+          <h2 style={{ margin: '4px 0 0' }}>
+            เบอร์ลูกค้าเดือน {MONTHS_TH[now.getMonth()]} {now.getFullYear() + 543}
+          </h2>
+        </div>
+        <span className={`badge ${goalReached ? 'approved' : onPace ? 'approved' : 'pending'}`}>
+          {goalReached ? 'ถึงเป้าหมายแล้ว 🎉' : onPace ? 'ตามจังหวะเป้าหมาย' : `ตามหลังเป้า ${expectedByNow - actual} เบอร์`}
+        </span>
+      </div>
+      <div className="lead-target-value">
+        <span className="lead-target-num">{actual}</span>
+        <span className="lead-target-goal">/ {LEAD_MONTHLY_TARGET} เบอร์</span>
+      </div>
+      <div className="lead-target-track">
+        <div className={`lead-target-fill ${onPace ? 'met' : ''}`} style={{ width: `${pct}%` }} />
+        <div
+          className="lead-target-pace-marker"
+          style={{ left: `${Math.min((dayOfMonth / daysInMonth) * 100, 100)}%` }}
+          title={`ตามจังหวะควรได้ ~${expectedByNow} เบอร์ ณ วันนี้ (วันที่ ${dayOfMonth}/${daysInMonth})`}
+        />
+      </div>
+      <div className="meta" style={{ marginTop: 10 }}>
+        วันนี้เป็นวันที่ {dayOfMonth} จาก {daysInMonth} วันของเดือน · ตามจังหวะควรได้ ~{expectedByNow} เบอร์
+        {!goalReached && remainingDays > 0 && (
+          <> · เหลืออีก {remainingTarget} เบอร์ ใน {remainingDays} วัน (เฉลี่ยวันละ {neededPerDay} เบอร์)</>
+        )}
+        {!goalReached && remainingDays <= 0 && <> · หมดเดือนแล้ว ยังขาดอีก {remainingTarget} เบอร์</>}
+      </div>
+    </div>
+  );
+}
+
 const MARKETING_TARGETS = {
   video: 28,
   videoPush: 12,
@@ -1209,7 +1269,9 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
 
   return (
     <>
-      <div className="calendar-head">
+      <LeadsTargetCard leads={leads} />
+
+      <div className="calendar-head" style={{ marginTop: 14 }}>
         <h1 style={{ marginBottom: 0 }}>แดชบอร์ดคอนเทนต์</h1>
         <div className="calendar-actions">
           <select className="control" value={preset} onChange={(e) => setPreset(e.target.value as RangeValue)}>

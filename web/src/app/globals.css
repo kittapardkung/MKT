@@ -314,6 +314,20 @@ tr.clickable:hover{background:var(--accent-soft)}
   .compass-direction-grid{grid-template-columns:1fr}
 }
 
+.lead-target-card{border:2px solid var(--accent);background:linear-gradient(135deg,var(--accent-soft),var(--surface) 60%)}
+.lead-target-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.lead-target-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.lead-target-value{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.lead-target-num{font-size:48px;font-weight:800;color:var(--navy);letter-spacing:-.02em;line-height:1}
+.lead-target-goal{font-size:18px;color:var(--muted);font-weight:600}
+.lead-target-track{position:relative;height:16px;border-radius:999px;background:var(--gray-soft)}
+.lead-target-fill{height:100%;border-radius:999px;background:var(--warning);transition:width .3s}
+.lead-target-fill.met{background:var(--success-dark)}
+.lead-target-pace-marker{position:absolute;top:-4px;width:2px;height:24px;background:var(--navy);border-radius:1px}
+@media(max-width:600px){
+  .lead-target-num{font-size:36px}
+}
+
 .spark-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .spark-tab{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;font-weight:600;font-size:13px;color:var(--muted);min-height:36px}
 .spark-tab.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-hover)}
