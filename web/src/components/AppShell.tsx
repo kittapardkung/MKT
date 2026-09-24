@@ -25,7 +25,7 @@ import {
   ymd,
   type RangeValue,
 } from '@/lib/date-utils';
-import type { Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
+import type { AgentId, Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
@@ -36,7 +36,15 @@ import {
   Library,
   Plus,
   LogOut,
+  Radar,
+  Compass,
+  Sparkles,
+  ListChecks,
+  type LucideIcon,
 } from 'lucide-react';
+import AgentReportPage from '@/components/AgentReportPage';
+import SparkPage from '@/components/SparkPage';
+import TimelinePage from '@/components/TimelinePage';
 
 const STATUS_LABELS: Record<PostStatus, string> = {
   DRAFT: 'ร่าง',
@@ -83,15 +91,51 @@ function attrUrl(url: string) {
   return s;
 }
 
-const NAV = [
-  { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
-  { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
-  { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน', icon: KanbanSquare },
-  { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง', icon: TableIcon },
-  { id: 'library', label: 'คลัง & แท็ก', short: 'คลัง', icon: Library },
-] as const;
+type PageId =
+  | 'scout'
+  | 'compass'
+  | 'spark'
+  | 'dashboard'
+  | 'timeline'
+  | 'calendarPage'
+  | 'board'
+  | 'tablePage'
+  | 'library';
 
-type PageId = (typeof NAV)[number]['id'];
+type NavItem = { id: PageId; label: string; short: string; icon: LucideIcon };
+type NavGroup = { agent: AgentId; label: string; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    agent: 'SCOUT',
+    label: 'SCOUT · วิเคราะห์คู่แข่ง',
+    items: [{ id: 'scout', label: 'ภาพรวมคู่แข่ง', short: 'SCOUT', icon: Radar }],
+  },
+  {
+    agent: 'COMPASS',
+    label: 'COMPASS · กลยุทธ์การตลาด',
+    items: [{ id: 'compass', label: 'ภาพรวมกลยุทธ์', short: 'COMPASS', icon: Compass }],
+  },
+  {
+    agent: 'SPARK',
+    label: 'SPARK · Content Creator',
+    items: [{ id: 'spark', label: 'คลังไอเดีย/Hook', short: 'SPARK', icon: Sparkles }],
+  },
+  {
+    agent: 'ALMANAC',
+    label: 'ALMANAC · Content Planner',
+    items: [
+      { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
+      { id: 'timeline', label: 'ไทม์ไลน์การผลิต', short: 'ไทม์ไลน์', icon: ListChecks },
+      { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
+      { id: 'board', label: 'บอร์ดคิวงาน', short: 'คิวงาน', icon: KanbanSquare },
+      { id: 'tablePage', label: 'ตารางคอนเทนต์', short: 'ตาราง', icon: TableIcon },
+      { id: 'library', label: 'คลัง & แท็ก', short: 'คลัง', icon: Library },
+    ],
+  },
+];
+
+const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 const CHANNELS = ['Facebook', 'Instagram', 'TikTok', 'LINE OA', 'YouTube'];
 const STATUSES: PostStatus[] = ['DRAFT', 'REVIEW', 'APPROVED', 'PUBLISHED'];
@@ -167,7 +211,15 @@ export default function AppShell() {
   });
 
   const [ideaModalOpen, setIdeaModalOpen] = useState(false);
-  const [ideaForm, setIdeaForm] = useState({ title: '', category: '', score: '5', note: '' });
+  const [ideaForm, setIdeaForm] = useState({
+    title: '',
+    category: '',
+    score: '5',
+    note: '',
+    suggested_date: '',
+    suggested_channel: 'Facebook',
+    suggested_format: 'ภาพ',
+  });
 
   async function reload() {
     try {
@@ -310,7 +362,13 @@ export default function AppShell() {
 
   function openPromoteIdea(idea: Idea) {
     setPromoteIdeaTarget(idea);
-    setPromoteForm({ title: idea.title, date: ymd(new Date()), time: '09:00', channel: 'Facebook', format: 'ภาพ' });
+    setPromoteForm({
+      title: idea.title,
+      date: idea.suggested_date || ymd(new Date()),
+      time: '09:00',
+      channel: idea.suggested_channel || 'Facebook',
+      format: idea.suggested_format || 'ภาพ',
+    });
     setPromoteModalOpen(true);
   }
 
@@ -328,6 +386,10 @@ export default function AppShell() {
         category: ideaForm.category.trim(),
         score: Number(ideaForm.score || 0),
         note: ideaForm.note,
+        agent: 'SPARK' as AgentId,
+        suggested_date: ideaForm.suggested_date || null,
+        suggested_channel: ideaForm.suggested_channel || null,
+        suggested_format: ideaForm.suggested_format || null,
       })
     );
   }
@@ -367,18 +429,25 @@ export default function AppShell() {
           <span className="icon"><Zap size={18} fill="currentColor" /></span>
           MKT Content
         </div>
-        <div className="brand-sub">ระบบจัดการคอนเทนต์การตลาด</div>
+        <div className="brand-sub">ระบบจัดการคอนเทนต์การตลาด · Workflow 4 AI</div>
 
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            className={`nav-btn ${page === n.id ? 'active' : ''}`}
-            onClick={() => setPage(n.id)}
-          >
-            <span className="icon"><n.icon size={17} /></span>
-            {n.label}
-          </button>
-        ))}
+        <nav className="nav-scroll">
+          {NAV_GROUPS.map((group) => (
+            <div className="nav-group" key={group.agent}>
+              <div className="nav-group-label">{group.label}</div>
+              {group.items.map((n) => (
+                <button
+                  key={n.id}
+                  className={`nav-btn ${page === n.id ? 'active' : ''}`}
+                  onClick={() => setPage(n.id)}
+                >
+                  <span className="icon"><n.icon size={17} /></span>
+                  {n.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
 
         <div className="user-box">
           <div className="user-email">{data?.me || 'ไม่พบอีเมลจาก Session'}</div>
@@ -440,6 +509,32 @@ export default function AppShell() {
         <div className="content">
           {error && <div className="error show">{error}</div>}
 
+          {page === 'scout' && <AgentReportPage agent="SCOUT" reports={data?.agentReports || []} />}
+
+          {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
+
+          {page === 'spark' && (
+            <SparkPage
+              ideas={data?.ideas || []}
+              onAddIdea={() => {
+                setIdeaForm({
+                  title: '',
+                  category: '',
+                  score: '5',
+                  note: '',
+                  suggested_date: '',
+                  suggested_channel: 'Facebook',
+                  suggested_format: 'ภาพ',
+                });
+                setIdeaModalOpen(true);
+              }}
+            />
+          )}
+
+          {page === 'timeline' && (
+            <TimelinePage ideas={data?.ideas || []} role={data?.role || 'creative'} onApprove={openPromoteIdea} />
+          )}
+
           {page === 'dashboard' && <DashboardPage posts={data?.posts || []} onOpenPost={openPost} />}
 
           {page === 'calendarPage' && (
@@ -465,7 +560,15 @@ export default function AppShell() {
               onAddTag={promptAddTag}
               onRemoveTag={confirmRemoveTag}
               onAddIdea={() => {
-                setIdeaForm({ title: '', category: '', score: '5', note: '' });
+                setIdeaForm({
+                  title: '',
+                  category: '',
+                  score: '5',
+                  note: '',
+                  suggested_date: '',
+                  suggested_channel: 'Facebook',
+                  suggested_format: 'ภาพ',
+                });
                 setIdeaModalOpen(true);
               }}
               onPromote={openPromoteIdea}
@@ -1407,6 +1510,16 @@ function PromoteModal({
   );
 }
 
+type IdeaForm = {
+  title: string;
+  category: string;
+  score: string;
+  note: string;
+  suggested_date: string;
+  suggested_channel: string;
+  suggested_format: string;
+};
+
 function IdeaModal({
   form,
   setForm,
@@ -1414,18 +1527,18 @@ function IdeaModal({
   onClose,
   onSave,
 }: {
-  form: { title: string; category: string; score: string; note: string };
-  setForm: Dispatch<SetStateAction<{ title: string; category: string; score: string; note: string }>>;
+  form: IdeaForm;
+  setForm: Dispatch<SetStateAction<IdeaForm>>;
   saving: boolean;
   onClose: () => void;
   onSave: () => void;
 }) {
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof IdeaForm>(k: K, v: IdeaForm[K]) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <div className="modal show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ width: 'min(560px,100%)' }}>
         <div className="toolbar">
-          <h2 style={{ margin: 0 }}>เพิ่มไอเดีย</h2>
+          <h2 style={{ margin: 0 }}>เสนอไอเดีย/Hook ใหม่ (SPARK)</h2>
           <button className="btn" onClick={onClose}>ปิด</button>
         </div>
         <div className="field"><label>ชื่อไอเดีย</label><input value={form.title} onChange={(e) => set('title', e.target.value)} /></div>
@@ -1434,6 +1547,22 @@ function IdeaModal({
           <div className="field"><label>คะแนน</label><input type="number" min={0} max={10} value={form.score} onChange={(e) => set('score', e.target.value)} /></div>
         </div>
         <div className="field" style={{ marginTop: 10 }}><label>โน้ต</label><textarea value={form.note} onChange={(e) => set('note', e.target.value)} /></div>
+        <div className="notice" style={{ marginTop: 10 }}>เสนอวันที่ควรลง (ไม่บังคับ) — ALMANAC จะใช้ค่านี้เป็นค่าเริ่มต้นตอนอนุมัติเข้าปฏิทินในหน้าไทม์ไลน์การผลิต</div>
+        <div className="modal-grid" style={{ marginTop: 10 }}>
+          <div className="field"><label>วันที่เสนอ</label><input type="date" value={form.suggested_date} onChange={(e) => set('suggested_date', e.target.value)} /></div>
+          <div className="field">
+            <label>ช่องทางที่เสนอ</label>
+            <select value={form.suggested_channel} onChange={(e) => set('suggested_channel', e.target.value)}>
+              {CHANNELS.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>รูปแบบที่เสนอ</label>
+            <select value={form.suggested_format} onChange={(e) => set('suggested_format', e.target.value)}>
+              <option>ภาพ</option><option>วิดีโอ</option>
+            </select>
+          </div>
+        </div>
         <div className="modal-actions">
           <button className="btn primary" disabled={saving} onClick={onSave}>{saving ? 'กำลังบันทึก...' : 'บันทึกไอเดีย'}</button>
         </div>

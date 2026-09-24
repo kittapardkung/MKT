@@ -44,11 +44,14 @@ a:hover{text-decoration:underline}
 .app{display:flex;min-height:100vh}
 .sidebar{
   position:fixed;inset:0 auto 0 0;width:246px;padding:24px 16px;background:var(--surface);
-  border-right:1px solid var(--line);z-index:20
+  border-right:1px solid var(--line);z-index:20;display:flex;flex-direction:column
 }
 .brand{display:flex;align-items:center;gap:9px;font-size:23px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
 .brand .icon{width:32px;height:32px;border-radius:9px;background:var(--navy);color:var(--primary);align-items:center;justify-content:center}
-.brand-sub{font-size:14px;color:var(--muted);margin-top:5px;margin-bottom:26px}
+.brand-sub{font-size:14px;color:var(--muted);margin-top:5px;margin-bottom:22px}
+.nav-scroll{flex:1;overflow-y:auto;min-height:0;padding-bottom:8px}
+.nav-group{margin-bottom:14px}
+.nav-group-label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-soft);padding:0 12px;margin-bottom:4px}
 .nav-btn{
   display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:1px solid transparent;
   border-radius:10px;padding:10px 12px;margin:4px 0;font-weight:500;color:var(--text);font-size:15px
@@ -57,7 +60,7 @@ a:hover{text-decoration:underline}
 .nav-btn.active{border-color:transparent;color:var(--white);background:var(--navy);font-weight:600}
 .nav-btn.active .icon{color:var(--primary)}
 
-.user-box{position:absolute;bottom:18px;left:16px;right:16px;border-top:1px solid var(--line);padding-top:12px}
+.user-box{flex-shrink:0;border-top:1px solid var(--line);padding-top:12px;margin-top:8px}
 .user-email{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-role{font-size:14px;margin-top:3px}
 
@@ -241,6 +244,35 @@ tr.clickable:hover{background:var(--accent-soft)}
 .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);padding:16px}
 .login-card{width:min(380px,100%);border:1px solid var(--line);border-radius:18px;padding:32px;background:var(--surface);box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .login-card .brand{font-size:24px}
+
+/* agent dashboards (SCOUT / COMPASS / SPARK / ALMANAC) */
+.agent-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.agent-badge{
+  display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;
+  font-family:ui-monospace,'SFMono-Regular',Consolas,monospace;font-weight:800;font-size:13px;letter-spacing:.04em;color:#fff;flex-shrink:0
+}
+.agent-scout .agent-badge{background:#0f172a}
+.agent-compass .agent-badge{background:var(--accent)}
+.agent-spark .agent-badge{background:#d9770e}
+.agent-almanac .agent-badge{background:var(--success-dark)}
+
+.report-list-wrap{display:flex;flex-direction:column;gap:14px}
+.report-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.report-body{font-size:13px;color:var(--text);line-height:1.7;margin:0 0 10px;white-space:pre-wrap}
+
+.kpi-chip-row{display:flex;flex-wrap:wrap;gap:10px}
+.kpi-chip-sm{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);min-width:140px}
+.kpi-chip-label{font-size:10.5px;color:var(--muted);margin-bottom:3px}
+.kpi-chip-value{font-family:ui-monospace,'SFMono-Regular',Consolas,monospace;font-size:18px;font-weight:700;color:var(--navy)}
+.kpi-chip-note{font-size:10.5px;color:var(--muted-soft);margin-top:2px}
+
+.scorecard-table td{font-size:12.5px}
+.scorecard-table td:first-child{width:28px;color:var(--muted)}
+.scorecard-table tr.row-highlight{background:var(--primary-soft)}
+.scorecard-table tr.row-highlight td{font-weight:700;color:var(--navy)}
+
+.report-list{margin:0;padding-left:18px;font-size:13px;color:var(--text);line-height:1.8}
+.report-list li{margin-bottom:4px}
 
 @media(max-width:980px){
   .sidebar{display:none}
