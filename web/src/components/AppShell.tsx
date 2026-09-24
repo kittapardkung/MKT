@@ -1066,26 +1066,37 @@ function LeadsStatusBySalesCard({
   }, [overall, total]);
 
   const bySales = useMemo(() => {
-    const map = new Map<string, Map<string, number>>();
+    const map = new Map<string, number>();
     leads.forEach((l) => {
       const sales = l.assigned_sales || 'ไม่ระบุผู้ดูแล';
-      const status = l.lead_status || 'ไม่ระบุ';
-      if (!map.has(sales)) map.set(sales, new Map());
-      const inner = map.get(sales)!;
-      inner.set(status, (inner.get(status) || 0) + 1);
+      map.set(sales, (map.get(sales) || 0) + 1);
     });
     return Array.from(map.entries())
-      .map(([sales, statusMap]) => ({
-        sales,
-        total: Array.from(statusMap.values()).reduce((a, b) => a + b, 0),
-        byStatus: statusOrder.map((s) => ({ status: s, count: statusMap.get(s) || 0 })).filter((x) => x.count > 0),
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [leads, statusOrder]);
+      .map(([sales, count]) => ({ sales, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [leads]);
+
+  const salesColor = (sales: string) => {
+    const idx = bySales.findIndex((b) => b.sales === sales);
+    return LEAD_STATUS_PALETTE[idx >= 0 ? idx % LEAD_STATUS_PALETTE.length : LEAD_STATUS_PALETTE.length - 1];
+  };
+
+  const salesSlices = useMemo(() => {
+    return bySales.reduce<Array<(typeof bySales)[number] & { startAngle: number; endAngle: number; pct: number }>>(
+      (acc, b) => {
+        const prevEnd = acc.length ? acc[acc.length - 1].endAngle : 0;
+        const frac = total ? b.count / total : 0;
+        const sweep = Math.min(frac * 360, 359.99);
+        acc.push({ ...b, startAngle: prevEnd, endAngle: prevEnd + sweep, pct: Math.round(frac * 100) });
+        return acc;
+      },
+      []
+    );
+  }, [bySales, total]);
 
   return (
     <div className="card">
-      <h2>สถานะลูกค้า (Leads) ในช่วงที่เลือก — แยกตาม Sale</h2>
+      <h2>สถานะลูกค้า (Leads) และจำนวนต่อ Sale ในช่วงที่เลือก</h2>
       {!total ? (
         <Empty text="ยังไม่มีลีดในช่วงที่เลือก" />
       ) : (
@@ -1112,25 +1123,26 @@ function LeadsStatusBySalesCard({
             </div>
           </div>
 
-          <div className="sales-status-rows leads-split-col">
-            {bySales.map((row) => (
-              <div className="sales-status-row" key={row.sales}>
-                <div className="sales-status-row-head">
-                  <span className="sales-status-name">{row.sales}</span>
-                  <span className="meta num">{row.total} เบอร์</span>
+          <div className="pie-chart-wrap leads-split-col">
+            <svg viewBox="0 0 200 200" className="pie-chart-svg">
+              {salesSlices.map((s) => (
+                <path key={s.sales} d={donutSlicePath(100, 100, 82, 48, s.startAngle, s.endAngle)} fill={salesColor(s.sales)}>
+                  <title>{`${s.sales}: ${s.count} เบอร์ (${s.pct}%)`}</title>
+                </path>
+              ))}
+              <circle cx="100" cy="100" r="47" fill="var(--surface)" />
+              <text x="100" y="96" textAnchor="middle" className="pie-chart-total-num">{total}</text>
+              <text x="100" y="115" textAnchor="middle" className="pie-chart-total-label">เบอร์ทั้งหมด</text>
+            </svg>
+            <div className="pie-chart-legend">
+              {salesSlices.map((s) => (
+                <div className="pie-chart-legend-row" key={s.sales}>
+                  <span className="chart-dot" style={{ background: salesColor(s.sales) }} />
+                  <span className="pie-chart-legend-label">{s.sales}</span>
+                  <span className="pie-chart-legend-value num">{s.count} · {s.pct}%</span>
                 </div>
-                <div className="sales-status-bar">
-                  {row.byStatus.map((b) => (
-                    <span
-                      key={b.status}
-                      className="sales-status-seg"
-                      style={{ width: `${(b.count / row.total) * 100}%`, background: statusColor(b.status) }}
-                      title={`${leadStatusLabel(b.status)}: ${b.count}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
