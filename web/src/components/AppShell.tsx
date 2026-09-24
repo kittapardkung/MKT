@@ -1199,6 +1199,7 @@ function ChannelBreakdownCard({ breakdown }: { breakdown: { channel: string; cou
 }
 
 function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lead[]; onOpenPost: (p: Post) => void }) {
+  const [dashTab, setDashTab] = useState<'marketing' | 'leads'>('marketing');
   const [preset, setPreset] = useState<RangeValue>('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -1289,8 +1290,23 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
       </div>
       <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} คอนเทนต์ · {leadsInRange.length} เบอร์</div>
 
-      <h2 className="dashboard-section-title">📣 KPI แผนก Marketing — การผลิตสื่อ</h2>
+      <div className="spark-tabs">
+        <button
+          className={`spark-tab ${dashTab === 'marketing' ? 'active' : ''}`}
+          onClick={() => setDashTab('marketing')}
+        >
+          📣 KPI แผนก Marketing — การผลิตสื่อ
+        </button>
+        <button
+          className={`spark-tab ${dashTab === 'leads' ? 'active' : ''}`}
+          onClick={() => setDashTab('leads')}
+        >
+          📞 KPI จำนวนลีด (เบอร์ลูกค้า)
+        </button>
+      </div>
 
+      {dashTab === 'marketing' && (
+      <>
       <div className="kpi-row" style={{ marginBottom: 14 }}>
         <div className="card kpi-cell">
           <div className="kpi-title">
@@ -1371,9 +1387,11 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
           </table>
         </div>
       )}
+      </>
+      )}
 
-      <h2 className="dashboard-section-title">📞 KPI จำนวนลีด (เบอร์ลูกค้า)</h2>
-
+      {dashTab === 'leads' && (
+      <>
       <div className="kpi-row" style={{ marginBottom: 14 }}>
         <div className="card kpi-cell">
           <div className="kpi-title">
@@ -1454,6 +1472,8 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
             </tbody>
           </table>
         </div>
+      )}
+      </>
       )}
     </>
   );
