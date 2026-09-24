@@ -194,6 +194,7 @@ export default function AppShell() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [calendarStatusFilter, setCalendarStatusFilter] = useState('');
+  const [calendarPpsFilter, setCalendarPpsFilter] = useState('');
 
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postForm, setPostForm] = useState<PostForm>(() => emptyPostForm(''));
@@ -263,13 +264,14 @@ export default function AppShell() {
     return data.posts.filter((p) => {
       if (channelFilter && csvTags(p.channel).indexOf(channelFilter) === -1) return false;
       if (calendarStatusFilter && p.status !== calendarStatusFilter) return false;
+      if (calendarPpsFilter && (p.content_type || '') !== calendarPpsFilter) return false;
       if (q) {
         const hay = [p.title, p.caption, p.tags, p.owner, p.channel].join(' ').toLowerCase();
         if (hay.indexOf(q) === -1) return false;
       }
       return true;
     });
-  }, [data, search, channelFilter, calendarStatusFilter]);
+  }, [data, search, channelFilter, calendarStatusFilter, calendarPpsFilter]);
 
   const activeTags = useMemo(() => (data?.tags || []).filter((t) => t.active !== false), [data]);
 
@@ -559,6 +561,8 @@ export default function AppShell() {
               onOpenPost={openPost}
               statusFilter={calendarStatusFilter}
               onStatusFilterChange={setCalendarStatusFilter}
+              ppsFilter={calendarPpsFilter}
+              onPpsFilterChange={setCalendarPpsFilter}
             />
           )}
 
@@ -1129,6 +1133,8 @@ function CalendarPage({
   onOpenPost,
   statusFilter,
   onStatusFilterChange,
+  ppsFilter,
+  onPpsFilterChange,
 }: {
   posts: Post[];
   cursor: Date;
@@ -1137,6 +1143,8 @@ function CalendarPage({
   onOpenPost: (p: Post) => void;
   statusFilter: string;
   onStatusFilterChange: (v: string) => void;
+  ppsFilter: string;
+  onPpsFilterChange: (v: string) => void;
 }) {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -1163,6 +1171,13 @@ function CalendarPage({
           <select className="control" value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}>
             <option value="">ทุกสถานะ</option>
             {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+          </select>
+          <select className="control" value={ppsFilter} onChange={(e) => onPpsFilterChange(e.target.value)}>
+            <option value="">ทุกหมวด (PPS)</option>
+            <option value="Push">Push (Awareness)</option>
+            <option value="Pull">Pull (Authority)</option>
+            <option value="Sell">Sell (ปิดการขาย)</option>
+            <option value="Event">Event / Test Drive</option>
           </select>
           <button className="btn" onClick={() => onMove(-1)}>ก่อนหน้า</button>
           <button className="btn" onClick={onToday}>เดือนนี้</button>
