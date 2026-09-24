@@ -6,7 +6,9 @@ function Empty({ text }: { text: string }) {
   return <div className="empty">{text}</div>;
 }
 
-function TableRow({ row, rowKey }: { row: string[]; rowKey: number }) {
+const GRADE_LETTERS = new Set(['A', 'B', 'C', 'D', 'X', 'N']);
+
+function TableRow({ row, rowKey, gradeColumn }: { row: string[]; rowKey: number; gradeColumn?: number }) {
   return (
     <tr key={rowKey}>
       {row.map((cell, j) =>
@@ -16,11 +18,37 @@ function TableRow({ row, rowKey }: { row: string[]; rowKey: number }) {
               ดูตัวอย่าง ↗
             </a>
           </td>
+        ) : j === gradeColumn && GRADE_LETTERS.has(cell) ? (
+          <td key={j}>
+            <span className={`grade-badge grade-badge-${cell}`}>{cell}</span>
+          </td>
         ) : (
           <td key={j}>{cell || '—'}</td>
         )
       )}
     </tr>
+  );
+}
+
+const GRADE_LEGEND: { grade: string; label: string }[] = [
+  { grade: 'A', label: '≤฿100/ผลลัพธ์' },
+  { grade: 'B', label: '≤฿200/ผลลัพธ์' },
+  { grade: 'C', label: '≤฿300/ผลลัพธ์' },
+  { grade: 'D', label: '>฿300/ผลลัพธ์' },
+  { grade: 'X', label: 'งบภาพลักษณ์ (AWN/Follow)' },
+  { grade: 'N', label: 'งบน้อยเกินไปจะวัดผล' },
+];
+
+function GradeLegend() {
+  return (
+    <div className="grade-legend">
+      {GRADE_LEGEND.map((g) => (
+        <span key={g.grade}>
+          <span className={`grade-badge grade-badge-${g.grade}`}>{g.grade}</span>
+          {g.label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -203,22 +231,30 @@ function ReportCard({ report }: { report: AgentReport }) {
       )}
 
       {data?.kind === 'table' && 'rows' in data && (
-        <div className="report-table-wrap">
-          <table className="report-table">
-            <thead>
-              <tr>
-                {data.columns.map((col, i) => (
-                  <th key={i}>{col}</th>
+        <>
+          {report.section === 'creatives' && <GradeLegend />}
+          <div className="report-table-wrap">
+            <table className="report-table">
+              <thead>
+                <tr>
+                  {data.columns.map((col, i) => (
+                    <th key={i}>{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row, i) => (
+                  <TableRow
+                    row={row}
+                    rowKey={i}
+                    gradeColumn={report.section === 'creatives' ? data.columns.length - 1 : undefined}
+                    key={i}
+                  />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row, i) => (
-                <TableRow row={row} rowKey={i} key={i} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {data?.kind === 'bar' && <BarChart items={data.items} />}
