@@ -9,6 +9,33 @@
       { "label": "คะแนนถ่วงน้ำหนัก", "value": "5.50/10", "note": "เสมออันดับ 3 กับ AION หลุดจากอันดับ 3 เดี่ยว" }
     ]
   },
+  "our_ads": {
+    "title": "โฆษณาของเรา (WULING CHONBURI) ที่กำลังยิงอยู่",
+    "body": "ดึงจากบัญชีโฆษณาของเราเอง — สถานะ ACTIVE ณ 24 ก.ย. 2569 · ผลลัพธ์ 7 วันล่าสุด",
+    "columns": ["แคมเปญ", "จำนวนโฆษณา", "งบ 7 วัน", "Impressions 7 วัน", "หมายเหตุ"],
+    "rows": [
+      ["MSG Test Drive (20-28 ก.ย. 2569)", "1", "฿3,731.45", "27,468", "โปรโมทอีเวนต์ทดลองขับ \"WULING TEST DRIVE\" — ยังยิงต่อเนื่อง งบ/impressions เพิ่มขึ้นจากรอบก่อน"],
+      ["MSG Wuling Chonburi EKSION EV (18 ก.ย. 2569)", "2", "฿1,623.37", "18,428", "แคมเปญ EKSION EV ยังคงยิงต่อเนื่อง — ยังเป็นแคมเปญเดียวที่โปรโมท BINGUO/EKXION โดยเฉพาะ"],
+      ["MSG Wuling Chonburi (PORTA/Darion ต่อเนื่อง)", "2", "฿3,658.83", "23,169", "ข้อความเน้นราคา/โปรโมชัน PORTA EV และ Darion EV เป็นตัวหลัก"],
+      ["AWN Wuling Chonburi (Awareness)", "1", "฿825.70", "39,371", "เน้น reach ต้นทุนต่ำ — ครีเอทีฟ \"PORTA EV เปิดรับจองแล้ววันนี้\" เป็นตัวหลัก"],
+      ["Follow Wuling Chonburi", "4", "฿836.84", "6,692", "แคมเปญสร้างผู้ติดตามเพจ"]
+    ]
+  },
+  "brand_share": {
+    "title": "สัดส่วนโฆษณาต่อแบรนด์ (เราเทียบกับทั้งตลาด)",
+    "body": "จำนวนโฆษณา ACTIVE รวมต่อแบรนด์ ณ 24 ก.ย. 2569 — WULING CHONBURI (เรา) ไฮไลต์สีเขียว ตัวเลขที่ตรวจได้ไม่ครบทุกเพจในรอบนี้ (BYD/Geely/AION) เป็น \"อย่างน้อย\"",
+    "items": [
+      { "label": "GWM · ORA", "value": 132 },
+      { "label": "AION", "value": 33 },
+      { "label": "Wuling คู่แข่งอื่น (รวม 7 เพจ)", "value": 24 },
+      { "label": "Deepal", "value": 23 },
+      { "label": "BYD", "value": 19 },
+      { "label": "MG", "value": 17 },
+      { "label": "WULING CHONBURI (เรา)", "value": 10, "highlight": true },
+      { "label": "Chery", "value": 10 },
+      { "label": "Geely", "value": 7 }
+    ]
+  },
   "scorecard": {
     "title": "Competitor Scorecard (ถ่วงน้ำหนัก)",
     "body": "คะแนนประเมินจากรูปแบบโฆษณาที่สังเกตได้จาก Meta Ad Library เท่านั้น ไม่ใช่ข้อมูลผลลัพธ์จริง (conversion/ยอดขาย)",
@@ -25,35 +52,75 @@
   },
   "pages": {
     "title": "แนวโฆษณาคู่แข่งรายเพจ (Meta Ad Library)",
-    "body": "จำนวนโฆษณา ACTIVE ต่อเพจ ณ 24 ก.ย. 2569 — ตัวเลขที่มี \"~\" หรือ \"อย่างน้อย\" หมายถึงตรวจได้ไม่ครบทุกเพจในเครือข่ายรอบนี้",
-    "columns": ["เพจ", "แบรนด์", "โฆษณา ACTIVE", "หมายเหตุ", "ตัวอย่าง"],
-    "rows": [
-      ["Wuling Chonburi - ศูนย์ วูหลิง ชลบุรี", "Wuling (คู่แข่ง)", "13", "ยืนยันคู่แข่งจริง — ยิงราคา PORTA EV 629,000 บาท ต่ำกว่าเรา 30,000 บาท ต่อเนื่องรอบที่ 2 ยังไม่ตรวจสอบ", "https://www.facebook.com/ads/library/?id=4620529518193542"],
-      ["Wuling Pinklao", "Wuling", "5", "คงที่จากรอบก่อน", "https://www.facebook.com/ads/library/?id=2938990453144757"],
-      ["Wuling Maporn Rayong", "Wuling", "1", "กลับมามีโฆษณา (รอบก่อน 0)", "https://www.facebook.com/ads/library/?id=2617360955386683"],
-      ["Wuling Rayong", "Wuling", "0", "ไม่พบโฆษณา ACTIVE รอบนี้", ""],
-      ["Wuling Suwin / EV Suwin", "Wuling", "0", "เน้นออร์แกนิก ไม่ยิงโฆษณา", ""],
-      ["Wuling Ubon Ratchathani", "Wuling", "1", "ยืนยันชื่อเพจตรง คงที่", "https://www.facebook.com/ads/library/?id=1847491619752148"],
-      ["Wuling Loei", "Wuling", "4", "นอกพื้นที่หลัก คงที่", "https://www.facebook.com/ads/library/?id=2549516788856009"],
-      ["BYD ชลบุรี ออโตโมทีฟ ศรีราชา", "BYD", "~10", "ตรวจได้ไม่ครบทุกเพจย่อยในรอบนี้", "https://www.facebook.com/ads/library/?id=1726604365306204"],
-      ["BYD ชลบุรี ออโตโมทีฟ พัทยา", "BYD", "~9", "ตรวจได้ไม่ครบทุกเพจย่อยในรอบนี้", "https://www.facebook.com/ads/library/?id=2105266883409982"],
-      ["GWM ORA Thailand", "GWM · ORA", "98", "พุ่งจาก 35 เป็น 98 ชิ้นในสัปดาห์เดียว — แรงที่สุดในรอบนี้", "https://www.facebook.com/ads/library/?id=1645780057274226"],
-      ["GWM Iconic Ramintra", "GWM · ORA", "34", "ผสม TANK ดีเซล + ORA5 EV", "https://www.facebook.com/ads/library/?id=1454913363186860"],
-      ["MG Primus Chonburi Bypass", "MG", "10", "ยืนยันครบเครือข่ายครั้งแรก", "https://www.facebook.com/ads/library/?id=949251121573602"],
-      ["Mg Primus Baipas Chonburi เซลล์นุ", "MG", "7", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=2591230314724753"],
-      ["Geely VIN Prestige Chonburi", "Geely", "7", "ตรวจได้เฉพาะเพจหลัก ไม่ครบเครือข่าย", "https://www.facebook.com/ads/library/?id=1060572579940453"],
-      ["Chery BRG Chonburi", "Chery", "10", "ทรงตัวจากรอบก่อน", "https://www.facebook.com/ads/library/?id=1378570703988298"],
-      ["GAC AION Primus Chonburi", "AION", "~28", "เพจหลัก ยิงต่อเนื่องยาวนานที่สุดในกลุ่ม", "https://www.facebook.com/ads/library/?id=1945302962810324"],
-      ["AION ชลบุรี - Primus", "AION", "3", "page_id แยกจากเพจหลัก", "https://www.facebook.com/ads/library/?id=2031781750863964"],
-      ["AION Primus Praram 9", "AION", "2", "นอกพื้นที่หลัก (กรุงเทพฯ)", "https://www.facebook.com/ads/library/?id=1619209653097742"],
-      ["Changan Deepal Primus Chonburi (เพจหลัก)", "Deepal", "11", "เพจนายหน้าหลัก", "https://www.facebook.com/ads/library/?id=3605480292942976"],
-      ["Deepal Primus Chonburi", "Deepal", "5", "page_id เดียวกับเพจหลัก รายการเก่ากว่า", "https://www.facebook.com/ads/library/?id=1723460345575171"],
-      ["Changan Deepal Primus Chonburi - Sine", "Deepal", "1", "เพจนายหน้าใหม่ที่พบรอบนี้", "https://www.facebook.com/ads/library/?id=1070774948910576"],
-      ["Changan Deepal Primus Chonburi By BB", "Deepal", "2", "เพจนายหน้าใหม่ที่พบรอบนี้", "https://www.facebook.com/ads/library/?id=2162666014661675"],
-      ["CHANGANDeepal Primus Chonburi ART", "Deepal", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=1566702955255609"],
-      ["Deepal Primus Chonburi - Sale ลูกปัด", "Deepal", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=1067121182961458"],
-      ["Changan Deepal Primus Chonburi - By Oat", "Deepal", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=2062027641184631"],
-      ["Deepal Primus Chonburi - Sale แคท", "Deepal", "1", "เพจนายหน้ารายบุคคล — รวม Deepal 8 เพจ ~23 ชิ้น เครือข่ายใหญ่ต่อเนื่อง ใกล้เคียงรอบก่อน", "https://www.facebook.com/ads/library/?id=1364050189049929"]
+    "body": "จำนวนโฆษณา ACTIVE ต่อเพจ ณ 24 ก.ย. 2569 จัดกลุ่มตามแบรนด์ — ตัวเลขที่มี \"~\" หรือ \"อย่างน้อย\" หมายถึงตรวจได้ไม่ครบทุกเพจในเครือข่ายรอบนี้",
+    "columns": ["เพจ", "โฆษณา ACTIVE", "หมายเหตุ", "ตัวอย่าง"],
+    "groups": [
+      {
+        "label": "Wuling — ดีลเลอร์คู่แข่ง (รวม 24 ชิ้น/7 เพจ)",
+        "rows": [
+          ["Wuling Chonburi - ศูนย์ วูหลิง ชลบุรี", "13", "ยืนยันคู่แข่งจริง — ยิงราคา PORTA EV 629,000 บาท ต่ำกว่าเรา 30,000 บาท ต่อเนื่องรอบที่ 2 ยังไม่ตรวจสอบ", "https://www.facebook.com/ads/library/?id=4620529518193542"],
+          ["Wuling Pinklao", "5", "คงที่จากรอบก่อน", "https://www.facebook.com/ads/library/?id=2938990453144757"],
+          ["Wuling Maporn Rayong", "1", "กลับมามีโฆษณา (รอบก่อน 0)", "https://www.facebook.com/ads/library/?id=2617360955386683"],
+          ["Wuling Rayong", "0", "ไม่พบโฆษณา ACTIVE รอบนี้", ""],
+          ["Wuling Suwin / EV Suwin", "0", "เน้นออร์แกนิก ไม่ยิงโฆษณา", ""],
+          ["Wuling Ubon Ratchathani", "1", "ยืนยันชื่อเพจตรง คงที่", "https://www.facebook.com/ads/library/?id=1847491619752148"],
+          ["Wuling Loei", "4", "นอกพื้นที่หลัก คงที่", "https://www.facebook.com/ads/library/?id=2549516788856009"]
+        ]
+      },
+      {
+        "label": "GWM · ORA (รวม 132 ชิ้น/2 เพจ — แรงที่สุดในรอบนี้)",
+        "rows": [
+          ["GWM ORA Thailand", "98", "พุ่งจาก 35 เป็น 98 ชิ้นในสัปดาห์เดียว — แรงที่สุดในรอบนี้", "https://www.facebook.com/ads/library/?id=1645780057274226"],
+          ["GWM Iconic Ramintra", "34", "ผสม TANK ดีเซล + ORA5 EV", "https://www.facebook.com/ads/library/?id=1454913363186860"]
+        ]
+      },
+      {
+        "label": "AION (รวมอย่างน้อย 33 ชิ้น/3 เพจ — ตรวจได้ไม่ครบรอบนี้)",
+        "rows": [
+          ["GAC AION Primus Chonburi", "~28", "เพจหลัก ยิงต่อเนื่องยาวนานที่สุดในกลุ่ม", "https://www.facebook.com/ads/library/?id=1945302962810324"],
+          ["AION ชลบุรี - Primus", "3", "page_id แยกจากเพจหลัก", "https://www.facebook.com/ads/library/?id=2031781750863964"],
+          ["AION Primus Praram 9", "2", "นอกพื้นที่หลัก (กรุงเทพฯ)", "https://www.facebook.com/ads/library/?id=1619209653097742"]
+        ]
+      },
+      {
+        "label": "Deepal (รวมอย่างน้อย 23 ชิ้น/8 เพจ — เครือข่ายนายหน้า)",
+        "rows": [
+          ["Changan Deepal Primus Chonburi (เพจหลัก)", "11", "เพจนายหน้าหลัก", "https://www.facebook.com/ads/library/?id=3605480292942976"],
+          ["Deepal Primus Chonburi", "5", "page_id เดียวกับเพจหลัก รายการเก่ากว่า", "https://www.facebook.com/ads/library/?id=1723460345575171"],
+          ["Changan Deepal Primus Chonburi - Sine", "1", "เพจนายหน้าใหม่ที่พบรอบนี้", "https://www.facebook.com/ads/library/?id=1070774948910576"],
+          ["Changan Deepal Primus Chonburi By BB", "2", "เพจนายหน้าใหม่ที่พบรอบนี้", "https://www.facebook.com/ads/library/?id=2162666014661675"],
+          ["CHANGANDeepal Primus Chonburi ART", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=1566702955255609"],
+          ["Deepal Primus Chonburi - Sale ลูกปัด", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=1067121182961458"],
+          ["Changan Deepal Primus Chonburi - By Oat", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=2062027641184631"],
+          ["Deepal Primus Chonburi - Sale แคท", "1", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=1364050189049929"]
+        ]
+      },
+      {
+        "label": "BYD (รวมอย่างน้อย 19 ชิ้น/2 เพจ — ตรวจได้ไม่ครบรอบนี้)",
+        "rows": [
+          ["BYD ชลบุรี ออโตโมทีฟ ศรีราชา", "~10", "ตรวจได้ไม่ครบทุกเพจย่อยในรอบนี้", "https://www.facebook.com/ads/library/?id=1726604365306204"],
+          ["BYD ชลบุรี ออโตโมทีฟ พัทยา", "~9", "ตรวจได้ไม่ครบทุกเพจย่อยในรอบนี้", "https://www.facebook.com/ads/library/?id=2105266883409982"]
+        ]
+      },
+      {
+        "label": "MG (รวม 17 ชิ้น/2 เพจ — ยืนยันครบเครือข่ายครั้งแรก)",
+        "rows": [
+          ["MG Primus Chonburi Bypass", "10", "ยืนยันครบเครือข่ายครั้งแรก", "https://www.facebook.com/ads/library/?id=949251121573602"],
+          ["Mg Primus Baipas Chonburi เซลล์นุ", "7", "เพจนายหน้ารายบุคคล", "https://www.facebook.com/ads/library/?id=2591230314724753"]
+        ]
+      },
+      {
+        "label": "Chery (รวม 10 ชิ้น/1 เพจ — ทรงตัว)",
+        "rows": [
+          ["Chery BRG Chonburi", "10", "ทรงตัวจากรอบก่อน", "https://www.facebook.com/ads/library/?id=1378570703988298"]
+        ]
+      },
+      {
+        "label": "Geely (รวมอย่างน้อย 7 ชิ้น/1 เพจ — ตรวจได้ไม่ครบรอบนี้)",
+        "rows": [
+          ["Geely VIN Prestige Chonburi", "7", "ตรวจได้เฉพาะเพจหลัก ไม่ครบเครือข่าย", "https://www.facebook.com/ads/library/?id=1060572579940453"]
+        ]
+      }
     ]
   },
   "findings": {
@@ -64,7 +131,7 @@
       "เพจ \"Wuling Chonburi - ศูนย์ วูหลิง ชลบุรี\" ยังยิงราคา PORTA EV 629,000 บาท ต่ำกว่าเรา 30,000 บาท ต่อเนื่องรอบที่ 2 — ยังไม่มีการตรวจสอบจากทีมขาย ต้องเร่งด่วนที่สุด",
       "MG ตรวจสอบครบทั้งเครือข่ายเป็นครั้งแรก — 17 โฆษณา ACTIVE จาก 2 เพจ ราคา MG4 Electric และ MG S5 EV Plus คงที่",
       "BYD, Geely, AION รอบนี้ตรวจสอบได้เพียงบางเพจ ไม่ครบเท่าที่เคยยืนยัน — ตัวเลขที่รายงานเป็น \"อย่างน้อย\" ต้องตรวจซ้ำให้ครบในรอบหน้า",
-      "Deepal เครือข่ายนายหน้ายังคงขนาดใหญ่ต่อเนื่อง (24 ชิ้น/8 เพจ) ราคา Deepal S07 ยังคง Early Bird 1,099,000 บาท",
+      "Deepal เครือข่ายนายหน้ายังคงขนาดใหญ่ต่อเนื่อง (~23 ชิ้น/8 เพจ) ราคา Deepal S07 ยังคง Early Bird 1,099,000 บาท",
       "คู่แข่งส่วนใหญ่จับกลุ่มลูกค้าซื้อคันแรก/เปลี่ยนรถทั่วไป ยังไม่มีแบรนด์ใดจับกลุ่มธุรกิจ/โลจิสติกส์อย่างชัดเจน",
       "Meta Ad Library สาธารณะไม่เปิดเผยรูปแบบครีเอทีฟ (ภาพ/วิดีโอ) หรือเป้าหมายแคมเปญของคู่แข่ง — ต้องอาศัยการทดสอบจริงของเราเอง"
     ]

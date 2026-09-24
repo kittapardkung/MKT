@@ -46,9 +46,19 @@ async function syncReport(supabase, agent, idPrefix, doc) {
       title: block.title || section,
       body: block.body || '',
       data: block.columns
-        ? { kind: 'table', columns: block.columns, rows: block.rows }
+        ? block.groups
+          ? { kind: 'table', columns: block.columns, groups: block.groups }
+          : { kind: 'table', columns: block.columns, rows: block.rows }
         : block.items
-          ? { kind: Array.isArray(block.items) && typeof block.items[0] === 'string' ? 'list' : 'kpi', items: block.items }
+          ? {
+              kind:
+                typeof block.items[0] === 'string'
+                  ? 'list'
+                  : typeof block.items[0]?.value === 'number'
+                    ? 'bar'
+                    : 'kpi',
+              items: block.items,
+            }
           : block.rows
             ? { kind: 'scorecard', rows: block.rows }
             : null,

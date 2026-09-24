@@ -5,6 +5,44 @@ function Empty({ text }: { text: string }) {
   return <div className="empty">{text}</div>;
 }
 
+function TableRow({ row, rowKey }: { row: string[]; rowKey: number }) {
+  return (
+    <tr key={rowKey}>
+      {row.map((cell, j) =>
+        cell.startsWith('http') ? (
+          <td key={j}>
+            <a href={cell} target="_blank" rel="noopener noreferrer">
+              ดูตัวอย่าง ↗
+            </a>
+          </td>
+        ) : (
+          <td key={j}>{cell || '—'}</td>
+        )
+      )}
+    </tr>
+  );
+}
+
+function BarChart({ items }: { items: { label: string; value: number; highlight?: boolean }[] }) {
+  const max = Math.max(...items.map((i) => i.value), 1);
+  return (
+    <div className="bar-chart">
+      {items.map((item, i) => (
+        <div className="bar-chart-row" key={i}>
+          <div className="bar-chart-label">{item.label}</div>
+          <div className="bar-chart-track">
+            <div
+              className={`bar-chart-fill${item.highlight ? ' bar-chart-fill-highlight' : ''}`}
+              style={{ width: `${(item.value / max) * 100}%` }}
+            />
+          </div>
+          <div className="bar-chart-value">{item.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
   COMPASS: { tagline: 'AI นักกลยุทธ์การตลาด', className: 'agent-compass' },
@@ -56,7 +94,31 @@ function ReportCard({ report }: { report: AgentReport }) {
         </ul>
       )}
 
-      {data?.kind === 'table' && (
+      {data?.kind === 'table' && 'groups' in data && (
+        <div className="report-table-wrap">
+          <table className="report-table">
+            <thead>
+              <tr>
+                {data.columns.map((col, i) => (
+                  <th key={i}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            {data.groups.map((g, gi) => (
+              <tbody key={gi}>
+                <tr className="report-table-group">
+                  <td colSpan={data.columns.length}>{g.label}</td>
+                </tr>
+                {g.rows.map((row, i) => (
+                  <TableRow row={row} rowKey={i} key={i} />
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      )}
+
+      {data?.kind === 'table' && 'rows' in data && (
         <div className="report-table-wrap">
           <table className="report-table">
             <thead>
@@ -68,24 +130,14 @@ function ReportCard({ report }: { report: AgentReport }) {
             </thead>
             <tbody>
               {data.rows.map((row, i) => (
-                <tr key={i}>
-                  {row.map((cell, j) =>
-                    cell.startsWith('http') ? (
-                      <td key={j}>
-                        <a href={cell} target="_blank" rel="noopener noreferrer">
-                          ดูตัวอย่าง ↗
-                        </a>
-                      </td>
-                    ) : (
-                      <td key={j}>{cell || '—'}</td>
-                    )
-                  )}
-                </tr>
+                <TableRow row={row} rowKey={i} key={i} />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {data?.kind === 'bar' && <BarChart items={data.items} />}
     </div>
   );
 }

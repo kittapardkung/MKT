@@ -48,7 +48,9 @@ export type AgentReportData =
   | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
   | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
   | { kind: 'list'; items: string[] }
-  | { kind: 'table'; columns: string[]; rows: string[][] };
+  | { kind: 'table'; columns: string[]; rows: string[][] }
+  | { kind: 'table'; columns: string[]; groups: { label: string; rows: string[][] }[] }
+  | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] };
 
 export type AgentReport = {
   id: string;
