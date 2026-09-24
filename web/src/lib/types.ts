@@ -90,9 +90,11 @@ export type Target = {
 export type Lead = {
   lead_id: string;
   created_date: string | null;
+  customer_name: string | null;
   phone_number: string;
   interested_model: string | null;
   source: string | null;
+  assigned_sales: string | null;
   lead_status: string | null;
 };
 

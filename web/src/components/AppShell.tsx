@@ -865,6 +865,170 @@ function stripTimeLocal(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+const LEAD_STATUS_PALETTE = ['#5b5bd6', '#22c55e', '#f59e0b', '#38bdf8', '#ef4444', '#8b5cf6', '#14b8a6', '#9ca3af'];
+
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  NEW: 'ลีดใหม่',
+  CONTACTED: 'ติดต่อแล้ว',
+  FOLLOW_UP: 'ติดตามต่อ',
+  TEST_DRIVE: 'นัดทดลองขับ',
+  LOST: 'เสียโอกาส',
+  WON: 'ปิดการขาย',
+};
+
+function leadStatusLabel(status: string) {
+  return LEAD_STATUS_LABELS[status] || status || 'ไม่ระบุสถานะ';
+}
+
+function LeadsDailyChart({
+  leads,
+  start,
+  end,
+  statusOrder,
+  statusColor,
+}: {
+  leads: Lead[];
+  start: Date;
+  end: Date;
+  statusOrder: string[];
+  statusColor: (status: string) => string;
+}) {
+  const days = useMemo(() => {
+    const list: Date[] = [];
+    let cur = stripTimeLocal(start);
+    const last = stripTimeLocal(end);
+    let guard = 0;
+    while (cur <= last && guard < 400) {
+      list.push(cur);
+      cur = addDays(cur, 1);
+      guard += 1;
+    }
+    return list;
+  }, [start, end]);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, Lead[]>();
+    leads.forEach((l) => {
+      const d = parseDate(l.created_date || '');
+      if (!d) return;
+      const key = ymd(d);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(l);
+    });
+    return map;
+  }, [leads]);
+
+  const counts = days.map((d) => (byDay.get(ymd(d)) || []).length);
+  const maxCount = niceMax(Math.max(...counts, 0));
+  const chartH = 170;
+  const marginLeft = 34;
+  const barW = days.length > 40 ? 8 : 20;
+  const gap = days.length > 40 ? 3 : 10;
+  const plotW = Math.max(days.length * (barW + gap) + gap, 280);
+  const chartW = plotW + marginLeft;
+  const showLabelEvery = Math.max(1, Math.ceil(days.length / 14));
+  const yTicks = [0, 0.5, 1].map((t) => Math.round(maxCount * t));
+
+  return (
+    <div className="card">
+      <h2>จำนวนลีด (เบอร์ลูกค้า) รายวัน แยกตามสถานะ</h2>
+      <div className="chart-legend">
+        {statusOrder.map((s) => (
+          <span className="chart-legend-item" key={s}>
+            <span className="chart-dot" style={{ background: statusColor(s) }} />
+            {leadStatusLabel(s)}
+          </span>
+        ))}
+      </div>
+      <div className="calendar-wrap">
+        <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+          {[0, 0.5, 1].map((t, i) => (
+            <g key={t}>
+              <line x1={marginLeft} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
+              <text x={marginLeft - 8} y={chartH - chartH * t} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                {yTicks[i]}
+              </text>
+            </g>
+          ))}
+          {days.map((d, i) => {
+            const key = ymd(d);
+            const dayLeads = byDay.get(key) || [];
+            const v = dayLeads.length;
+            const x = marginLeft + gap + i * (barW + gap);
+            let y = chartH;
+            return (
+              <g key={key}>
+                {statusOrder.map((s) => {
+                  const sCount = dayLeads.filter((l) => (l.lead_status || 'ไม่ระบุ') === s).length;
+                  if (!sCount) return null;
+                  const h = maxCount ? Math.max((sCount / maxCount) * chartH, 3) : 0;
+                  y -= h;
+                  return (
+                    <rect key={s} x={x} y={y} width={barW} height={h} fill={statusColor(s)}>
+                      <title>{`${displayDate(key)} · ${leadStatusLabel(s)}: ${sCount} (รวมวันนี้ ${v} เบอร์)`}</title>
+                    </rect>
+                  );
+                })}
+                {i % showLabelEvery === 0 && (
+                  <text x={x + barW / 2} y={chartH + 18} textAnchor="middle" className="chart-axis-label">
+                    {d.getDate()}/{d.getMonth() + 1}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function LeadsStatusBreakdownCard({
+  leads,
+  statusOrder,
+  statusColor,
+}: {
+  leads: Lead[];
+  statusOrder: string[];
+  statusColor: (status: string) => string;
+}) {
+  const breakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    leads.forEach((l) => {
+      const s = l.lead_status || 'ไม่ระบุ';
+      map.set(s, (map.get(s) || 0) + 1);
+    });
+    return statusOrder
+      .map((s) => ({ status: s, count: map.get(s) || 0 }))
+      .filter((x) => x.count > 0)
+      .map((x) => ({ ...x, pct: leads.length ? Math.round((x.count / leads.length) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+  }, [leads, statusOrder]);
+
+  return (
+    <div className="card">
+      <h2>สถานะลูกค้า (Leads) ในช่วงที่เลือก</h2>
+      {breakdown.length ? (
+        <div className="channel-breakdown">
+          {breakdown.map((b) => (
+            <div className="channel-breakdown-row" key={b.status}>
+              <span className="channel-tag" style={{ color: statusColor(b.status), background: `${statusColor(b.status)}22` }}>
+                {leadStatusLabel(b.status)}
+              </span>
+              <div className="progress channel-breakdown-bar">
+                <span style={{ width: `${b.pct}%`, background: statusColor(b.status) }} />
+              </div>
+              <span className="meta num" style={{ minWidth: 90, textAlign: 'right' }}>{b.count} เบอร์ · {b.pct}%</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty text="ยังไม่มีลีดในช่วงที่เลือก" />
+      )}
+    </div>
+  );
+}
+
 const MARKETING_TARGETS = {
   video: 28,
   videoPush: 12,
@@ -1029,6 +1193,20 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
 
   const publishRate = inRange.length ? Math.round((statusCounts.PUBLISHED / inRange.length) * 100) : 0;
 
+  const leadStatusOrder = useMemo(() => {
+    const seen: string[] = [];
+    leads.forEach((l) => {
+      const s = l.lead_status || 'ไม่ระบุ';
+      if (!seen.includes(s)) seen.push(s);
+    });
+    return seen;
+  }, [leads]);
+
+  const leadStatusColor = (status: string) => {
+    const idx = leadStatusOrder.indexOf(status || 'ไม่ระบุ');
+    return LEAD_STATUS_PALETTE[idx >= 0 ? idx % LEAD_STATUS_PALETTE.length : LEAD_STATUS_PALETTE.length - 1];
+  };
+
   return (
     <>
       <div className="calendar-head">
@@ -1117,6 +1295,16 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
         <MonthlyStatusChart posts={posts} />
         {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
         <ChannelBreakdownCard breakdown={channelBreakdown} />
+        {range.start && range.end && (
+          <LeadsDailyChart
+            leads={leadsInRange}
+            start={range.start}
+            end={range.end}
+            statusOrder={leadStatusOrder}
+            statusColor={leadStatusColor}
+          />
+        )}
+        <LeadsStatusBreakdownCard leads={leadsInRange} statusOrder={leadStatusOrder} statusColor={leadStatusColor} />
       </div>
 
       {inRange.length > 0 && (
@@ -1135,6 +1323,42 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
                   <td><StatusBadge status={p.status} /></td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {leadsInRange.length > 0 && (
+        <div className="card" style={{ marginTop: 14, overflow: 'auto' }}>
+          <h2>ลีด (เบอร์ลูกค้า) ในช่วงที่เลือก</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>วันที่</th><th>ชื่อ</th><th>เบอร์โทร</th><th>รุ่นที่สนใจ</th>
+                <th>ช่องทาง</th><th>สถานะ</th><th>ผู้ดูแล</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...leadsInRange]
+                .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')))
+                .map((l) => (
+                  <tr key={l.lead_id}>
+                    <td>{l.created_date ? displayDate(l.created_date) : '-'}</td>
+                    <td>{l.customer_name || '-'}</td>
+                    <td>{l.phone_number || '-'}</td>
+                    <td>{l.interested_model || '-'}</td>
+                    <td>{l.source || '-'}</td>
+                    <td>
+                      <span
+                        className="channel-tag"
+                        style={{ color: leadStatusColor(l.lead_status || 'ไม่ระบุ'), background: `${leadStatusColor(l.lead_status || 'ไม่ระบุ')}22` }}
+                      >
+                        {leadStatusLabel(l.lead_status || 'ไม่ระบุ')}
+                      </span>
+                    </td>
+                    <td>{l.assigned_sales || '-'}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
