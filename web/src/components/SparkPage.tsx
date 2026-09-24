@@ -13,7 +13,62 @@ function typeBadgeClass(type: string) {
   return 'type-default';
 }
 
-function CompassDirectionCard({ reports }: { reports: AgentReport[] }) {
+const PPS_TARGET: Record<string, number> = { Push: 45, Pull: 35, Sell: 20 };
+const PPS_TYPES = ['Push', 'Pull', 'Sell'] as const;
+
+function InterestPpsChart({ ideas }: { ideas: Idea[] }) {
+  const interested = ideas.filter((i) => i.interest === 'interested');
+  const total = interested.length;
+  const counts: Record<string, number> = { Push: 0, Pull: 0, Sell: 0 };
+  interested.forEach((i) => {
+    if (i.type && i.type in counts) counts[i.type] += 1;
+  });
+
+  return (
+    <div className="spark-pps-chart">
+      <div className="spark-pps-chart-title">สัดส่วนคอนเทนต์ที่ &quot;สนใจ&quot; ตอนนี้ ({total} รายการ)</div>
+      {total === 0 ? (
+        <Empty text="ยังไม่มีไอเดียที่ทำเครื่องหมายว่าสนใจ" />
+      ) : (
+        <>
+          <div className="spark-pps-rows">
+            {PPS_TYPES.map((type) => {
+              const pct = total ? Math.round((counts[type] / total) * 100) : 0;
+              const target = PPS_TARGET[type];
+              const met = type === 'Sell' ? pct <= target : pct >= target;
+              return (
+                <div className="spark-pps-row" key={type}>
+                  <div className="spark-pps-row-head">
+                    <span className={`type-badge ${typeBadgeClass(type)}`}>{type}</span>
+                    <span className="spark-pps-row-value num">{pct}%</span>
+                  </div>
+                  <div className="spark-pps-track">
+                    <div className={`spark-pps-fill ${met ? 'met' : ''}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    <div
+                      className="spark-pps-target"
+                      style={{ left: `${Math.min(target, 100)}%` }}
+                      title={`เป้าหมาย COMPASS: ${type === 'Sell' ? '≤' : ''}${target}%`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="spark-pps-legend">
+            <span className="spark-pps-legend-item">
+              <span className="spark-pps-legend-swatch" /> % จริงจากไอเดียที่สนใจ
+            </span>
+            <span className="spark-pps-legend-item">
+              <span className="spark-pps-legend-tick" /> เป้าหมายจาก COMPASS
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CompassDirectionCard({ reports, ideas }: { reports: AgentReport[]; ideas: Idea[] }) {
   const positioning = reports.find((r) => r.agent === 'COMPASS' && r.section === 'positioning');
   const pps = reports.find((r) => r.agent === 'COMPASS' && r.section === 'pps');
   const ppsItems = pps?.data?.kind === 'kpi' ? pps.data.items : [];
@@ -23,18 +78,23 @@ function CompassDirectionCard({ reports }: { reports: AgentReport[] }) {
   return (
     <div className="card">
       <h2>COMPASS กำหนดแนวทางคอนเทนต์มาอย่างไร</h2>
-      {positioning?.body && <p className="report-body">{positioning.body}</p>}
-      {ppsItems.length > 0 && (
-        <div className="kpi-chip-row">
-          {ppsItems.map((item, i) => (
-            <div className="kpi-chip-sm" key={i}>
-              <div className="kpi-chip-label">{item.label}</div>
-              <div className="kpi-chip-value">{item.value}</div>
-              {item.note && <div className="kpi-chip-note">{item.note}</div>}
+      <div className="compass-direction-grid">
+        <div>
+          {positioning?.body && <p className="report-body">{positioning.body}</p>}
+          {ppsItems.length > 0 && (
+            <div className="kpi-chip-row">
+              {ppsItems.map((item, i) => (
+                <div className="kpi-chip-sm" key={i}>
+                  <div className="kpi-chip-label">{item.label}</div>
+                  <div className="kpi-chip-value">{item.value}</div>
+                  {item.note && <div className="kpi-chip-note">{item.note}</div>}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+        <InterestPpsChart ideas={ideas} />
+      </div>
     </div>
   );
 }
@@ -138,7 +198,7 @@ export default function SparkPage({
         </div>
       </div>
 
-      <CompassDirectionCard reports={reports} />
+      <CompassDirectionCard reports={reports} ideas={ideas} />
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="toolbar">
