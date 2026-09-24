@@ -69,9 +69,17 @@ function ReportCard({ report }: { report: AgentReport }) {
             <tbody>
               {data.rows.map((row, i) => (
                 <tr key={i}>
-                  {row.map((cell, j) => (
-                    <td key={j}>{cell}</td>
-                  ))}
+                  {row.map((cell, j) =>
+                    cell.startsWith('http') ? (
+                      <td key={j}>
+                        <a href={cell} target="_blank" rel="noopener noreferrer">
+                          ดูตัวอย่าง
+                        </a>
+                      </td>
+                    ) : (
+                      <td key={j}>{cell || '—'}</td>
+                    )
+                  )}
                 </tr>
               ))}
             </tbody>
