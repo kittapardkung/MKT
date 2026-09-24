@@ -1536,29 +1536,35 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
         <MonthlyStatusChart posts={posts} />
         {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
         <FormatPieChart posts={inRange} />
-        <ChannelBreakdownCard breakdown={channelBreakdown} />
       </div>
 
-      {inRange.length > 0 && (
-        <div className="card" style={{ marginTop: 14, overflow: 'auto' }}>
-          <h2>คอนเทนต์ในช่วงที่เลือก</h2>
-          <table>
-            <thead>
-              <tr><th>วันที่</th><th>หัวเรื่อง</th><th>ช่องทาง</th><th>สถานะ</th></tr>
-            </thead>
-            <tbody>
-              {[...inRange].sort(sortPostDate).map((p) => (
-                <tr className="clickable" key={p.id} onClick={() => onOpenPost(p)}>
-                  <td>{displayDate(p.date)}</td>
-                  <td>{p.title}</td>
-                  <td><span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span></td>
-                  <td><StatusBadge status={p.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="two-col">
+        <ChannelBreakdownCard breakdown={channelBreakdown} />
+        {inRange.length > 0 ? (
+          <div className="card" style={{ overflow: 'auto' }}>
+            <h2>คอนเทนต์ในช่วงที่เลือก</h2>
+            <table>
+              <thead>
+                <tr><th>วันที่</th><th>หัวเรื่อง</th><th>ช่องทาง</th><th>สถานะ</th></tr>
+              </thead>
+              <tbody>
+                {[...inRange].sort(sortPostDate).map((p) => (
+                  <tr className="clickable" key={p.id} onClick={() => onOpenPost(p)}>
+                    <td>{displayDate(p.date)}</td>
+                    <td>{p.title}</td>
+                    <td><span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span></td>
+                    <td><StatusBadge status={p.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="card">
+            <Empty text="ยังไม่มีคอนเทนต์ในช่วงที่เลือก" />
+          </div>
+        )}
+      </div>
       </>
       )}
 
