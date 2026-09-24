@@ -1,6 +1,8 @@
 export type PostStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED';
 export type Format = 'ภาพ' | 'วิดีโอ';
 export type Role = 'editor' | 'creative';
+// PPS Content System: Push (Awareness) / Pull (Authority) / Sell (ปิดการขาย) / Event (Test Drive/กิจกรรม)
+export type ContentType = 'Push' | 'Pull' | 'Sell' | 'Event';
 
 export type Post = {
   id: string;
@@ -18,6 +20,8 @@ export type Post = {
   approved_by: string;
   approved_at: string | null;
   post_url: string;
+  content_type: ContentType | null;
+  is_viral: boolean;
 };
 
 export type Tag = {

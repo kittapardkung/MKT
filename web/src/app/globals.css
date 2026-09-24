@@ -117,6 +117,13 @@ h3{font-size:16px;margin:0 0 8px}
 .mini-progress{margin-top:10px}
 .mini-row{display:grid;grid-template-columns:65px 1fr 40px;align-items:center;gap:8px;font-size:13px;margin-top:6px}
 
+.kpi-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.kpi-cell{flex:1 1 0;min-width:150px}
+
+.channel-breakdown{display:flex;flex-direction:column;gap:12px}
+.channel-breakdown-row{display:flex;align-items:center;gap:12px}
+.channel-breakdown-bar{flex:1}
+
 .chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px}
 .chart-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
 .chart-dot{display:inline-block;width:8px;height:8px;border-radius:999px;flex-shrink:0}

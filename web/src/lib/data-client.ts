@@ -87,6 +87,8 @@ export type PostInput = {
   final_link: string;
   caption: string;
   tags: string;
+  content_type: string | null;
+  is_viral: boolean;
   comment?: string;
 };
 

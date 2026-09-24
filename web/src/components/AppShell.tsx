@@ -109,6 +109,8 @@ type PostForm = {
   src_link: string;
   final_link: string;
   caption: string;
+  content_type: string;
+  is_viral: boolean;
   comment: string;
 };
 
@@ -125,6 +127,8 @@ const emptyPostForm = (me: string): PostForm => ({
   src_link: '',
   final_link: '',
   caption: '',
+  content_type: '',
+  is_viral: false,
   comment: '',
 });
 
@@ -255,6 +259,8 @@ export default function AppShell() {
       src_link: p.src_link || '',
       final_link: p.final_link || '',
       caption: p.caption || '',
+      content_type: p.content_type || '',
+      is_viral: !!p.is_viral,
       comment: '',
     });
     setPostModalOpen(true);
@@ -281,6 +287,8 @@ export default function AppShell() {
       final_link: postForm.final_link.trim(),
       caption: postForm.caption,
       tags: selectedTags.join(', '),
+      content_type: postForm.content_type || null,
+      is_viral: postForm.content_type === 'Push' ? postForm.is_viral : false,
       comment: postForm.comment,
     };
 
@@ -566,10 +574,11 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
   }, [posts]);
 
   const maxTotal = niceMax(Math.max(...months.map((m) => m.total), 0));
-  const chartH = 190;
-  const barW = 44;
-  const gap = 30;
+  const chartH = 230;
+  const barW = 56;
+  const gap = 40;
   const chartW = months.length * (barW + gap) + gap;
+  const svgH = chartH + 34;
 
   return (
     <div className="card">
@@ -582,7 +591,8 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
           </span>
         ))}
       </div>
-      <svg viewBox={`0 0 ${chartW} ${chartH + 34}`} width={chartW} style={{ maxWidth: '100%', height: 'auto', overflow: 'visible' }}>
+      <div style={{ width: '100%', maxWidth: 1000, margin: '0 auto', aspectRatio: `${chartW} / ${svgH}` }}>
+      <svg viewBox={`0 0 ${chartW} ${svgH}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible', display: 'block' }}>
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
           <line
             key={t}
@@ -625,6 +635,7 @@ function MonthlyStatusChart({ posts }: { posts: Post[] }) {
           );
         })}
       </svg>
+      </div>
     </div>
   );
 }
@@ -732,6 +743,115 @@ function stripTimeLocal(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+const MARKETING_TARGETS = {
+  video: 28,
+  videoPush: 12,
+  videoPull: 11,
+  videoSell: 5,
+  viralPush: 8,
+  image: 12,
+  event: 2,
+  sellPctMax: 20,
+};
+
+function KpiTargetRow({
+  label,
+  actual,
+  target,
+  color,
+  suffix = '',
+}: {
+  label: string;
+  actual: number;
+  target: number;
+  color: string;
+  suffix?: string;
+}) {
+  const pct = target ? Math.min(100, Math.round((actual / target) * 100)) : 0;
+  const met = actual >= target;
+  return (
+    <div className="channel-breakdown-row">
+      <span className="meta" style={{ minWidth: 170, fontWeight: 600, color: 'var(--text)' }}>{label}</span>
+      <div className="progress channel-breakdown-bar">
+        <span style={{ width: `${pct}%`, background: met ? 'var(--success-dark)' : color }} />
+      </div>
+      <span className="meta num" style={{ minWidth: 90, textAlign: 'right', color: met ? 'var(--success-dark)' : 'var(--muted)', fontWeight: met ? 700 : 400 }}>
+        {actual}{suffix} / {target}{suffix}
+      </span>
+    </div>
+  );
+}
+
+function MarketingKPICard({ posts }: { posts: Post[] }) {
+  const now = useMemo(() => new Date(), []);
+  const thisMonth = useMemo(
+    () =>
+      posts.filter((p) => {
+        const d = parseDate(p.date);
+        return d && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }),
+    [posts, now]
+  );
+
+  const videos = thisMonth.filter((p) => p.format === 'วิดีโอ');
+  const images = thisMonth.filter((p) => p.format === 'ภาพ');
+  const videoPush = videos.filter((p) => p.content_type === 'Push');
+  const videoPull = videos.filter((p) => p.content_type === 'Pull');
+  const videoSell = videos.filter((p) => p.content_type === 'Sell');
+  const viralPush = videoPush.filter((p) => p.is_viral);
+  const events = thisMonth.filter((p) => p.content_type === 'Event');
+  const sellAll = thisMonth.filter((p) => p.content_type === 'Sell').length;
+  const sellPct = thisMonth.length ? Math.round((sellAll / thisMonth.length) * 100) : 0;
+  const weekOfMonth = Math.ceil(now.getDate() / 7);
+
+  return (
+    <div className="card">
+      <h2>KPI แผนก Marketing — PPS Content System ({MONTHS_TH[now.getMonth()]} {now.getFullYear() + 543})</h2>
+      <div className="meta" style={{ marginBottom: 12 }}>
+        เป้าหมาย Short Video ≥28 คลิป/เดือน (~7 คลิป/สัปดาห์ = Push 3 + Pull 3 + Sell 1, Push ต้องมี Viral ≥2 คลิป/สัปดาห์) · ตอนนี้อยู่สัปดาห์ที่ {weekOfMonth} ของเดือน
+      </div>
+      <div className="channel-breakdown">
+        <KpiTargetRow label="Short Video (รวม)" actual={videos.length} target={MARKETING_TARGETS.video} color="var(--danger)" suffix=" คลิป" />
+        <KpiTargetRow label="↳ Push (Awareness)" actual={videoPush.length} target={MARKETING_TARGETS.videoPush} color="var(--accent)" suffix=" คลิป" />
+        <KpiTargetRow label="↳ Pull (Authority)" actual={videoPull.length} target={MARKETING_TARGETS.videoPull} color="var(--info)" suffix=" คลิป" />
+        <KpiTargetRow label="↳ Sell (ปิดการขาย)" actual={videoSell.length} target={MARKETING_TARGETS.videoSell} color="var(--warning)" suffix=" คลิป" />
+        <KpiTargetRow label="↳ Viral Content ใน Push" actual={viralPush.length} target={MARKETING_TARGETS.viralPush} color="var(--purple)" suffix=" คลิป" />
+        <KpiTargetRow label="Image Content" actual={images.length} target={MARKETING_TARGETS.image} color="var(--success)" suffix=" ภาพ" />
+        <KpiTargetRow label="Event / Test Drive" actual={events.length} target={MARKETING_TARGETS.event} color="var(--teal)" suffix=" งาน" />
+      </div>
+      <div className="notice" style={{ marginTop: 14 }}>
+        สัดส่วน Sell เดือนนี้: <strong>{sellPct}%</strong> ของคอนเทนต์ทั้งหมด ({sellAll}/{thisMonth.length}) —
+        {sellPct > MARKETING_TARGETS.sellPctMax
+          ? ` เกินเป้าหมายที่แนะนำ (ไม่เกิน ${MARKETING_TARGETS.sellPctMax}%)`
+          : ` อยู่ในเป้าหมาย (ไม่เกิน ${MARKETING_TARGETS.sellPctMax}%)`}
+      </div>
+    </div>
+  );
+}
+
+function ChannelBreakdownCard({ breakdown }: { breakdown: { channel: string; count: number; pct: number }[] }) {
+  return (
+    <div className="card">
+      <h2>ช่องทางที่ลง — จำนวนและสัดส่วน</h2>
+      {breakdown.length ? (
+        <div className="channel-breakdown">
+          {breakdown.map((c) => (
+            <div className="channel-breakdown-row" key={c.channel}>
+              <span className={`channel-tag ${channelClass(c.channel)}`}>{c.channel}</span>
+              <div className="progress channel-breakdown-bar">
+                <span style={{ width: `${c.pct}%`, background: 'currentColor' }} className={channelClass(c.channel)} />
+              </div>
+              <span className="meta num" style={{ minWidth: 70, textAlign: 'right' }}>{c.count} ชิ้น · {c.pct}%</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty text="ยังไม่มีคอนเทนต์ในช่วงที่เลือก" />
+      )}
+    </div>
+  );
+}
+
 function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post) => void }) {
   const [preset, setPreset] = useState<RangeValue>('month');
   const [from, setFrom] = useState('');
@@ -764,10 +884,18 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
     return map;
   }, [inRange]);
 
-  const channelCount = useMemo(
-    () => new Set(inRange.flatMap((p) => csvTags(p.channel))).size,
-    [inRange]
-  );
+  const channelBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    inRange.forEach((p) => {
+      csvTags(p.channel).forEach((c) => map.set(c, (map.get(c) || 0) + 1));
+    });
+    const totalHits = Array.from(map.values()).reduce((a, b) => a + b, 0);
+    return Array.from(map.entries())
+      .map(([channel, count]) => ({ channel, count, pct: totalHits ? Math.round((count / totalHits) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+  }, [inRange]);
+
+  const channelCount = channelBreakdown.length;
 
   const publishRate = inRange.length ? Math.round((statusCounts.PUBLISHED / inRange.length) * 100) : 0;
 
@@ -791,8 +919,8 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
       </div>
       <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} ชิ้น</div>
 
-      <div className="grid3" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 14 }}>
-        <div className="card">
+      <div className="kpi-row" style={{ marginBottom: 14 }}>
+        <div className="card kpi-cell">
           <div className="kpi-title">
             รวมทั้งหมด
             <span className="kpi-icon" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
@@ -802,7 +930,7 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
           <div className="kpi-value">{inRange.length}</div>
         </div>
         {STATUSES.map((s) => (
-          <div className="card" key={s}>
+          <div className="card kpi-cell" key={s}>
             <div className="kpi-title">
               {statusLabel(s)}
               <span className="kpi-icon" style={{ background: statusDotColor(s) + '22', color: statusDotColor(s) }}>
@@ -812,7 +940,7 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
             <div className="kpi-value">{statusCounts[s]}</div>
           </div>
         ))}
-        <div className="card">
+        <div className="card kpi-cell">
           <div className="kpi-title">
             อัตราเผยแพร่
             <span className="kpi-icon" style={{ background: 'var(--success-soft)', color: 'var(--success-dark)' }}>
@@ -821,7 +949,7 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
           </div>
           <div className="kpi-value">{publishRate}%</div>
         </div>
-        <div className="card">
+        <div className="card kpi-cell">
           <div className="kpi-title">
             ภาพ / วิดีโอ
             <span className="kpi-icon" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
@@ -830,7 +958,7 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
           </div>
           <div className="kpi-value">{formatCounts['ภาพ']} / {formatCounts['วิดีโอ']}</div>
         </div>
-        <div className="card">
+        <div className="card kpi-cell">
           <div className="kpi-title">
             ช่องทางที่ใช้
             <span className="kpi-icon" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
@@ -838,12 +966,17 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
             </span>
           </div>
           <div className="kpi-value">{channelCount}</div>
+          <div className="kpi-foot">
+            {channelBreakdown.length ? channelBreakdown.map((c) => c.channel).join(', ') : 'ยังไม่มีข้อมูล'}
+          </div>
         </div>
       </div>
 
       <div className="two-col" style={{ gridTemplateColumns: '1fr', marginTop: 0, gap: 14 }}>
+        <MarketingKPICard posts={posts} />
         <MonthlyStatusChart posts={posts} />
         {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
+        <ChannelBreakdownCard breakdown={channelBreakdown} />
       </div>
 
       {inRange.length > 0 && (
@@ -1146,6 +1279,28 @@ function PostModal({
               {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
             </select>
           </div>
+          <div className="field">
+            <label>ประเภทคอนเทนต์ (PPS)</label>
+            <select value={form.content_type} onChange={(e) => set('content_type', e.target.value)}>
+              <option value="">ไม่ระบุ</option>
+              <option value="Push">Push (Awareness)</option>
+              <option value="Pull">Pull (Authority)</option>
+              <option value="Sell">Sell (ปิดการขาย)</option>
+              <option value="Event">Event / Test Drive</option>
+            </select>
+          </div>
+          {form.content_type === 'Push' && (
+            <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
+              <input
+                type="checkbox"
+                id="is_viral"
+                checked={form.is_viral}
+                onChange={(e) => set('is_viral', e.target.checked)}
+                style={{ width: 'auto' }}
+              />
+              <label htmlFor="is_viral" style={{ margin: 0 }}>เป็น Viral Content</label>
+            </div>
+          )}
           <div className="field"><label>ลิงก์โพสต์</label><input value={form.post_url} onChange={(e) => set('post_url', e.target.value)} placeholder="https://..." /></div>
         </div>
 
