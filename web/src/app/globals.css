@@ -134,6 +134,7 @@ h3{font-size:16px;margin:0 0 8px}
 .chart-grid{stroke:var(--line);stroke-width:1}
 .chart-value{font-size:12px;font-weight:700;fill:var(--navy)}
 .chart-axis-label{font-size:11px;fill:var(--muted)}
+.chart-axis-tick{stroke:var(--muted-soft);stroke-width:1}
 
 table{width:100%;border-collapse:collapse}
 thead th{background:var(--gray-soft);position:sticky;top:0}

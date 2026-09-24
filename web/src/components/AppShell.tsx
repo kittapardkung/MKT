@@ -852,9 +852,18 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
                   );
                 })}
                 {i % showLabelEvery === 0 && (
-                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
-                    {d.getDate()}/{d.getMonth() + 1}
-                  </text>
+                  <>
+                    <line
+                      x1={x + barW / 2}
+                      x2={x + barW / 2}
+                      y1={padTop + chartH}
+                      y2={padTop + chartH + 5}
+                      className="chart-axis-tick"
+                    />
+                    <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
+                      {d.getDate()}/{d.getMonth() + 1}
+                    </text>
+                  </>
                 )}
               </g>
             );
@@ -978,9 +987,18 @@ function LeadsDailyChart({
                   );
                 })}
                 {i % showLabelEvery === 0 && (
-                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
-                    {d.getDate()}/{d.getMonth() + 1}
-                  </text>
+                  <>
+                    <line
+                      x1={x + barW / 2}
+                      x2={x + barW / 2}
+                      y1={padTop + chartH}
+                      y2={padTop + chartH + 5}
+                      className="chart-axis-tick"
+                    />
+                    <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
+                      {d.getDate()}/{d.getMonth() + 1}
+                    </text>
+                  </>
                 )}
               </g>
             );
