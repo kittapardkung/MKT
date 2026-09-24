@@ -315,7 +315,13 @@ tr.clickable:hover{background:var(--accent-soft)}
   .compass-direction-grid{grid-template-columns:1fr}
 }
 
-.sales-status-rows{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.leads-split-wrap{display:flex;gap:24px;align-items:flex-start}
+.leads-split-col{flex:1;min-width:0}
+@media(max-width:760px){
+  .leads-split-wrap{flex-direction:column}
+}
+
+.sales-status-rows{display:flex;flex-direction:column;gap:12px;margin-top:0;max-height:340px;overflow-y:auto;padding-right:4px}
 .sales-status-row-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:13px}
 .sales-status-name{font-weight:600;color:var(--navy)}
 .sales-status-bar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--gray-soft)}

@@ -1089,8 +1089,8 @@ function LeadsStatusBySalesCard({
       {!total ? (
         <Empty text="ยังไม่มีลีดในช่วงที่เลือก" />
       ) : (
-        <>
-          <div className="pie-chart-wrap">
+        <div className="leads-split-wrap">
+          <div className="pie-chart-wrap leads-split-col">
             <svg viewBox="0 0 200 200" className="pie-chart-svg">
               {slices.map((s) => (
                 <path key={s.status} d={donutSlicePath(100, 100, 82, 48, s.startAngle, s.endAngle)} fill={statusColor(s.status)}>
@@ -1112,7 +1112,7 @@ function LeadsStatusBySalesCard({
             </div>
           </div>
 
-          <div className="sales-status-rows">
+          <div className="sales-status-rows leads-split-col">
             {bySales.map((row) => (
               <div className="sales-status-row" key={row.sales}>
                 <div className="sales-status-row-head">
@@ -1132,7 +1132,7 @@ function LeadsStatusBySalesCard({
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
