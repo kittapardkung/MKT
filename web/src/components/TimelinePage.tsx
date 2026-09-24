@@ -14,7 +14,7 @@ export default function TimelinePage({
   role: Role;
   onApprove: (idea: Idea) => void;
 }) {
-  const pending = ideas.filter((i) => !i.promoted_post_id);
+  const pending = ideas.filter((i) => !i.promoted_post_id && i.interest === 'interested');
   const withDate = pending
     .filter((i) => i.suggested_date)
     .sort((a, b) => String(a.suggested_date).localeCompare(String(b.suggested_date)));
@@ -29,7 +29,7 @@ export default function TimelinePage({
         <div>
           <h1 style={{ margin: 0 }}>ไทม์ไลน์การผลิต</h1>
           <div className="meta">
-            คลังไอเดียพร้อมวันที่ควรลง — {canApprove ? 'กดอนุมัติเพื่อส่งเข้าปฏิทินทันที' : 'รอบรรณาธิการกดอนุมัติก่อนเข้าปฏิทิน'}
+            เฉพาะไอเดียที่ SPARK ทำเครื่องหมายว่า &quot;สนใจ&quot; แล้ว — {canApprove ? 'กดอนุมัติเพื่อส่งเข้าปฏิทินทันที' : 'รอบรรณาธิการกดอนุมัติก่อนเข้าปฏิทิน'}
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function TimelinePage({
             </div>
           ))
         ) : (
-          <Empty text="ไม่มีไอเดียค้างเสนอวันที่" />
+          <Empty text="ไม่มีไอเดียที่สนใจค้างเสนอวันที่ — ไปติ๊ก 'สนใจ' เพิ่มได้ที่หน้า SPARK" />
         )}
       </div>
 
