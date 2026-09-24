@@ -47,7 +47,8 @@ export type Idea = {
 export type AgentReportData =
   | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
   | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
-  | { kind: 'list'; items: string[] };
+  | { kind: 'list'; items: string[] }
+  | { kind: 'table'; columns: string[]; rows: string[][] };
 
 export type AgentReport = {
   id: string;

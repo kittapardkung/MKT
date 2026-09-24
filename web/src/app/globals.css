@@ -274,6 +274,11 @@ tr.clickable:hover{background:var(--accent-soft)}
 .report-list{margin:0;padding-left:18px;font-size:13px;color:var(--text);line-height:1.8}
 .report-list li{margin-bottom:4px}
 
+.report-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+.report-table{width:100%;border-collapse:collapse}
+.report-table th,.report-table td{font-size:12.5px;padding:8px 10px;white-space:nowrap}
+.report-table td:nth-child(2){white-space:normal;min-width:220px}
+
 @media(max-width:980px){
   .sidebar{display:none}
   .main{margin-left:0;width:100%}

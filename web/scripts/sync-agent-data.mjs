@@ -45,11 +45,13 @@ async function syncReport(supabase, agent, idPrefix, doc) {
       section,
       title: block.title || section,
       body: block.body || '',
-      data: block.items
-        ? { kind: block.rows ? 'kpi' : Array.isArray(block.items) && typeof block.items[0] === 'string' ? 'list' : 'kpi', items: block.items }
-        : block.rows
-          ? { kind: 'scorecard', rows: block.rows }
-          : null,
+      data: block.columns
+        ? { kind: 'table', columns: block.columns, rows: block.rows }
+        : block.items
+          ? { kind: Array.isArray(block.items) && typeof block.items[0] === 'string' ? 'list' : 'kpi', items: block.items }
+          : block.rows
+            ? { kind: 'scorecard', rows: block.rows }
+            : null,
       sort_order: sortOrder++,
       updated_at: new Date().toISOString(),
     });
