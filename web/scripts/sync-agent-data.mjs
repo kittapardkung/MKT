@@ -83,7 +83,7 @@ async function syncSparkHooks(supabase, doc) {
     id: `spark-${h.code}`,
     title: h.title,
     category: `${h.type} · ${h.product}`,
-    note: `Body: ${h.body}\nCTA: ${h.cta}\nกลุ่มเป้าหมาย: ${h.audience}`,
+    note: `Body: ${h.body}\nCTA: ${h.cta}\nกลุ่มเป้าหมาย: ${h.audience}${h.formula ? `\nสูตร Hook: ${h.formula}` : ''}`,
     score: 7,
     promoted_post_id: null,
     agent: 'SPARK',
