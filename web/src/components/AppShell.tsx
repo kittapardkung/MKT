@@ -379,6 +379,12 @@ export default function AppShell() {
     runAction(() => promoteIdea(promoteIdeaTarget, promoteForm, data?.me || ''));
   }
 
+  function rejectPromote() {
+    if (!promoteIdeaTarget) return;
+    if (!confirm('ไม่อนุมัติไอเดียนี้? จะถูกย้ายไปหน้า "ไม่สนใจ" ในหน้า SPARK')) return;
+    runAction(() => setIdeaInterest(promoteIdeaTarget.id, 'not_interested'));
+  }
+
   function submitIdea() {
     if (!ideaForm.title.trim()) return alert('กรุณาระบุชื่อไอเดีย');
     runAction(() =>
@@ -608,6 +614,7 @@ export default function AppShell() {
           saving={saving}
           onClose={() => setPromoteModalOpen(false)}
           onConfirm={confirmPromote}
+          onReject={rejectPromote}
         />
       )}
 
@@ -1477,12 +1484,14 @@ function PromoteModal({
   saving,
   onClose,
   onConfirm,
+  onReject,
 }: {
   form: { title: string; date: string; time: string; channel: string; format: string };
   setForm: Dispatch<SetStateAction<{ title: string; date: string; time: string; channel: string; format: string }>>;
   saving: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  onReject: () => void;
 }) {
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
   return (
@@ -1510,6 +1519,7 @@ function PromoteModal({
           </div>
         </div>
         <div className="modal-actions">
+          <button className="btn danger" disabled={saving} onClick={onReject} style={{ marginRight: 'auto' }}>ไม่อนุมัติ</button>
           <button className="btn primary" disabled={saving} onClick={onConfirm}>{saving ? 'กำลังบันทึก...' : 'สร้างเป็นร่าง'}</button>
         </div>
       </div>
