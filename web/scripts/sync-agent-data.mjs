@@ -48,7 +48,9 @@ async function syncReport(supabase, agent, idPrefix, doc) {
       data: block.columns
         ? block.groups
           ? { kind: 'table', columns: block.columns, groups: block.groups }
-          : { kind: 'table', columns: block.columns, rows: block.rows }
+          : block.rows?.[0] && !Array.isArray(block.rows[0])
+            ? { kind: 'drilldown', columns: block.columns, rows: block.rows }
+            : { kind: 'table', columns: block.columns, rows: block.rows }
         : block.items
           ? {
               kind:

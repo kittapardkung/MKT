@@ -1,4 +1,5 @@
-import type { AgentId, AgentReport } from '@/lib/types';
+import { useState } from 'react';
+import type { AgentId, AgentReport, DrilldownRow } from '@/lib/types';
 import { displayDateTime } from '@/lib/date-utils';
 
 function Empty({ text }: { text: string }) {
@@ -20,6 +21,67 @@ function TableRow({ row, rowKey }: { row: string[]; rowKey: number }) {
         )
       )}
     </tr>
+  );
+}
+
+function DrilldownRowView({ row, depth, colCount }: { row: DrilldownRow; depth: number; colCount: number }) {
+  const [open, setOpen] = useState(false);
+  const hasChildren = !!row.children && row.children.length > 0;
+  return (
+    <>
+      <tr>
+        <td className="drilldown-toggle-cell">
+          {hasChildren && (
+            <button
+              type="button"
+              className="drilldown-toggle"
+              onClick={() => setOpen((o) => !o)}
+              aria-label={open ? 'ย่อ' : 'ขยาย'}
+            >
+              {open ? '▾' : '▸'}
+            </button>
+          )}
+        </td>
+        {row.cells.map((cell, j) =>
+          cell.startsWith('http') ? (
+            <td key={j}>
+              <a href={cell} target="_blank" rel="noopener noreferrer">
+                ดูตัวอย่าง ↗
+              </a>
+            </td>
+          ) : (
+            <td key={j} style={j === 0 ? { paddingLeft: 10 + depth * 18 } : undefined}>
+              {cell || '—'}
+            </td>
+          )
+        )}
+      </tr>
+      {open && hasChildren && row.children!.map((child, i) => (
+        <DrilldownRowView row={child} depth={depth + 1} colCount={colCount} key={i} />
+      ))}
+    </>
+  );
+}
+
+function DrilldownTable({ columns, rows }: { columns: string[]; rows: DrilldownRow[] }) {
+  return (
+    <div className="report-table-wrap">
+      <table className="report-table">
+        <thead>
+          <tr>
+            <th style={{ width: 24 }}></th>
+            {columns.map((col, i) => (
+              <th key={i}>{col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <DrilldownRowView row={row} depth={0} colCount={columns.length} key={i} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -138,6 +200,8 @@ function ReportCard({ report }: { report: AgentReport }) {
       )}
 
       {data?.kind === 'bar' && <BarChart items={data.items} />}
+
+      {data?.kind === 'drilldown' && <DrilldownTable columns={data.columns} rows={data.rows} />}
     </div>
   );
 }

@@ -44,13 +44,16 @@ export type Idea = {
 };
 
 // บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/COMPASS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
+export type DrilldownRow = { cells: string[]; children?: DrilldownRow[] };
+
 export type AgentReportData =
   | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
   | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
   | { kind: 'list'; items: string[] }
   | { kind: 'table'; columns: string[]; rows: string[][] }
   | { kind: 'table'; columns: string[]; groups: { label: string; rows: string[][] }[] }
-  | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] };
+  | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] }
+  | { kind: 'drilldown'; columns: string[]; rows: DrilldownRow[] };
 
 export type AgentReport = {
   id: string;
