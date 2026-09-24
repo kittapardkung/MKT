@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { AgentId, Bootstrap, Idea, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
+import type { AgentId, Bootstrap, Idea, IdeaInterest, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -227,6 +227,12 @@ export async function addIdea(input: {
     suggested_format: input.suggested_format || null,
     promoted_post_id: null,
   });
+  if (error) throw error;
+}
+
+export async function setIdeaInterest(id: string, interest: IdeaInterest): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('ideas').update({ interest }).eq('id', id);
   if (error) throw error;
 }
 

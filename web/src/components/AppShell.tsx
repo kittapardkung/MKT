@@ -12,6 +12,7 @@ import {
   promoteIdea,
   removeTag,
   savePost,
+  setIdeaInterest,
 } from '@/lib/data-client';
 import {
   MONTHS_TH,
@@ -25,7 +26,7 @@ import {
   ymd,
   type RangeValue,
 } from '@/lib/date-utils';
-import type { AgentId, Bootstrap, Idea, Post, PostStatus } from '@/lib/types';
+import type { AgentId, Bootstrap, Idea, IdeaInterest, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
@@ -394,6 +395,10 @@ export default function AppShell() {
     );
   }
 
+  function doSetInterest(idea: Idea, interest: IdeaInterest) {
+    runAction(() => setIdeaInterest(idea.id, interest));
+  }
+
   function promptAddTag() {
     const tag = window.prompt('ชื่อแท็กใหม่');
     if (!tag) return;
@@ -516,6 +521,8 @@ export default function AppShell() {
           {page === 'spark' && (
             <SparkPage
               ideas={data?.ideas || []}
+              reports={data?.agentReports || []}
+              onSetInterest={doSetInterest}
               onAddIdea={() => {
                 setIdeaForm({
                   title: '',

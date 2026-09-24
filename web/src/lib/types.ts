@@ -30,6 +30,8 @@ export type Tag = {
   active: boolean;
 };
 
+export type IdeaInterest = 'pending' | 'interested' | 'not_interested';
+
 export type Idea = {
   id: string;
   title: string;
@@ -41,6 +43,11 @@ export type Idea = {
   suggested_date: string | null;
   suggested_channel: string | null;
   suggested_format: Format | null;
+  code?: string | null;
+  product?: string | null;
+  type?: string | null;
+  formula?: string | null;
+  interest?: IdeaInterest | null;
 };
 
 // บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/COMPASS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
