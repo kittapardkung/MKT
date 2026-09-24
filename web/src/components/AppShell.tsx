@@ -1319,6 +1319,56 @@ function ChannelBreakdownCard({ breakdown }: { breakdown: { channel: string; cou
   );
 }
 
+function FormatPieChart({ posts }: { posts: Post[] }) {
+  const total = posts.length;
+  const breakdown = FORMATS.map((f) => ({
+    format: f,
+    count: posts.filter((p) => (p.format || 'ภาพ') === f).length,
+  })).filter((b) => b.count > 0);
+
+  const slices = breakdown.reduce<Array<(typeof breakdown)[number] & { startAngle: number; endAngle: number; pct: number }>>(
+    (acc, b) => {
+      const prevEnd = acc.length ? acc[acc.length - 1].endAngle : 0;
+      const frac = total ? b.count / total : 0;
+      const sweep = Math.min(frac * 360, 359.99);
+      acc.push({ ...b, startAngle: prevEnd, endAngle: prevEnd + sweep, pct: Math.round(frac * 100) });
+      return acc;
+    },
+    []
+  );
+
+  return (
+    <div className="card">
+      <h2>สัดส่วนประเภทสื่อที่ลง (ภาพ/วิดีโอ)</h2>
+      {!total ? (
+        <Empty text="ยังไม่มีคอนเทนต์ในช่วงที่เลือก" />
+      ) : (
+        <div className="pie-chart-wrap">
+          <svg viewBox="0 0 200 200" className="pie-chart-svg">
+            {slices.map((s) => (
+              <path key={s.format} d={donutSlicePath(100, 100, 82, 48, s.startAngle, s.endAngle)} fill={formatColor(s.format)}>
+                <title>{`${s.format}: ${s.count} ชิ้น (${s.pct}%)`}</title>
+              </path>
+            ))}
+            <circle cx="100" cy="100" r="47" fill="var(--surface)" />
+            <text x="100" y="96" textAnchor="middle" className="pie-chart-total-num">{total}</text>
+            <text x="100" y="115" textAnchor="middle" className="pie-chart-total-label">ชิ้นทั้งหมด</text>
+          </svg>
+          <div className="pie-chart-legend">
+            {slices.map((s) => (
+              <div className="pie-chart-legend-row" key={s.format}>
+                <span className="chart-dot" style={{ background: formatColor(s.format) }} />
+                <span className="pie-chart-legend-label">{s.format}</span>
+                <span className="pie-chart-legend-value num">{s.count} · {s.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lead[]; onOpenPost: (p: Post) => void }) {
   const [dashTab, setDashTab] = useState<'marketing' | 'leads'>('marketing');
   const [preset, setPreset] = useState<RangeValue>('month');
@@ -1485,6 +1535,7 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
         <MarketingKPICard posts={posts} />
         <MonthlyStatusChart posts={posts} />
         {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
+        <FormatPieChart posts={inRange} />
         <ChannelBreakdownCard breakdown={channelBreakdown} />
       </div>
 
