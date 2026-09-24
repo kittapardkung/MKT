@@ -26,7 +26,7 @@ import {
   ymd,
   type RangeValue,
 } from '@/lib/date-utils';
-import type { AgentId, Bootstrap, Idea, IdeaInterest, Post, PostStatus } from '@/lib/types';
+import type { AgentId, Bootstrap, Idea, IdeaInterest, Lead, Post, PostStatus } from '@/lib/types';
 import { errMsg } from '@/lib/err';
 import {
   Zap,
@@ -550,7 +550,7 @@ export default function AppShell() {
             <TimelinePage ideas={data?.ideas || []} role={data?.role || 'creative'} onApprove={openPromoteIdea} />
           )}
 
-          {page === 'dashboard' && <DashboardPage posts={data?.posts || []} onOpenPost={openPost} />}
+          {page === 'dashboard' && <DashboardPage posts={data?.posts || []} leads={data?.leads || []} onOpenPost={openPost} />}
 
           {page === 'calendarPage' && (
             <CalendarPage
@@ -974,7 +974,7 @@ function ChannelBreakdownCard({ breakdown }: { breakdown: { channel: string; cou
   );
 }
 
-function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post) => void }) {
+function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lead[]; onOpenPost: (p: Post) => void }) {
   const [preset, setPreset] = useState<RangeValue>('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -987,6 +987,14 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
       return d && d >= range.start! && d <= range.end!;
     });
   }, [posts, range]);
+
+  const leadsInRange = useMemo(() => {
+    if (!range.start || !range.end) return [];
+    return leads.filter((l) => {
+      const d = parseDate(l.created_date || '');
+      return d && d >= range.start! && d <= range.end!;
+    });
+  }, [leads, range]);
 
   const statusCounts = useMemo(() => {
     const map: Record<PostStatus, number> = { DRAFT: 0, REVIEW: 0, APPROVED: 0, PUBLISHED: 0 };
@@ -1091,6 +1099,16 @@ function DashboardPage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: P
           <div className="kpi-foot">
             {channelBreakdown.length ? channelBreakdown.map((c) => c.channel).join(', ') : 'ยังไม่มีข้อมูล'}
           </div>
+        </div>
+        <div className="card kpi-cell">
+          <div className="kpi-title">
+            เบอร์ลูกค้าที่ได้ (Leads)
+            <span className="kpi-icon" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
+              <span className="chart-dot" style={{ background: 'var(--purple)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{leads.length}</div>
+          <div className="kpi-foot">ทั้งหมด · {leadsInRange.length} เบอร์ในช่วงที่เลือก</div>
         </div>
       </div>
 
