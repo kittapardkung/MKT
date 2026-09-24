@@ -73,7 +73,7 @@ function ReportCard({ report }: { report: AgentReport }) {
                     cell.startsWith('http') ? (
                       <td key={j}>
                         <a href={cell} target="_blank" rel="noopener noreferrer">
-                          ดูตัวอย่าง
+                          ดูตัวอย่าง ↗
                         </a>
                       </td>
                     ) : (
