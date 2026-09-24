@@ -154,6 +154,77 @@ function BarChart({ items }: { items: { label: string; value: number; highlight?
   );
 }
 
+function niceMaxValue(n: number) {
+  if (n <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(n)));
+  const frac = n / pow;
+  const niceFrac = frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 5 ? 5 : 10;
+  return niceFrac * pow;
+}
+
+function DailySpendChart({ items }: { items: { label: string; value: number; highlight?: boolean }[] }) {
+  const maxValue = niceMaxValue(Math.max(...items.map((i) => i.value), 0));
+  const chartH = 170;
+  const padTop = 14;
+  const marginLeft = 46;
+  const barW = items.length > 20 ? 10 : 20;
+  const gap = items.length > 20 ? 4 : 10;
+  const plotW = Math.max(items.length * (barW + gap) + gap, 280);
+  const chartW = plotW + marginLeft;
+  const showLabelEvery = Math.max(1, Math.ceil(items.length / 14));
+  const tickFracs = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div className="calendar-wrap">
+      <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+        {tickFracs.map((t) => {
+          const y = padTop + chartH - chartH * t;
+          return (
+            <g key={t}>
+              <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
+              <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                {Math.round(maxValue * t).toLocaleString('th-TH')}
+              </text>
+            </g>
+          );
+        })}
+        {items.map((item, i) => {
+          const x = marginLeft + gap + i * (barW + gap);
+          const h = maxValue ? Math.max((item.value / maxValue) * chartH, item.value > 0 ? 2 : 0) : 0;
+          const y = padTop + chartH - h;
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={h}
+                fill={item.highlight ? 'var(--accent)' : 'var(--primary)'}
+              >
+                <title>{`${item.label}: ฿${item.value.toLocaleString('th-TH')}`}</title>
+              </rect>
+              {i % showLabelEvery === 0 && (
+                <>
+                  <line
+                    x1={x + barW / 2}
+                    x2={x + barW / 2}
+                    y1={padTop + chartH}
+                    y2={padTop + chartH + 5}
+                    className="chart-axis-tick"
+                  />
+                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
+                    {item.label}
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
   COMPASS: { tagline: 'AI นักกลยุทธ์การตลาด', className: 'agent-compass' },
@@ -257,7 +328,8 @@ function ReportCard({ report }: { report: AgentReport }) {
         </>
       )}
 
-      {data?.kind === 'bar' && <BarChart items={data.items} />}
+      {data?.kind === 'bar' && report.section === 'daily_spend' && <DailySpendChart items={data.items} />}
+      {data?.kind === 'bar' && report.section !== 'daily_spend' && <BarChart items={data.items} />}
 
       {data?.kind === 'drilldown' && <DrilldownTable columns={data.columns} rows={data.rows} />}
 
