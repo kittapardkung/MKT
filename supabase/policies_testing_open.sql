@@ -41,3 +41,9 @@ create policy "log_insert_public" on log for insert to public with check (true);
 
 drop policy if exists "team_members_select_authenticated" on team_members;
 create policy "team_members_select_public" on team_members for select to public using (true);
+
+-- agent_reports (SCOUT/COMPASS/SPARK/ALMANAC) — เพิ่มทีหลังตอน migrate_agent_workflow.sql
+drop policy if exists "agent_reports_select_authenticated" on agent_reports;
+create policy "agent_reports_select_public" on agent_reports for select to public using (true);
+drop policy if exists "agent_reports_write_editor" on agent_reports;
+create policy "agent_reports_write_public" on agent_reports for all to public using (true) with check (true);
