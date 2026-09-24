@@ -110,12 +110,14 @@ async function main() {
   const scout = readJsonIfExists(join(DATA_DIR, 'scout.json'));
   const compass = readJsonIfExists(join(DATA_DIR, 'compass.json'));
   const spark = readJsonIfExists(join(DATA_DIR, 'spark.json'));
+  const ads = readJsonIfExists(join(DATA_DIR, 'ads.json'));
 
   if (scout) console.log(`SCOUT: sync ${await syncReport(supabase, 'SCOUT', 'scout', scout)} rows`);
   if (compass) console.log(`COMPASS: sync ${await syncReport(supabase, 'COMPASS', 'compass', compass)} rows`);
   if (spark) console.log(`SPARK: sync ${await syncSparkHooks(supabase, spark)} hooks`);
+  if (ads) console.log(`ADS: sync ${await syncReport(supabase, 'ADS', 'ads', ads)} rows`);
 
-  if (!scout && !compass && !spark) {
+  if (!scout && !compass && !spark && !ads) {
     console.log('ไม่พบไฟล์ agent-sync ใดๆ ใน data/agent-sync/ — ไม่มีอะไรให้ sync');
   }
 }

@@ -41,6 +41,7 @@ import {
   Compass,
   Sparkles,
   ListChecks,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
@@ -96,6 +97,7 @@ type PageId =
   | 'scout'
   | 'compass'
   | 'spark'
+  | 'ads'
   | 'dashboard'
   | 'timeline'
   | 'calendarPage'
@@ -121,6 +123,11 @@ const NAV_GROUPS: NavGroup[] = [
     agent: 'SPARK',
     label: 'SPARK · Content Creator',
     items: [{ id: 'spark', label: 'คลังไอเดีย/Hook', short: 'SPARK', icon: Sparkles }],
+  },
+  {
+    agent: 'ADS',
+    label: 'ADS · ทีมโฆษณา Meta',
+    items: [{ id: 'ads', label: 'ภาพรวมโฆษณา', short: 'ADS', icon: Megaphone }],
   },
   {
     agent: 'ALMANAC',
@@ -525,6 +532,8 @@ export default function AppShell() {
           {page === 'scout' && <AgentReportPage agent="SCOUT" reports={data?.agentReports || []} />}
 
           {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
+
+          {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} />}
 
           {page === 'spark' && (
             <SparkPage

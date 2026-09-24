@@ -256,6 +256,7 @@ tr.clickable:hover{background:var(--accent-soft)}
 .agent-scout .agent-badge{background:#0f172a}
 .agent-compass .agent-badge{background:var(--accent)}
 .agent-spark .agent-badge{background:#d9770e}
+.agent-ads .agent-badge{background:#c2255c}
 .agent-almanac .agent-badge{background:var(--success-dark)}
 
 .report-list-wrap{display:flex;flex-direction:column;gap:14px}

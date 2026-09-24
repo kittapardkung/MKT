@@ -3,7 +3,7 @@ export type Format = 'ภาพ' | 'วิดีโอ';
 export type Role = 'editor' | 'creative';
 // PPS Content System: Push (Awareness) / Pull (Authority) / Sell (ปิดการขาย) / Event (Test Drive/กิจกรรม)
 export type ContentType = 'Push' | 'Pull' | 'Sell' | 'Event';
-export type AgentId = 'SCOUT' | 'COMPASS' | 'SPARK' | 'ALMANAC';
+export type AgentId = 'SCOUT' | 'COMPASS' | 'SPARK' | 'ADS' | 'ALMANAC';
 
 export type Post = {
   id: string;

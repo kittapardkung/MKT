@@ -130,6 +130,7 @@ const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
   COMPASS: { tagline: 'AI นักกลยุทธ์การตลาด', className: 'agent-compass' },
   SPARK: { tagline: 'AI Content Creator', className: 'agent-spark' },
+  ADS: { tagline: 'ทีมโฆษณา Meta Ads — เป้า 100 เบอร์/เดือน ใต้งบ ฿45,000', className: 'agent-ads' },
   ALMANAC: { tagline: 'AI Content Planner', className: 'agent-almanac' },
 };
 
