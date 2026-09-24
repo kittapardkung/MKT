@@ -279,9 +279,13 @@ tr.clickable:hover{background:var(--accent-soft)}
 .report-table th,.report-table td{font-size:12.5px;padding:8px 10px;white-space:nowrap}
 .report-table td:nth-child(2){white-space:normal;min-width:220px}
 .report-table-group td{background:var(--bg);font-weight:700;color:var(--navy);font-size:12px;padding:7px 10px}
-.drilldown-toggle-cell{width:24px;padding:8px 4px!important}
-.drilldown-toggle{border:none;background:none;cursor:pointer;color:var(--accent);font-size:11px;padding:2px 4px;line-height:1}
-.drilldown-toggle:hover{color:var(--accent-hover)}
+.drilldown-toggle-cell{width:40px;padding:6px 4px!important}
+.drilldown-toggle{
+  border:1px solid var(--line);background:var(--bg);border-radius:7px;cursor:pointer;
+  color:var(--accent);font-size:16px;font-weight:700;line-height:1;
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center
+}
+.drilldown-toggle:hover{color:var(--accent-hover);border-color:var(--accent)}
 
 .bar-chart{display:flex;flex-direction:column;gap:9px}
 .bar-chart-row{display:grid;grid-template-columns:180px 1fr 44px;align-items:center;gap:10px}
