@@ -314,6 +314,15 @@ tr.clickable:hover{background:var(--accent-soft)}
   .compass-direction-grid{grid-template-columns:1fr}
 }
 
+.pie-chart-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.pie-chart-svg{width:180px;height:180px;flex-shrink:0}
+.pie-chart-total-num{font-size:26px;font-weight:800;fill:var(--navy)}
+.pie-chart-total-label{font-size:9.5px;fill:var(--muted)}
+.pie-chart-legend{flex:1;min-width:170px;display:flex;flex-direction:column;gap:9px}
+.pie-chart-legend-row{display:flex;align-items:center;gap:8px;font-size:13px}
+.pie-chart-legend-label{flex:1;color:var(--text)}
+.pie-chart-legend-value{color:var(--navy);font-weight:600;font-size:12.5px;white-space:nowrap}
+
 .dashboard-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:2px solid var(--line);padding-bottom:8px;margin:24px 0 14px}
 .dashboard-section-title:first-of-type{margin-top:18px}
 

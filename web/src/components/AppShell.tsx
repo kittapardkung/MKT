@@ -991,6 +991,26 @@ function LeadsDailyChart({
   );
 }
 
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function donutSlicePath(cx: number, cy: number, rOuter: number, rInner: number, startAngle: number, endAngle: number) {
+  const startOuter = polarToCartesian(cx, cy, rOuter, startAngle);
+  const endOuter = polarToCartesian(cx, cy, rOuter, endAngle);
+  const startInner = polarToCartesian(cx, cy, rInner, startAngle);
+  const endInner = polarToCartesian(cx, cy, rInner, endAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  return [
+    `M ${startOuter.x} ${startOuter.y}`,
+    `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${endOuter.x} ${endOuter.y}`,
+    `L ${endInner.x} ${endInner.y}`,
+    `A ${rInner} ${rInner} 0 ${largeArc} 0 ${startInner.x} ${startInner.y}`,
+    'Z',
+  ].join(' ');
+}
+
 function LeadsStatusBreakdownCard({
   leads,
   statusOrder,
@@ -1009,22 +1029,79 @@ function LeadsStatusBreakdownCard({
     return statusOrder
       .map((s) => ({ status: s, count: map.get(s) || 0 }))
       .filter((x) => x.count > 0)
-      .map((x) => ({ ...x, pct: leads.length ? Math.round((x.count / leads.length) * 100) : 0 }))
       .sort((a, b) => b.count - a.count);
   }, [leads, statusOrder]);
+
+  const total = breakdown.reduce((sum, b) => sum + b.count, 0);
+
+  const slices = useMemo(() => {
+    return breakdown.reduce<Array<(typeof breakdown)[number] & { startAngle: number; endAngle: number; pct: number }>>(
+      (acc, b) => {
+        const prevEnd = acc.length ? acc[acc.length - 1].endAngle : 0;
+        const frac = total ? b.count / total : 0;
+        const sweep = Math.min(frac * 360, 359.99);
+        acc.push({ ...b, startAngle: prevEnd, endAngle: prevEnd + sweep, pct: Math.round(frac * 100) });
+        return acc;
+      },
+      []
+    );
+  }, [breakdown, total]);
 
   return (
     <div className="card">
       <h2>สถานะลูกค้า (Leads) ในช่วงที่เลือก</h2>
       {breakdown.length ? (
+        <div className="pie-chart-wrap">
+          <svg viewBox="0 0 200 200" className="pie-chart-svg">
+            {slices.map((s) => (
+              <path key={s.status} d={donutSlicePath(100, 100, 82, 48, s.startAngle, s.endAngle)} fill={statusColor(s.status)}>
+                <title>{`${leadStatusLabel(s.status)}: ${s.count} เบอร์ (${s.pct}%)`}</title>
+              </path>
+            ))}
+            <circle cx="100" cy="100" r="47" fill="var(--surface)" />
+            <text x="100" y="96" textAnchor="middle" className="pie-chart-total-num">{total}</text>
+            <text x="100" y="115" textAnchor="middle" className="pie-chart-total-label">เบอร์ทั้งหมด</text>
+          </svg>
+          <div className="pie-chart-legend">
+            {slices.map((s) => (
+              <div className="pie-chart-legend-row" key={s.status}>
+                <span className="chart-dot" style={{ background: statusColor(s.status) }} />
+                <span className="pie-chart-legend-label">{leadStatusLabel(s.status)}</span>
+                <span className="pie-chart-legend-value num">{s.count} · {s.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <Empty text="ยังไม่มีลีดในช่วงที่เลือก" />
+      )}
+    </div>
+  );
+}
+
+function LeadsBySalesCard({ leads }: { leads: Lead[] }) {
+  const breakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    leads.forEach((l) => {
+      const s = l.assigned_sales || 'ไม่ระบุผู้ดูแล';
+      map.set(s, (map.get(s) || 0) + 1);
+    });
+    const total = leads.length;
+    return Array.from(map.entries())
+      .map(([sales, count]) => ({ sales, count, pct: total ? Math.round((count / total) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+  }, [leads]);
+
+  return (
+    <div className="card">
+      <h2>จำนวนลีดที่อยู่กับ Sale แต่ละคน</h2>
+      {breakdown.length ? (
         <div className="channel-breakdown">
           {breakdown.map((b) => (
-            <div className="channel-breakdown-row" key={b.status}>
-              <span className="channel-tag" style={{ color: statusColor(b.status), background: `${statusColor(b.status)}22` }}>
-                {leadStatusLabel(b.status)}
-              </span>
+            <div className="channel-breakdown-row" key={b.sales}>
+              <span className="channel-tag channel-default">{b.sales}</span>
               <div className="progress channel-breakdown-bar">
-                <span style={{ width: `${b.pct}%`, background: statusColor(b.status) }} />
+                <span style={{ width: `${b.pct}%`, background: 'var(--accent)' }} />
               </div>
               <span className="meta num" style={{ minWidth: 90, textAlign: 'right' }}>{b.count} เบอร์ · {b.pct}%</span>
             </div>
@@ -1444,43 +1521,8 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
           />
         )}
         <LeadsStatusBreakdownCard leads={leadsInRange} statusOrder={leadStatusOrder} statusColor={leadStatusColor} />
+        <LeadsBySalesCard leads={leadsInRange} />
       </div>
-
-      {leadsInRange.length > 0 && (
-        <div className="card" style={{ marginTop: 14, overflow: 'auto' }}>
-          <h2>ลีด (เบอร์ลูกค้า) ในช่วงที่เลือก</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>วันที่</th><th>ชื่อ</th><th>เบอร์โทร</th><th>รุ่นที่สนใจ</th>
-                <th>ช่องทาง</th><th>สถานะ</th><th>ผู้ดูแล</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...leadsInRange]
-                .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')))
-                .map((l) => (
-                  <tr key={l.lead_id}>
-                    <td>{l.created_date ? displayDate(l.created_date) : '-'}</td>
-                    <td>{l.customer_name || '-'}</td>
-                    <td>{l.phone_number || '-'}</td>
-                    <td>{l.interested_model || '-'}</td>
-                    <td>{l.source || '-'}</td>
-                    <td>
-                      <span
-                        className="channel-tag"
-                        style={{ color: leadStatusColor(l.lead_status || 'ไม่ระบุ'), background: `${leadStatusColor(l.lead_status || 'ไม่ระบุ')}22` }}
-                      >
-                        {leadStatusLabel(l.lead_status || 'ไม่ระบุ')}
-                      </span>
-                    </td>
-                    <td>{l.assigned_sales || '-'}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      )}
       </>
       )}
     </>
