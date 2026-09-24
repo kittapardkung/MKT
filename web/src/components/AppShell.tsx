@@ -1287,7 +1287,9 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
           )}
         </div>
       </div>
-      <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} ชิ้น</div>
+      <div className="period-label">ช่วงที่แสดง: {range.label} · รวม {inRange.length} คอนเทนต์ · {leadsInRange.length} เบอร์</div>
+
+      <h2 className="dashboard-section-title">📣 KPI แผนก Marketing — การผลิตสื่อ</h2>
 
       <div className="kpi-row" style={{ marginBottom: 14 }}>
         <div className="card kpi-cell">
@@ -1340,16 +1342,6 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
             {channelBreakdown.length ? channelBreakdown.map((c) => c.channel).join(', ') : 'ยังไม่มีข้อมูล'}
           </div>
         </div>
-        <div className="card kpi-cell">
-          <div className="kpi-title">
-            เบอร์ลูกค้าที่ได้ (Leads)
-            <span className="kpi-icon" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
-              <span className="chart-dot" style={{ background: 'var(--purple)' }} />
-            </span>
-          </div>
-          <div className="kpi-value">{leads.length}</div>
-          <div className="kpi-foot">ทั้งหมด · {leadsInRange.length} เบอร์ในช่วงที่เลือก</div>
-        </div>
       </div>
 
       <div className="two-col" style={{ gridTemplateColumns: '1fr', marginTop: 0, gap: 14 }}>
@@ -1357,16 +1349,6 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
         <MonthlyStatusChart posts={posts} />
         {range.start && range.end && <DailyVolumeChart posts={inRange} start={range.start} end={range.end} />}
         <ChannelBreakdownCard breakdown={channelBreakdown} />
-        {range.start && range.end && (
-          <LeadsDailyChart
-            leads={leadsInRange}
-            start={range.start}
-            end={range.end}
-            statusOrder={leadStatusOrder}
-            statusColor={leadStatusColor}
-          />
-        )}
-        <LeadsStatusBreakdownCard leads={leadsInRange} statusOrder={leadStatusOrder} statusColor={leadStatusColor} />
       </div>
 
       {inRange.length > 0 && (
@@ -1389,6 +1371,54 @@ function DashboardPage({ posts, leads, onOpenPost }: { posts: Post[]; leads: Lea
           </table>
         </div>
       )}
+
+      <h2 className="dashboard-section-title">📞 KPI จำนวนลีด (เบอร์ลูกค้า)</h2>
+
+      <div className="kpi-row" style={{ marginBottom: 14 }}>
+        <div className="card kpi-cell">
+          <div className="kpi-title">
+            เบอร์ลูกค้าที่ได้ (ทั้งหมด)
+            <span className="kpi-icon" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
+              <span className="chart-dot" style={{ background: 'var(--purple)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{leads.length}</div>
+        </div>
+        <div className="card kpi-cell">
+          <div className="kpi-title">
+            เบอร์ในช่วงที่เลือก
+            <span className="kpi-icon" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
+              <span className="chart-dot" style={{ background: 'var(--purple)' }} />
+            </span>
+          </div>
+          <div className="kpi-value">{leadsInRange.length}</div>
+          <div className="kpi-foot">{range.label}</div>
+        </div>
+        {leadStatusOrder.slice(0, 4).map((s) => (
+          <div className="card kpi-cell" key={s}>
+            <div className="kpi-title">
+              {leadStatusLabel(s)}
+              <span className="kpi-icon" style={{ background: `${leadStatusColor(s)}22`, color: leadStatusColor(s) }}>
+                <span className="chart-dot" style={{ background: leadStatusColor(s) }} />
+              </span>
+            </div>
+            <div className="kpi-value">{leadsInRange.filter((l) => (l.lead_status || 'ไม่ระบุ') === s).length}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="two-col" style={{ gridTemplateColumns: '1fr', marginTop: 0, gap: 14 }}>
+        {range.start && range.end && (
+          <LeadsDailyChart
+            leads={leadsInRange}
+            start={range.start}
+            end={range.end}
+            statusOrder={leadStatusOrder}
+            statusColor={leadStatusColor}
+          />
+        )}
+        <LeadsStatusBreakdownCard leads={leadsInRange} statusOrder={leadStatusOrder} statusColor={leadStatusColor} />
+      </div>
 
       {leadsInRange.length > 0 && (
         <div className="card" style={{ marginTop: 14, overflow: 'auto' }}>
