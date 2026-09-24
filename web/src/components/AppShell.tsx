@@ -797,13 +797,14 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
   const counts = days.map((d) => (byDay.get(ymd(d)) || []).length);
   const maxCount = niceMax(Math.max(...counts, 0));
   const chartH = 170;
+  const padTop = 14;
   const marginLeft = 34;
   const barW = days.length > 40 ? 8 : 20;
   const gap = days.length > 40 ? 3 : 10;
   const plotW = Math.max(days.length * (barW + gap) + gap, 280);
   const chartW = plotW + marginLeft;
   const showLabelEvery = Math.max(1, Math.ceil(days.length / 14));
-  const yTicks = [0, 0.5, 1].map((t) => Math.round(maxCount * t));
+  const tickFracs = [0, 0.25, 0.5, 0.75, 1];
 
   return (
     <div className="card">
@@ -817,15 +818,18 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
         ))}
       </div>
       <div className="calendar-wrap">
-        <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
-          {[0, 0.5, 1].map((t, i) => (
-            <g key={t}>
-              <line x1={marginLeft} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
-              <text x={marginLeft - 8} y={chartH - chartH * t} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
-                {yTicks[i]}
-              </text>
-            </g>
-          ))}
+        <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+          {tickFracs.map((t) => {
+            const y = padTop + chartH - chartH * t;
+            return (
+              <g key={t}>
+                <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
+                <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                  {Math.round(maxCount * t)}
+                </text>
+              </g>
+            );
+          })}
           {days.map((d, i) => {
             const key = ymd(d);
             const dayPosts = byDay.get(key) || [];
@@ -833,7 +837,7 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
             const x = marginLeft + gap + i * (barW + gap);
             const titles = dayPosts.slice(0, 5).map((p) => p.title).join(', ');
             const more = dayPosts.length > 5 ? ` +${dayPosts.length - 5} อื่นๆ` : '';
-            let y = chartH;
+            let y = padTop + chartH;
             return (
               <g key={key}>
                 {FORMATS.map((f) => {
@@ -848,7 +852,7 @@ function DailyVolumeChart({ posts, start, end }: { posts: Post[]; start: Date; e
                   );
                 })}
                 {i % showLabelEvery === 0 && (
-                  <text x={x + barW / 2} y={chartH + 18} textAnchor="middle" className="chart-axis-label">
+                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
                     {d.getDate()}/{d.getMonth() + 1}
                   </text>
                 )}
@@ -921,13 +925,14 @@ function LeadsDailyChart({
   const counts = days.map((d) => (byDay.get(ymd(d)) || []).length);
   const maxCount = niceMax(Math.max(...counts, 0));
   const chartH = 170;
+  const padTop = 14;
   const marginLeft = 34;
   const barW = days.length > 40 ? 8 : 20;
   const gap = days.length > 40 ? 3 : 10;
   const plotW = Math.max(days.length * (barW + gap) + gap, 280);
   const chartW = plotW + marginLeft;
   const showLabelEvery = Math.max(1, Math.ceil(days.length / 14));
-  const yTicks = [0, 0.5, 1].map((t) => Math.round(maxCount * t));
+  const tickFracs = [0, 0.25, 0.5, 0.75, 1];
 
   return (
     <div className="card">
@@ -941,21 +946,24 @@ function LeadsDailyChart({
         ))}
       </div>
       <div className="calendar-wrap">
-        <svg viewBox={`0 0 ${chartW} ${chartH + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
-          {[0, 0.5, 1].map((t, i) => (
-            <g key={t}>
-              <line x1={marginLeft} x2={chartW} y1={chartH - chartH * t} y2={chartH - chartH * t} className="chart-grid" />
-              <text x={marginLeft - 8} y={chartH - chartH * t} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
-                {yTicks[i]}
-              </text>
-            </g>
-          ))}
+        <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+          {tickFracs.map((t) => {
+            const y = padTop + chartH - chartH * t;
+            return (
+              <g key={t}>
+                <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
+                <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
+                  {Math.round(maxCount * t)}
+                </text>
+              </g>
+            );
+          })}
           {days.map((d, i) => {
             const key = ymd(d);
             const dayLeads = byDay.get(key) || [];
             const v = dayLeads.length;
             const x = marginLeft + gap + i * (barW + gap);
-            let y = chartH;
+            let y = padTop + chartH;
             return (
               <g key={key}>
                 {statusOrder.map((s) => {
@@ -970,7 +978,7 @@ function LeadsDailyChart({
                   );
                 })}
                 {i % showLabelEvery === 0 && (
-                  <text x={x + barW / 2} y={chartH + 18} textAnchor="middle" className="chart-axis-label">
+                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
                     {d.getDate()}/{d.getMonth() + 1}
                   </text>
                 )}
