@@ -1,0 +1,30 @@
+name: Sync SCOUT/COMPASS/SPARK data from Artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/agent-sync/**'
+  workflow_dispatch: {}
+
+jobs:
+  sync-agent-data:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - run: node scripts/sync-agent-data.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
