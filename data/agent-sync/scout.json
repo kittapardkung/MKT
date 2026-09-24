@@ -91,6 +91,47 @@
       { "label": "Geely", "value": 7 }
     ]
   },
+  "product_ads": {
+    "title": "Product Ads รายเพจ (จากตัวอย่างที่พบ)",
+    "body": "ดึงตรงจาก Meta Ads API — อ่าน caption จริงของโฆษณาแต่ละชิ้น (ไม่ใช่การเดา) แต่ไม่ใช่ทุกชิ้นมี caption สาธารณะให้เห็น (เพจ Wuling Chonburi คู่แข่ง เห็นแค่ 2/14 ชิ้น) และดึงได้สูงสุด 50 ชิ้น/เพจ/ครั้ง (เพจใหญ่อย่าง GWM ORA Thailand มี 98 ชิ้น ได้ตัวอย่างแค่ 50) ตัวเลขจึงเป็น \"จากตัวอย่างที่พบ\" เท่านั้น",
+    "columns": ["เพจ", "แบรนด์", "รุ่น", "ราคาที่พบ", "โปรโมชันที่พบ", "จำนวนตัวอย่าง"],
+    "rows": [
+      ["WULING CHONBURI (เรา)", "Wuling", "PORTA EV", "—", "เปิดรับจองแล้ววันนี้ / ใช้จริงแล้ว 1 เดือน / ค่าพลังงานลดลง", "4"],
+      ["WULING CHONBURI (เรา)", "Wuling", "Darion EV", "839,000 บาท", "รถครอบครัวยุคใหม่ / เปิดตัวรถใหม่ 7 ที่นั่ง", "5"],
+      ["Wuling Chonburi - ศูนย์วูหลิงชลบุรี", "Wuling (คู่แข่ง)", "PORTA EV", "629,000 บาท", "รับประกันแบตเตอรี่ 5 ปี/200,000 กม.", "1"],
+      ["Wuling Chonburi - ศูนย์วูหลิงชลบุรี", "Wuling (คู่แข่ง)", "Darion EV", "839,000 บาท", "รับประกันแบตเตอรี่ 8 ปี/150,000 กม.", "1"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "GWM TANK 500 Diesel", "1,399,000 บาท", "ผ่อนพิเศษ/ดอกเบี้ยพิเศษ", "4"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "GWM TANK 300 Diesel", "1,029,000 บาท", "ดาวน์เริ่มต้น 5% / ผ่อน 5,000 บาท 6 เดือน", "2"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "GWM ORA5 EV", "649,000 บาท", "ราคาเริ่มต้นพิเศษ", "2"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "WEY G9 (Luxury MPV)", "—", "ดอกเบี้ยพิเศษ 0.85%", "2"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "GWM POER SAHAR Diesel", "999,000 บาท", "—", "1"],
+      ["BYD ชลบุรี ออโตโมทีฟ พัทยา", "BYD", "BYD DM-i (SEAL5/SEALION5/SEALION6)", "—", "เปรียบเทียบ 3 รุ่นฮิต", "1"]
+    ]
+  },
+  "etc_ads": {
+    "title": "ETC Ads รายเพจ (Event/บริการ/Branding อื่นๆ)",
+    "body": "โฆษณาที่ไม่เน้นขายรุ่นรถโดยตรง (event/CTA ทั่วไป/ให้ความรู้) นับจากตัวอย่างที่พบเช่นกัน — แถว \"ไม่มีคำบรรยายสาธารณะให้จำแนก\" คือชิ้นที่ Ad Library ไม่เปิดให้เห็น caption เลย ไม่ใช่ ETC จริง เพียงแต่จำแนกไม่ได้",
+    "columns": ["เพจ", "แบรนด์", "ลักษณะเนื้อหา", "จำนวนตัวอย่าง"],
+    "rows": [
+      ["WULING CHONBURI (เรา)", "Wuling", "Event — WULING TEST DRIVE", "1"],
+      ["Wuling Chonburi - ศูนย์วูหลิงชลบุรี", "Wuling (คู่แข่ง)", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "12"],
+      ["GWM ORA Thailand", "GWM · ORA", "Event — ลงทะเบียนทดลองขับ", "10 (จากตัวอย่าง 50/98 ชิ้นที่ดึงได้)"],
+      ["GWM ORA Thailand", "GWM · ORA", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "40 (จากตัวอย่าง 50/98 ชิ้น)"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "Event/Branding — Test Drive Event, 9.9 Double Day", "2"],
+      ["GWM Iconic Ramintra", "GWM · ORA", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "~15"],
+      ["MG Primus Chonburi Bypass", "MG", "Branding/CTA — จองเลย / Chat on Messenger", "9"],
+      ["MG Primus Chonburi Bypass", "MG", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "2"],
+      ["Mg Primus Baipas Chonburi เซลล์นุ", "MG", "Branding — ลิงก์ทั่วไป (www.fb.com)", "1"],
+      ["Mg Primus Baipas Chonburi เซลล์นุ", "MG", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "5"],
+      ["Geely VIN Prestige Chonburi", "Geely", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "7"],
+      ["Chery BRG Chonburi", "Chery", "Branding/CTA — สอบถามเพิ่มเติม", "5"],
+      ["Chery BRG Chonburi", "Chery", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "5"],
+      ["BYD ชลบุรี ออโตโมทีฟ (ศรีราชา/พัทยา)", "BYD", "Event/Branding — โปรลับทักแชท, เทคนิคดูแลแบต, กำหนดเวลาโปร", "3"],
+      ["BYD ชลบุรี ออโตโมทีฟ (ศรีราชา/พัทยา)", "BYD", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "15"],
+      ["AION (3 เพจ)", "AION", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "17"],
+      ["Deepal (เครือข่ายนายหน้า 8 เพจ)", "Deepal", "ไม่มีคำบรรยายสาธารณะให้จำแนก", "~20 (จากตัวอย่างที่ดึงได้)"]
+    ]
+  },
   "scorecard": {
     "title": "Competitor Scorecard (ถ่วงน้ำหนัก)",
     "body": "คะแนนประเมินจากรูปแบบโฆษณาที่สังเกตได้จาก Meta Ad Library เท่านั้น ไม่ใช่ข้อมูลผลลัพธ์จริง (conversion/ยอดขาย)",
