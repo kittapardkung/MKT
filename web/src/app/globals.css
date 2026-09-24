@@ -294,6 +294,14 @@ tr.clickable:hover{background:var(--accent-soft)}
 .bar-chart-fill{height:100%;background:var(--muted-soft);border-radius:6px}
 .bar-chart-fill-highlight{background:var(--primary)}
 .bar-chart-value{font-size:12px;font-weight:700;color:var(--navy);text-align:right;font-variant-numeric:tabular-nums}
+
+.todo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.todo-box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--bg)}
+.todo-box-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin-bottom:6px}
+.todo-box-goal{font-size:13.5px;font-weight:600;color:var(--navy);line-height:1.5;margin-bottom:10px}
+.todo-box-tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.todo-box-tasks li{display:flex;gap:7px;align-items:flex-start;font-size:12.5px;color:var(--text);line-height:1.6}
+.todo-check{color:var(--muted-soft);flex-shrink:0;font-size:13px;line-height:1.6}
 @media(max-width:600px){
   .bar-chart-row{grid-template-columns:96px 1fr 34px;gap:6px}
   .bar-chart-label{font-size:11px}

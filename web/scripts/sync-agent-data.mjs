@@ -56,9 +56,11 @@ async function syncReport(supabase, agent, idPrefix, doc) {
               kind:
                 typeof block.items[0] === 'string'
                   ? 'list'
-                  : typeof block.items[0]?.value === 'number'
-                    ? 'bar'
-                    : 'kpi',
+                  : 'goal' in block.items[0]
+                    ? 'todo'
+                    : typeof block.items[0]?.value === 'number'
+                      ? 'bar'
+                      : 'kpi',
               items: block.items,
             }
           : block.rows

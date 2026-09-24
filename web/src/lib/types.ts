@@ -53,7 +53,8 @@ export type AgentReportData =
   | { kind: 'table'; columns: string[]; rows: string[][] }
   | { kind: 'table'; columns: string[]; groups: { label: string; rows: string[][] }[] }
   | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] }
-  | { kind: 'drilldown'; columns: string[]; rows: DrilldownRow[] };
+  | { kind: 'drilldown'; columns: string[]; rows: DrilldownRow[] }
+  | { kind: 'todo'; items: { label: string; goal: string; tasks: string[] }[] };
 
 export type AgentReport = {
   id: string;

@@ -85,6 +85,27 @@ function DrilldownTable({ columns, rows }: { columns: string[]; rows: DrilldownR
   );
 }
 
+function TodoList({ items }: { items: { label: string; goal: string; tasks: string[] }[] }) {
+  return (
+    <div className="todo-grid">
+      {items.map((item, i) => (
+        <div className="todo-box" key={i}>
+          <div className="todo-box-label">{item.label}</div>
+          <div className="todo-box-goal">{item.goal}</div>
+          <ul className="todo-box-tasks">
+            {item.tasks.map((task, j) => (
+              <li key={j}>
+                <span className="todo-check">☐</span>
+                {task}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BarChart({ items }: { items: { label: string; value: number; highlight?: boolean }[] }) {
   const max = Math.max(...items.map((i) => i.value), 1);
   return (
@@ -202,6 +223,8 @@ function ReportCard({ report }: { report: AgentReport }) {
       {data?.kind === 'bar' && <BarChart items={data.items} />}
 
       {data?.kind === 'drilldown' && <DrilldownTable columns={data.columns} rows={data.rows} />}
+
+      {data?.kind === 'todo' && <TodoList items={data.items} />}
     </div>
   );
 }
