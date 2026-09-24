@@ -609,6 +609,7 @@ export default function AppShell() {
 
       {promoteModalOpen && promoteIdeaTarget && (
         <PromoteModal
+          idea={promoteIdeaTarget}
           form={promoteForm}
           setForm={setPromoteForm}
           saving={saving}
@@ -1479,6 +1480,7 @@ function PostModal({
 }
 
 function PromoteModal({
+  idea,
   form,
   setForm,
   saving,
@@ -1486,6 +1488,7 @@ function PromoteModal({
   onConfirm,
   onReject,
 }: {
+  idea: Idea;
   form: { title: string; date: string; time: string; channel: string; format: string };
   setForm: Dispatch<SetStateAction<{ title: string; date: string; time: string; channel: string; format: string }>>;
   saving: boolean;
@@ -1501,6 +1504,9 @@ function PromoteModal({
           <h2 style={{ margin: 0 }}>ส่งไอเดียเข้าปฏิทิน</h2>
           <button className="btn" onClick={onClose}>ปิด</button>
         </div>
+        {idea.note && (
+          <div className="notice" style={{ whiteSpace: 'pre-wrap' }}>{idea.note}</div>
+        )}
         <div className="field"><label>ไอเดีย</label><input value={form.title} onChange={(e) => set('title', e.target.value)} /></div>
         <div className="modal-grid" style={{ marginTop: 10 }}>
           <div className="field"><label>วันที่</label><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} /></div>
