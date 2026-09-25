@@ -42,6 +42,7 @@ import {
   Sparkles,
   ListChecks,
   Megaphone,
+  BookOpenText,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
@@ -98,6 +99,7 @@ type PageId =
   | 'compass'
   | 'spark'
   | 'ads'
+  | 'almanacReport'
   | 'dashboard'
   | 'timeline'
   | 'calendarPage'
@@ -133,6 +135,7 @@ const NAV_GROUPS: NavGroup[] = [
     agent: 'ALMANAC',
     label: 'ALMANAC · Content Planner',
     items: [
+      { id: 'almanacReport', label: 'ภาพรวมแผนคอนเทนต์', short: 'ภาพรวม', icon: BookOpenText },
       { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
       { id: 'timeline', label: 'ไทม์ไลน์การผลิต', short: 'ไทม์ไลน์', icon: ListChecks },
       { id: 'calendarPage', label: 'ปฏิทินคอนเทนต์', short: 'ปฏิทิน', icon: CalendarDays },
@@ -534,6 +537,8 @@ export default function AppShell() {
           {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
 
           {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
+
+          {page === 'almanacReport' && <AgentReportPage agent="ALMANAC" reports={data?.agentReports || []} />}
 
           {page === 'spark' && (
             <SparkPage
