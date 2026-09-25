@@ -249,6 +249,8 @@ tr.clickable:hover{background:var(--accent-soft)}
 .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);padding:16px}
 .login-card{width:min(380px,100%);border:1px solid var(--line);border-radius:18px;padding:32px;background:var(--surface);box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .login-card .brand{font-size:24px}
+.login-divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted-soft);font-size:12px}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--line)}
 
 /* agent dashboards (SCOUT / COMPASS / SPARK / ALMANAC) */
 .agent-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
