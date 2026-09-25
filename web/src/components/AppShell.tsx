@@ -533,7 +533,7 @@ export default function AppShell() {
 
           {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
 
-          {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} />}
+          {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
 
           {page === 'spark' && (
             <SparkPage
@@ -1900,10 +1900,26 @@ function PostModal({
           <div className="field"><label>วันที่</label><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} /></div>
           <div className="field"><label>เวลา</label><input type="time" value={form.time} onChange={(e) => set('time', e.target.value)} /></div>
           <div className="field">
-            <label>ช่องทาง</label>
-            <select value={form.channel} onChange={(e) => set('channel', e.target.value)}>
-              {CHANNELS.map((c) => <option key={c}>{c}</option>)}
-            </select>
+            <label>ช่องทาง (เลือกได้หลายข้อ)</label>
+            <div className="tags-grid">
+              {CHANNELS.map((c) => {
+                const selected = csvTags(form.channel).includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`tag-btn ${selected ? 'selected' : ''}`}
+                    onClick={() => {
+                      const current = csvTags(form.channel);
+                      const next = selected ? current.filter((x) => x !== c) : [...current, c];
+                      set('channel', next.join(', '));
+                    }}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="field">
             <label>รูปแบบ</label>

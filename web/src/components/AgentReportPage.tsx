@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import type { AgentId, AgentReport, DrilldownRow } from '@/lib/types';
-import { displayDateTime } from '@/lib/date-utils';
+import { useMemo, useState } from 'react';
+import type { AgentId, AgentReport, DrilldownRow, Lead } from '@/lib/types';
+import { displayDateTime, parseDate, ymd } from '@/lib/date-utils';
 
 function Empty({ text }: { text: string }) {
   return <div className="empty">{text}</div>;
@@ -162,10 +162,44 @@ function niceMaxValue(n: number) {
   return niceFrac * pow;
 }
 
-function DailySpendChart({ items }: { items: { label: string; value: number; highlight?: boolean }[] }) {
+function DailySpendChartWithLeads({
+  items,
+  updatedAt,
+  leads,
+}: {
+  items: { label: string; value: number; highlight?: boolean }[];
+  updatedAt: string;
+  leads: Lead[];
+}) {
+  const leadCounts = useMemo(() => {
+    const byDay = new Map<string, number>();
+    leads.forEach((l) => {
+      const d = parseDate(l.created_date || '');
+      if (!d) return;
+      const key = ymd(d);
+      byDay.set(key, (byDay.get(key) || 0) + 1);
+    });
+    const ref = parseDate(updatedAt) || new Date();
+    return items.map((_, i) => {
+      const d = new Date(ref.getFullYear(), ref.getMonth(), i + 1);
+      return byDay.get(ymd(d)) || 0;
+    });
+  }, [items, updatedAt, leads]);
+
+  return <DailySpendChart items={items} leadCounts={leadCounts} />;
+}
+
+function DailySpendChart({
+  items,
+  leadCounts,
+}: {
+  items: { label: string; value: number; highlight?: boolean }[];
+  leadCounts: number[];
+}) {
   const maxValue = niceMaxValue(Math.max(...items.map((i) => i.value), 0));
-  const chartH = 170;
-  const padTop = 14;
+  const maxLeads = niceMaxValue(Math.max(...leadCounts, 0));
+  const chartH = 100;
+  const padTop = 10;
   const marginLeft = 46;
   const barW = items.length > 20 ? 10 : 20;
   const gap = items.length > 20 ? 4 : 10;
@@ -173,55 +207,86 @@ function DailySpendChart({ items }: { items: { label: string; value: number; hig
   const chartW = plotW + marginLeft;
   const showLabelEvery = Math.max(1, Math.ceil(items.length / 14));
   const tickFracs = [0, 0.25, 0.5, 0.75, 1];
+  const labelStyle = { fontSize: 9 };
+
+  const points = items.map((item, i) => {
+    const x = marginLeft + gap + i * (barW + gap) + barW / 2;
+    const count = leadCounts[i] || 0;
+    const y = maxLeads ? padTop + chartH - (count / maxLeads) * chartH : padTop + chartH;
+    return { x, y, count, label: item.label };
+  });
 
   return (
-    <div className="calendar-wrap">
-      <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 30}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
-        {tickFracs.map((t) => {
-          const y = padTop + chartH - chartH * t;
-          return (
-            <g key={t}>
-              <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
-              <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label">
-                {Math.round(maxValue * t).toLocaleString('th-TH')}
-              </text>
-            </g>
-          );
-        })}
-        {items.map((item, i) => {
-          const x = marginLeft + gap + i * (barW + gap);
-          const h = maxValue ? Math.max((item.value / maxValue) * chartH, item.value > 0 ? 2 : 0) : 0;
-          const y = padTop + chartH - h;
-          return (
-            <g key={i}>
-              <rect
-                x={x}
-                y={y}
-                width={barW}
-                height={h}
-                fill={item.highlight ? 'var(--accent)' : 'var(--primary)'}
-              >
-                <title>{`${item.label}: ฿${item.value.toLocaleString('th-TH')}`}</title>
-              </rect>
-              {i % showLabelEvery === 0 && (
-                <>
-                  <line
-                    x1={x + barW / 2}
-                    x2={x + barW / 2}
-                    y1={padTop + chartH}
-                    y2={padTop + chartH + 5}
-                    className="chart-axis-tick"
-                  />
-                  <text x={x + barW / 2} y={padTop + chartH + 18} textAnchor="middle" className="chart-axis-label">
-                    {item.label}
-                  </text>
-                </>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+    <>
+      <div className="chart-legend">
+        <span className="chart-legend-item">
+          <span className="chart-dot" style={{ background: 'var(--primary)' }} />
+          งบที่ใช้ (บาท)
+        </span>
+        <span className="chart-legend-item">
+          <span className="chart-dot" style={{ background: '#c62828' }} />
+          จำนวนเบอร์ที่ได้
+        </span>
+      </div>
+      <div className="calendar-wrap">
+        <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 26}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+          {tickFracs.map((t) => {
+            const y = padTop + chartH - chartH * t;
+            return (
+              <g key={t}>
+                <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
+                <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label" style={labelStyle}>
+                  {Math.round(maxValue * t).toLocaleString('th-TH')}
+                </text>
+              </g>
+            );
+          })}
+          {items.map((item, i) => {
+            const x = marginLeft + gap + i * (barW + gap);
+            const h = maxValue ? Math.max((item.value / maxValue) * chartH, item.value > 0 ? 2 : 0) : 0;
+            const y = padTop + chartH - h;
+            return (
+              <g key={i}>
+                <rect
+                  x={x}
+                  y={y}
+                  width={barW}
+                  height={h}
+                  fill={item.highlight ? 'var(--accent)' : 'var(--primary)'}
+                >
+                  <title>{`${item.label}: ฿${item.value.toLocaleString('th-TH')}`}</title>
+                </rect>
+                {i % showLabelEvery === 0 && (
+                  <>
+                    <line
+                      x1={x + barW / 2}
+                      x2={x + barW / 2}
+                      y1={padTop + chartH}
+                      y2={padTop + chartH + 5}
+                      className="chart-axis-tick"
+                    />
+                    <text x={x + barW / 2} y={padTop + chartH + 16} textAnchor="middle" className="chart-axis-label" style={labelStyle}>
+                      {item.label}
+                    </text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+          <polyline
+            points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#c62828"
+            strokeWidth={1.5}
+          />
+          {points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#c62828">
+              <title>{`${p.label}: ${p.count} เบอร์`}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+    </>
   );
 }
 
@@ -233,7 +298,7 @@ const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   ALMANAC: { tagline: 'AI Content Planner', className: 'agent-almanac' },
 };
 
-function ReportCard({ report }: { report: AgentReport }) {
+function ReportCard({ report, leads }: { report: AgentReport; leads: Lead[] }) {
   const data = report.data;
   return (
     <div className="card report-card">
@@ -328,7 +393,9 @@ function ReportCard({ report }: { report: AgentReport }) {
         </>
       )}
 
-      {data?.kind === 'bar' && report.section === 'daily_spend' && <DailySpendChart items={data.items} />}
+      {data?.kind === 'bar' && report.section === 'daily_spend' && (
+        <DailySpendChartWithLeads items={data.items} updatedAt={report.updated_at} leads={leads} />
+      )}
       {data?.kind === 'bar' && report.section !== 'daily_spend' && <BarChart items={data.items} />}
 
       {data?.kind === 'drilldown' && <DrilldownTable columns={data.columns} rows={data.rows} />}
@@ -338,7 +405,15 @@ function ReportCard({ report }: { report: AgentReport }) {
   );
 }
 
-export default function AgentReportPage({ agent, reports }: { agent: AgentId; reports: AgentReport[] }) {
+export default function AgentReportPage({
+  agent,
+  reports,
+  leads = [],
+}: {
+  agent: AgentId;
+  reports: AgentReport[];
+  leads?: Lead[];
+}) {
   const meta = AGENT_META[agent];
   const mine = reports.filter((r) => r.agent === agent).sort((a, b) => a.sort_order - b.sort_order);
 
@@ -355,7 +430,7 @@ export default function AgentReportPage({ agent, reports }: { agent: AgentId; re
       {mine.length ? (
         <div className="report-list-wrap">
           {mine.map((r) => (
-            <ReportCard key={r.id} report={r} />
+            <ReportCard key={r.id} report={r} leads={leads} />
           ))}
         </div>
       ) : (

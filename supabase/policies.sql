@@ -63,6 +63,10 @@ drop policy if exists "posts_update_authenticated" on posts;
 create policy "posts_update_authenticated" on posts
   for update to authenticated using (true) with check (true);
 
+drop policy if exists "posts_delete_authenticated" on posts;
+create policy "posts_delete_authenticated" on posts
+  for delete to authenticated using (true);
+
 -- ======================
 -- ideas
 -- ======================
