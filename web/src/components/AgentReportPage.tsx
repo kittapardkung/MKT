@@ -198,16 +198,17 @@ function DailySpendChart({
 }) {
   const maxValue = niceMaxValue(Math.max(...items.map((i) => i.value), 0));
   const maxLeads = niceMaxValue(Math.max(...leadCounts, 0));
-  const chartH = 100;
-  const padTop = 10;
-  const marginLeft = 46;
+  const chartH = 90;
+  const padTop = 8;
+  const marginLeft = 40;
+  const marginRight = 26;
   const barW = items.length > 20 ? 10 : 20;
   const gap = items.length > 20 ? 4 : 10;
   const plotW = Math.max(items.length * (barW + gap) + gap, 280);
-  const chartW = plotW + marginLeft;
+  const chartW = plotW + marginLeft + marginRight;
   const showLabelEvery = Math.max(1, Math.ceil(items.length / 14));
   const tickFracs = [0, 0.25, 0.5, 0.75, 1];
-  const labelStyle = { fontSize: 9 };
+  const labelStyle = { fontSize: 8 };
 
   const points = items.map((item, i) => {
     const x = marginLeft + gap + i * (barW + gap) + barW / 2;
@@ -218,7 +219,7 @@ function DailySpendChart({
 
   return (
     <>
-      <div className="chart-legend">
+      <div className="chart-legend chart-legend-sm">
         <span className="chart-legend-item">
           <span className="chart-dot" style={{ background: 'var(--primary)' }} />
           งบที่ใช้ (บาท)
@@ -229,14 +230,17 @@ function DailySpendChart({
         </span>
       </div>
       <div className="calendar-wrap">
-        <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 26}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
+        <svg viewBox={`0 0 ${chartW} ${chartH + padTop + 24}`} width={chartW} style={{ minWidth: '100%', overflow: 'visible' }}>
           {tickFracs.map((t) => {
             const y = padTop + chartH - chartH * t;
             return (
               <g key={t}>
-                <line x1={marginLeft} x2={chartW} y1={y} y2={y} className="chart-grid" />
-                <text x={marginLeft - 8} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label" style={labelStyle}>
+                <line x1={marginLeft} x2={chartW - marginRight} y1={y} y2={y} className="chart-grid" />
+                <text x={marginLeft - 6} y={y} textAnchor="end" dominantBaseline="middle" className="chart-axis-label" style={labelStyle}>
                   {Math.round(maxValue * t).toLocaleString('th-TH')}
+                </text>
+                <text x={chartW - marginRight + 6} y={y} textAnchor="start" dominantBaseline="middle" className="chart-axis-label" style={{ ...labelStyle, fill: '#c62828' }}>
+                  {Math.round(maxLeads * t)}
                 </text>
               </g>
             );
@@ -262,10 +266,10 @@ function DailySpendChart({
                       x1={x + barW / 2}
                       x2={x + barW / 2}
                       y1={padTop + chartH}
-                      y2={padTop + chartH + 5}
+                      y2={padTop + chartH + 4}
                       className="chart-axis-tick"
                     />
-                    <text x={x + barW / 2} y={padTop + chartH + 16} textAnchor="middle" className="chart-axis-label" style={labelStyle}>
+                    <text x={x + barW / 2} y={padTop + chartH + 14} textAnchor="middle" className="chart-axis-label" style={labelStyle}>
                       {item.label}
                     </text>
                   </>
@@ -280,7 +284,7 @@ function DailySpendChart({
             strokeWidth={1.5}
           />
           {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#c62828">
+            <circle key={i} cx={p.x} cy={p.y} r={2.2} fill="#c62828">
               <title>{`${p.label}: ${p.count} เบอร์`}</title>
             </circle>
           ))}
