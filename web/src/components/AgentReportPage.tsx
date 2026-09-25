@@ -200,15 +200,15 @@ function DailySpendChart({
   const maxLeads = niceMaxValue(Math.max(...leadCounts, 0));
   const chartH = 90;
   const padTop = 8;
-  const marginLeft = 40;
-  const marginRight = 26;
+  const marginLeft = 30;
+  const marginRight = 20;
   const barW = items.length > 20 ? 10 : 20;
   const gap = items.length > 20 ? 4 : 10;
   const plotW = Math.max(items.length * (barW + gap) + gap, 280);
   const chartW = plotW + marginLeft + marginRight;
   const showLabelEvery = Math.max(1, Math.ceil(items.length / 14));
   const tickFracs = [0, 0.25, 0.5, 0.75, 1];
-  const labelStyle = { fontSize: 8 };
+  const labelStyle = { fontSize: 6.5 };
 
   const points = items.map((item, i) => {
     const x = marginLeft + gap + i * (barW + gap) + barW / 2;
