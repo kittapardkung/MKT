@@ -96,6 +96,9 @@ export type Lead = {
   source: string | null;
   assigned_sales: string | null;
   lead_status: string | null;
+  lead_temperature: string | null;
+  sales_reply: string | null;
+  follow_up_note: string | null;
 };
 
 export type Bootstrap = {

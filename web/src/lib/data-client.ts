@@ -34,7 +34,9 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
     // ตาราง leads อาจยังไม่ถูกสร้าง (ต้องรัน schema_leads.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
     supabase
       .from('leads')
-      .select('lead_id, created_date, customer_name, phone_number, interested_model, source, assigned_sales, lead_status'),
+      .select(
+        'lead_id, created_date, customer_name, phone_number, interested_model, source, assigned_sales, lead_status, lead_temperature, sales_reply, follow_up_note'
+      ),
     // ตาราง agent_reports อาจยังไม่ถูกสร้าง (ต้องรัน migrate_agent_workflow.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
     supabase.from('agent_reports').select('*').order('agent').order('sort_order'),
   ]);

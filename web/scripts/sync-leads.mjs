@@ -25,6 +25,8 @@ const COLUMNS = [
   'Assigned_Sales',
   'Lead_Status',
   'Lead_Temperature',
+  'Sales_Reply',
+  'Follow_Up_Note',
 ];
 
 function requireEnv(name) {
@@ -92,6 +94,8 @@ async function main() {
       assigned_sales: String(r[colIndex.Assigned_Sales] || '').trim() || null,
       lead_status: String(r[colIndex.Lead_Status] || '').trim() || null,
       lead_temperature: String(r[colIndex.Lead_Temperature] || '').trim() || null,
+      sales_reply: String(r[colIndex.Sales_Reply] || '').trim() || null,
+      follow_up_note: String(r[colIndex.Follow_Up_Note] || '').trim() || null,
       synced_at: new Date().toISOString(),
     }))
     .filter((l) => l.lead_id);

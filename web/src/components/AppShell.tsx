@@ -42,11 +42,13 @@ import {
   Sparkles,
   ListChecks,
   Megaphone,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
 import SparkPage from '@/components/SparkPage';
 import TimelinePage from '@/components/TimelinePage';
+import LeadsOverviewPage from '@/components/LeadsOverviewPage';
 
 const STATUS_LABELS: Record<PostStatus, string> = {
   DRAFT: 'ร่าง',
@@ -98,6 +100,7 @@ type PageId =
   | 'compass'
   | 'spark'
   | 'ads'
+  | 'leadsOverview'
   | 'dashboard'
   | 'timeline'
   | 'calendarPage'
@@ -106,31 +109,36 @@ type PageId =
   | 'library';
 
 type NavItem = { id: PageId; label: string; short: string; icon: LucideIcon };
-type NavGroup = { agent: AgentId; label: string; items: NavItem[] };
+type NavGroup = { id: string; label: string; items: NavItem[] };
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    agent: 'SCOUT',
+    id: 'SCOUT',
     label: 'SCOUT · วิเคราะห์คู่แข่ง',
     items: [{ id: 'scout', label: 'ภาพรวมคู่แข่ง', short: 'SCOUT', icon: Radar }],
   },
   {
-    agent: 'COMPASS',
+    id: 'COMPASS',
     label: 'COMPASS · กลยุทธ์การตลาด',
     items: [{ id: 'compass', label: 'ภาพรวมกลยุทธ์', short: 'COMPASS', icon: Compass }],
   },
   {
-    agent: 'SPARK',
+    id: 'SPARK',
     label: 'SPARK · Content Creator',
     items: [{ id: 'spark', label: 'คลังไอเดีย/Hook', short: 'SPARK', icon: Sparkles }],
   },
   {
-    agent: 'ADS',
+    id: 'ADS',
     label: 'ADS · ทีมโฆษณา Meta',
     items: [{ id: 'ads', label: 'ภาพรวมโฆษณา', short: 'ADS', icon: Megaphone }],
   },
   {
-    agent: 'ALMANAC',
+    id: 'LEADS',
+    label: 'ลีด · ฝ่ายขาย',
+    items: [{ id: 'leadsOverview', label: 'ภาพรวมลีด', short: 'ลีด', icon: Users }],
+  },
+  {
+    id: 'ALMANAC',
     label: 'ALMANAC · Content Planner',
     items: [
       { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
@@ -453,7 +461,7 @@ export default function AppShell() {
 
         <nav className="nav-scroll">
           {NAV_GROUPS.map((group) => (
-            <div className="nav-group" key={group.agent}>
+            <div className="nav-group" key={group.id}>
               <div className="nav-group-label">{group.label}</div>
               {group.items.map((n) => (
                 <button
@@ -534,6 +542,8 @@ export default function AppShell() {
           {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
 
           {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
+
+          {page === 'leadsOverview' && <LeadsOverviewPage leads={data?.leads || []} />}
 
           {page === 'spark' && (
             <SparkPage

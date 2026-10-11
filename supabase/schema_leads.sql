@@ -13,6 +13,8 @@ create table if not exists leads (
   assigned_sales      text,
   lead_status         text,
   lead_temperature    text,
+  sales_reply         text,
+  follow_up_note      text,
   synced_at           timestamptz not null default now()
 );
 
