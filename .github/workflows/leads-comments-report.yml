@@ -1,0 +1,26 @@
+name: Leads comments report
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  leads-comments-report:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - run: node scripts/leads-comments-report.mjs
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          LEADS_SPREADSHEET_ID: ${{ secrets.LEADS_SPREADSHEET_ID }}
