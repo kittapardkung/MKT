@@ -109,37 +109,50 @@ type PageId =
   | 'library';
 
 type NavItem = { id: PageId; label: string; short: string; icon: LucideIcon };
-type NavGroup = { id: string; label: string; items: NavItem[] };
+type SectionId = 'AI_TEAM' | 'MARKETING' | 'LEAD';
+type NavGroup = { id: string; label: string; section: SectionId; items: NavItem[] };
+
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'AI_TEAM', label: 'AI TEAM' },
+  { id: 'MARKETING', label: 'MARKETING' },
+  { id: 'LEAD', label: 'LEAD' },
+];
 
 const NAV_GROUPS: NavGroup[] = [
   {
     id: 'SCOUT',
     label: 'SCOUT · วิเคราะห์คู่แข่ง',
+    section: 'AI_TEAM',
     items: [{ id: 'scout', label: 'ภาพรวมคู่แข่ง', short: 'SCOUT', icon: Radar }],
   },
   {
     id: 'COMPASS',
     label: 'COMPASS · กลยุทธ์การตลาด',
+    section: 'AI_TEAM',
     items: [{ id: 'compass', label: 'ภาพรวมกลยุทธ์', short: 'COMPASS', icon: Compass }],
   },
   {
     id: 'SPARK',
     label: 'SPARK · Content Creator',
+    section: 'AI_TEAM',
     items: [{ id: 'spark', label: 'คลังไอเดีย/Hook', short: 'SPARK', icon: Sparkles }],
   },
   {
     id: 'ADS',
     label: 'ADS · ทีมโฆษณา Meta',
+    section: 'AI_TEAM',
     items: [{ id: 'ads', label: 'ภาพรวมโฆษณา', short: 'ADS', icon: Megaphone }],
   },
   {
     id: 'LEADS',
     label: 'ลีด · ฝ่ายขาย',
+    section: 'LEAD',
     items: [{ id: 'leadsOverview', label: 'ภาพรวมลีด', short: 'ลีด', icon: Users }],
   },
   {
     id: 'ALMANAC',
     label: 'ALMANAC · Content Planner',
+    section: 'MARKETING',
     items: [
       { id: 'dashboard', label: 'แดชบอร์ด', short: 'แดชบอร์ด', icon: LayoutDashboard },
       { id: 'timeline', label: 'ไทม์ไลน์การผลิต', short: 'ไทม์ไลน์', icon: ListChecks },
@@ -152,6 +165,13 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+
+const PAGE_SECTION: Record<PageId, SectionId> = NAV_GROUPS.reduce((acc, g) => {
+  g.items.forEach((item) => {
+    acc[item.id] = g.section;
+  });
+  return acc;
+}, {} as Record<PageId, SectionId>);
 
 const CHANNELS = ['Facebook', 'Instagram', 'TikTok', 'LINE OA', 'YouTube'];
 const STATUSES: PostStatus[] = ['DRAFT', 'REVIEW', 'APPROVED', 'PUBLISHED'];
@@ -196,7 +216,19 @@ export default function AppShell() {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [page, setPage] = useState<PageId>('calendarPage');
+  const [page, setPageRaw] = useState<PageId>('calendarPage');
+  const [navSection, setNavSection] = useState<SectionId>(() => PAGE_SECTION['calendarPage']);
+
+  function setPage(id: PageId) {
+    setPageRaw(id);
+    setNavSection(PAGE_SECTION[id]);
+  }
+
+  function selectSection(id: SectionId) {
+    setNavSection(id);
+    const firstGroup = NAV_GROUPS.find((g) => g.section === id);
+    if (firstGroup) setPageRaw(firstGroup.items[0].id);
+  }
 
   const [search, setSearch] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
@@ -459,8 +491,20 @@ export default function AppShell() {
         </div>
         <div className="brand-sub">ระบบจัดการคอนเทนต์การตลาด · Workflow 4 AI</div>
 
+        <div className="nav-section-tabs">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              className={`nav-section-tab ${navSection === s.id ? 'active' : ''}`}
+              onClick={() => selectSection(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         <nav className="nav-scroll">
-          {NAV_GROUPS.map((group) => (
+          {NAV_GROUPS.filter((group) => group.section === navSection).map((group) => (
             <div className="nav-group" key={group.id}>
               <div className="nav-group-label">{group.label}</div>
               {group.items.map((n) => (
