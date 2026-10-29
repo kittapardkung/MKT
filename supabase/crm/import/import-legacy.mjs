@@ -248,6 +248,7 @@ from jsonb_to_recordset(${lit(JSON.stringify(dq))}::jsonb) as t(lead_code text, 
 join crm.leads l on l.lead_code = t.lead_code
 on conflict (entity, entity_id, code) where status = 'OPEN' do nothing;
 select crm.run_data_quality() as extra_dq_issues;
+analyze crm.leads; analyze crm.lead_events; analyze crm.tasks; analyze crm.data_quality_issues; analyze crm.sales_team;
 ${tail}`);
 
 write('99_verify.sql', `-- ตรวจผลหลังนำเข้า (ไม่แสดงข้อมูลส่วนบุคคล)

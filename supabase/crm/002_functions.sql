@@ -47,6 +47,11 @@ language sql stable security definer set search_path = crm, pg_temp as $$
   select * from crm.sales_team where user_id = auth.uid() and active
 $$;
 
+create or replace function crm.my_id() returns uuid
+language sql stable security definer set search_path = crm, pg_temp as $$
+  select id from crm.sales_team where user_id = auth.uid() and active
+$$;
+
 create or replace function crm.my_role() returns text
 language sql stable security definer set search_path = crm, pg_temp as $$
   select role from crm.sales_team where user_id = auth.uid() and active

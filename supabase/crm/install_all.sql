@@ -229,6 +229,11 @@ language sql stable security definer set search_path = crm, pg_temp as $$
   select * from crm.sales_team where user_id = auth.uid() and active
 $$;
 
+create or replace function crm.my_id() returns uuid
+language sql stable security definer set search_path = crm, pg_temp as $$
+  select id from crm.sales_team where user_id = auth.uid() and active
+$$;
+
 create or replace function crm.my_role() returns text
 language sql stable security definer set search_path = crm, pg_temp as $$
   select role from crm.sales_team where user_id = auth.uid() and active
@@ -705,20 +710,32 @@ select
 from crm.leads l
 left join crm.sales_team s on s.id = l.owner_id
 left join crm.tasks t on t.lead_id = l.id and t.status = 'OPEN'
-left join lateral (select next_best_action from crm.ai_insights i where i.lead_id = l.id order by i.id desc limit 1) ai on true
+-- สรุปประวัติต่อลีด "ครั้งเดียว" (ไม่ใช่ subquery ต่อแถว) เพื่อไม่ให้ช้าเมื่อข้อมูลโต
+left join (
+  select e.lead_id,
+         max(e.occurred_at) as last_event,
+         max(e.occurred_at) filter (where e.type = 'CUSTOMER_MESSAGE') as last_msg,
+         max(e.occurred_at) filter (where e.type = 'STAGE_CHANGE' and e.evidence->>'to' = 'LOST') as last_lost
+  from crm.lead_events e group by e.lead_id
+) ev on ev.lead_id = l.id
+left join (
+  select q.entity_id from crm.data_quality_issues q
+  where q.entity = 'lead' and q.status = 'OPEN' and q.severity <> 'INFO' group by q.entity_id
+) dq on dq.entity_id = l.id::text
+left join (select distinct on (i.lead_id) i.lead_id, i.next_best_action from crm.ai_insights i order by i.lead_id, i.id desc) ai on ai.lead_id = l.id
+cross join (select minutes as new_minutes from crm.sla_rules where scope = 'NEW') sla
 cross join lateral (
   select coalesce(array_remove(array[
     case when l.owner_id is null and l.phone_norm is not null and l.stage not in ('WON','LOST') then 'UNASSIGNED' end,
     case when not l.dormant and l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
-              and l.assigned_at < now() - make_interval(mins => (select minutes from crm.sla_rules where scope = 'NEW')) then 'NOT_ACCEPTED' end,
+              and l.assigned_at < now() - make_interval(mins => sla.new_minutes) then 'NOT_ACCEPTED' end,
     case when not l.dormant and l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
     case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
     case when not l.dormant and l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
     case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null
-              and coalesce((select max(e.occurred_at) from crm.lead_events e where e.lead_id = l.id), l.updated_at) < now() - interval '7 days' then 'STALE' end,
-    case when l.stage = 'LOST' and exists (select 1 from crm.lead_events e where e.lead_id = l.id and e.type = 'CUSTOMER_MESSAGE'
-              and e.occurred_at > coalesce((select max(x.occurred_at) from crm.lead_events x where x.lead_id = l.id and x.type = 'STAGE_CHANGE' and x.evidence->>'to' = 'LOST'), l.created_at)) then 'LOST_WITH_SIGNAL' end,
-    case when exists (select 1 from crm.data_quality_issues q where q.entity = 'lead' and q.entity_id = l.id::text and q.status = 'OPEN' and q.severity <> 'INFO') then 'DATA_CONFLICT' end
+              and coalesce(ev.last_event, l.updated_at) < now() - interval '7 days' then 'STALE' end,
+    case when l.stage = 'LOST' and ev.last_msg is not null and ev.last_msg > coalesce(ev.last_lost, l.created_at) then 'LOST_WITH_SIGNAL' end,
+    case when dq.entity_id is not null then 'DATA_CONFLICT' end
   ], null), '{}'::text[]) as flags
 ) f;
 
@@ -774,7 +791,7 @@ select
   round(100.0 * count(l.id) filter (where l.temperature = 'HOT') / nullif(count(l.id), 0), 1) as hot_share_pct
 from crm.sales_team s
 left join crm.leads l on l.owner_id = s.id
-where s.role = 'sales' and (crm.is_leadership() or s.id = (crm.me()).id)
+where s.role = 'sales' and ((select crm.is_leadership()) or s.id = (select crm.my_id()))
 group by s.id, s.code, s.display_name;
 
 create or replace view crm.v_exec_summary as
@@ -792,17 +809,17 @@ select
       / nullif(count(*) filter (where assigned_at is not null), 0), 1) as contact_sla_pct,
   (select count(*) from crm.data_quality_issues where status = 'OPEN') as open_dq_issues
 from crm.leads
-where crm.is_leadership();
+where (select crm.is_leadership());
 
 create or replace view crm.v_funnel as
 select stage, count(*) as leads
-from crm.leads where crm.is_leadership() group by stage;
+from crm.leads where (select crm.is_leadership()) group by stage;
 
 -- ลีดเสี่ยงสำหรับผู้บริหาร: ไม่มีชื่อ/เบอร์ลูกค้า
 create or replace view crm.v_exec_risk_leads as
 select c.lead_code, c.responsible_sales, c.stage, c.temperature, c.risk_level, c.flags, c.next_follow_up_at, c.created_at
 from crm.v_lead_control_center_all c
-where crm.is_leadership() and c.risk_level = 'HIGH';
+where (select crm.is_leadership()) and c.risk_level = 'HIGH';
 
 -- JUSTICE GROUP AI Sales Manager — RLS + Grants (Phase 3)
 -- หลักการ: authenticated อ่านได้ตาม RLS, เขียนผ่าน RPC เท่านั้น; service_role (n8n) เรียก ingest/sweep/claim
@@ -816,13 +833,13 @@ end $$;
 
 drop policy if exists p_leads_sel on crm.leads;
 create policy p_leads_sel on crm.leads for select to authenticated
-  using (crm.is_manager() or owner_id = (crm.me()).id);
+  using ((select crm.is_manager()) or owner_id = (select crm.my_id()));
 
 -- ตารางลูกของลีด: เห็นได้เมื่อเห็นลีดนั้น (RLS ของ leads ทำงานใน subquery)
 do $$ declare t text; begin
   foreach t in array array['lead_events','deals','tasks','ai_insights'] loop
     execute format('drop policy if exists p_%1$s_sel on crm.%1$I', t);
-    execute format('create policy p_%1$s_sel on crm.%1$I for select to authenticated using (exists (select 1 from crm.leads l where l.id = lead_id))', t);
+    execute format('create policy p_%1$s_sel on crm.%1$I for select to authenticated using ((select crm.is_manager()) or exists (select 1 from crm.leads l where l.id = lead_id and l.owner_id = (select crm.my_id())))', t);
   end loop;
 end $$;
 
@@ -833,20 +850,20 @@ drop policy if exists p_sla_sel on crm.sla_rules;
 create policy p_sla_sel on crm.sla_rules for select to authenticated using (true);
 drop policy if exists p_sla_upd on crm.sla_rules;
 create policy p_sla_upd on crm.sla_rules for update to authenticated
-  using (crm.my_role() in ('executive','admin')) with check (crm.my_role() in ('executive','admin'));
+  using ((select crm.my_role()) in ('executive','admin')) with check ((select crm.my_role()) in ('executive','admin'));
 
 drop policy if exists p_settings_sel on crm.settings;
 create policy p_settings_sel on crm.settings for select to authenticated using (true);
 drop policy if exists p_settings_upd on crm.settings;
 create policy p_settings_upd on crm.settings for update to authenticated
-  using (crm.my_role() in ('executive','admin')) with check (crm.my_role() in ('executive','admin'));
+  using ((select crm.my_role()) in ('executive','admin')) with check ((select crm.my_role()) in ('executive','admin'));
 
 drop policy if exists p_alerts_sel on crm.alerts;
-create policy p_alerts_sel on crm.alerts for select to authenticated using (crm.is_leadership());
+create policy p_alerts_sel on crm.alerts for select to authenticated using ((select crm.is_leadership()));
 drop policy if exists p_dq_sel on crm.data_quality_issues;
-create policy p_dq_sel on crm.data_quality_issues for select to authenticated using (crm.is_leadership());
+create policy p_dq_sel on crm.data_quality_issues for select to authenticated using ((select crm.is_leadership()));
 drop policy if exists p_audit_sel on crm.audit_log;
-create policy p_audit_sel on crm.audit_log for select to authenticated using (crm.my_role() in ('admin','executive'));
+create policy p_audit_sel on crm.audit_log for select to authenticated using ((select crm.my_role()) in ('admin','executive'));
 
 -- ---------- Grants ----------
 revoke all on schema crm from public, anon;
@@ -862,7 +879,7 @@ grant update (value) on crm.settings to authenticated;
 grant select on crm.v_lead_control_center, crm.v_my_today, crm.v_sales_performance, crm.v_exec_summary,
                 crm.v_funnel, crm.v_exec_risk_leads to authenticated;
 
-grant execute on function crm.me(), crm.my_role(), crm.is_manager(), crm.is_leadership(), crm.setting(text),
+grant execute on function crm.me(), crm.my_id(), crm.my_role(), crm.is_manager(), crm.is_leadership(), crm.setting(text),
   crm.add_work_minutes(timestamptz, int), crm.normalize_phone(text) to authenticated, service_role;
 grant execute on function crm.accept_lead(uuid), crm.log_contact(uuid, text, text, text, timestamptz, text),
   crm.change_stage(uuid, text, text, jsonb), crm.add_deal(uuid, text, text, numeric), crm.verify_deal(uuid),
