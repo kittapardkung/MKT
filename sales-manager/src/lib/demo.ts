@@ -57,7 +57,7 @@ function toToday(l: DemoLead): TodayItem {
   return {
     task_id: l.lead_id, lead_id: l.lead_id, lead_code: l.lead_code, customer_name: l.customer_name, interested_model: l.interested_model,
     phone: l.phone, stage: l.stage, temperature: l.temperature, kind: first ? "FIRST_CONTACT" : "FOLLOW_UP", due_at: l.task_due_at ?? iso(0),
-    overdue_minutes: over, risk_level: l.risk_level, flags: l.flags, action: l.next_best_action,
+    overdue_minutes: over, risk_level: l.risk_level, flags: l.flags, action: l.next_best_action, responsible_sales: l.responsible_sales,
     reason: first && over > 0 ? "ลีดใหม่ เลยกำหนดติดต่อครั้งแรก — ลูกค้ากำลังรอ"
       : first ? "ลีดใหม่ ต้องติดต่อครั้งแรกภายในเวลา SLA"
       : over > 0 && l.temperature === "HOT" ? "ลีด HOT เลยกำหนดติดตาม — เสี่ยงเสียโอกาสสูง"

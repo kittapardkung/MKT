@@ -12,7 +12,7 @@ export interface TodayItem {
   customer_name: string | null; interested_model: string | null; phone: string | null;
   stage: Stage; temperature: Temperature; kind: "FIRST_CONTACT" | "FOLLOW_UP";
   due_at: string; overdue_minutes: number; reason: string; action: string;
-  risk_level: Risk; flags: string[];
+  risk_level: Risk; flags: string[]; responsible_sales?: string | null;
 }
 
 export interface LeadRow {

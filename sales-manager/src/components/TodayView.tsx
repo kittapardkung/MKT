@@ -1,20 +1,26 @@
 "use client";
+import { useState } from "react";
 import { Phone, ClipboardPen, AlarmClock } from "lucide-react";
 import type { TodayItem } from "@/lib/types";
 import { fmtDateTime, fmtOverdue, maskPhone } from "@/lib/format";
 import { Empty, Flags, StageChip, TempChip } from "./ui";
 
-export default function TodayView({ items, onOpen }: { items: TodayItem[]; onOpen: (leadId: string) => void }) {
+const TOP_N = 15;
+
+export default function TodayView({ items, onOpen, showOwner }: { items: TodayItem[]; onOpen: (leadId: string) => void; showOwner: boolean }) {
+  const [showAll, setShowAll] = useState(false);
   const overdue = items.filter((i) => i.overdue_minutes > 0).length;
+  const veryOld = items.filter((i) => i.overdue_minutes > 7 * 1440).length;
+  const shown = showAll ? items : items.slice(0, TOP_N);
   return (
     <section>
       <h1 className="text-xl font-bold">วันนี้ต้องติดต่อใครก่อน</h1>
       <p className="mt-1 text-sm text-muted">
-        {items.length === 0 ? "ไม่มีงานค้างสำหรับวันนี้" : `${items.length} งาน · เลยกำหนดแล้ว ${overdue} งาน — เรียงตามความเร่งด่วน`}
+        {items.length === 0 ? "ไม่มีงานค้างสำหรับวันนี้" : `${items.length} งาน · เลยกำหนดแล้ว ${overdue} งาน${veryOld ? ` (ค้างเกิน 7 วัน ${veryOld} งาน)` : ""} — เรียงตามความเร่งด่วน`}
       </p>
       <div className="mt-4 space-y-3">
         {items.length === 0 && <Empty>เยี่ยมมาก! ไม่มีงานติดตามค้างวันนี้</Empty>}
-        {items.map((i, idx) => (
+        {shown.map((i, idx) => (
           <article key={i.task_id} className={`rounded-2xl border bg-surface p-4 ${i.overdue_minutes > 0 ? "border-danger/40" : "border-line"}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -25,6 +31,7 @@ export default function TodayView({ items, onOpen }: { items: TodayItem[]; onOpe
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
                   <TempChip t={i.temperature} /><StageChip s={i.stage} />
                   {i.interested_model && <span>· {i.interested_model}</span>}
+                  {showOwner && i.responsible_sales && <span>· ผู้ดูแล {i.responsible_sales}</span>}
                 </div>
               </div>
               {i.overdue_minutes > 0 ? (
@@ -52,6 +59,11 @@ export default function TodayView({ items, onOpen }: { items: TodayItem[]; onOpe
             </div>
           </article>
         ))}
+        {items.length > TOP_N && (
+          <button onClick={() => setShowAll((v) => !v)} className="min-h-11 w-full rounded-xl border border-line font-semibold">
+            {showAll ? `แสดงเฉพาะ ${TOP_N} งานแรก` : `ดูทั้งหมด (${items.length} งาน)`}
+          </button>
+        )}
       </div>
     </section>
   );

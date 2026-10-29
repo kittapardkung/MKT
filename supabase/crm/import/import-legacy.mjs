@@ -133,8 +133,12 @@ for (const t of tel) {
   const temp = ['HOT', 'WARM', 'COLD'].includes(clean(t.Lead_Temperature).toUpperCase()) ? clean(t.Lead_Temperature).toUpperCase() : null;
 
   const replyActs = acts.filter((a) => (clean(a.r.Sales_Reply) || clean(a.r.Follow_Up_Note)) && clean(a.r.Lead_Status).toUpperCase() !== 'NEW');
-  const firstContact = replyActs.length ? replyActs[0].at : null;
-  const lastContact = replyActs.length ? replyActs[replyActs.length - 1].at : null;
+  // เวลาติดต่อครั้งแรก: ข้อความเซลล์ครั้งแรก → ไม่มีก็ใช้แถวแรกที่สถานะเลย NEW → ไม่มีก็ใช้เวลารับลีด (ลีดสถานะ NEW = ยังไม่ติดต่อ)
+  const progressActs = acts.filter((a) => clean(a.r.Lead_Status).toUpperCase() !== 'NEW');
+  const evidenceActs = replyActs.length ? replyActs : progressActs;
+  const accTs = (() => { if (!(t.Accepted_Time instanceof Date)) return null; const w = wall(t.Accepted_Time); return `${w.y}-${p2(w.mo)}-${p2(w.d)}T${p2(w.h)}:${p2(w.mi)}:${p2(w.s)}+07:00`; })();
+  const firstContact = stage === 'NEW' ? null : (evidenceActs.length ? evidenceActs[0].at : accTs);
+  const lastContact = stage === 'NEW' ? null : (evidenceActs.length ? evidenceActs[evidenceActs.length - 1].at : accTs);
 
   let accepted = null; if (t.Accepted_Time instanceof Date) { const w = wall(t.Accepted_Time); accepted = `${w.y}-${p2(w.mo)}-${p2(w.d)}T${p2(w.h)}:${p2(w.mi)}:${p2(w.s)}+07:00`; }
   if (accepted && ms(accepted) < ms(created)) { addDq(code, 'ACCEPTED_BEFORE_CREATED', 'ERROR', 'เวลารับลีดก่อนเวลาสร้างลีด'); }

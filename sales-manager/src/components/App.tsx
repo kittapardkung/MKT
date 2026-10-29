@@ -91,7 +91,7 @@ export default function App() {
       </header>
       <main className="px-4">
         {error && <div role="alert" className="mb-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดข้อมูลไม่สำเร็จ: {error}</div>}
-        {tab === "today" && <TodayView items={today} onOpen={setOpenId} />}
+        {tab === "today" && <TodayView items={today} onOpen={setOpenId} showOwner={leadership} />}
         {tab === "leads" && <LeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} />}
         {tab === "dash" && <DashboardView summary={summary} perf={perf} funnel={funnel} leads={leads} leadership={leadership} />}
       </main>

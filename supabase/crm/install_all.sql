@@ -756,7 +756,7 @@ select
     when l.temperature = 'HOT' then 'ลีด HOT ถึงกำหนดติดตามวันนี้'
     else 'ถึงกำหนดติดตาม' end as reason,
   cc.next_best_action as action,
-  cc.risk_level, cc.flags
+  cc.risk_level, cc.flags, cc.responsible_sales
 from crm.tasks k
 join crm.leads l on l.id = k.lead_id
 join crm.v_lead_control_center cc on cc.lead_id = l.id
