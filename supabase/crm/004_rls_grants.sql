@@ -3,7 +3,7 @@
 
 do $$ declare t text; begin
   foreach t in array array['settings','sla_rules','sales_team','leads','lead_events','deals','tasks','alerts',
-                           'ai_insights','data_quality_issues','audit_log','ingest_log'] loop
+                           'ai_insights','data_quality_issues','audit_log','ingest_log','lead_stars'] loop
     execute format('alter table crm.%I enable row level security', t);
   end loop;
 end $$;
@@ -19,6 +19,9 @@ do $$ declare t text; begin
     execute format('create policy p_%1$s_sel on crm.%1$I for select to authenticated using ((select crm.is_manager()) or exists (select 1 from crm.leads l where l.id = lead_id and l.owner_id = (select crm.my_id())))', t);
   end loop;
 end $$;
+
+drop policy if exists p_stars_sel on crm.lead_stars;
+create policy p_stars_sel on crm.lead_stars for select to authenticated using (sales_id = (select crm.my_id()));   -- ดาวของใครของมัน
 
 drop policy if exists p_sales_team_sel on crm.sales_team;
 create policy p_sales_team_sel on crm.sales_team for select to authenticated using (true);
@@ -49,18 +52,19 @@ revoke all on all functions in schema crm from public, anon;
 
 grant usage on schema crm to authenticated, service_role;
 grant select on crm.leads, crm.lead_events, crm.deals, crm.tasks, crm.ai_insights, crm.sla_rules, crm.settings,
-                crm.alerts, crm.data_quality_issues, crm.audit_log to authenticated;
+                crm.alerts, crm.data_quality_issues, crm.audit_log, crm.lead_stars to authenticated;
 grant select (id, user_id, code, display_name, role, manager_id, active) on crm.sales_team to authenticated;  -- ไม่เปิด telegram_chat_id
 grant update (minutes, business_hours_only, remind_before_minutes, escalate_after_minutes) on crm.sla_rules to authenticated;
 grant update (value) on crm.settings to authenticated;
 grant select on crm.v_lead_control_center, crm.v_my_today, crm.v_sales_performance, crm.v_exec_summary,
-                crm.v_funnel, crm.v_exec_risk_leads to authenticated;
+                crm.v_funnel, crm.v_exec_risk_leads, crm.v_bookings to authenticated;
 
 grant execute on function crm.me(), crm.my_id(), crm.my_role(), crm.is_manager(), crm.is_leadership(), crm.setting(text),
   crm.add_work_minutes(timestamptz, int), crm.normalize_phone(text) to authenticated, service_role;
 grant execute on function crm.accept_lead(uuid), crm.log_contact(uuid, text, text, text, timestamptz, text),
   crm.change_stage(uuid, text, text, jsonb), crm.add_deal(uuid, text, text, numeric), crm.verify_deal(uuid),
-  crm.reassign_lead(uuid, uuid, text) to authenticated;
+  crm.reassign_lead(uuid, uuid, text),
+  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text) to authenticated;
 grant execute on function crm.ingest_message(text, text, text, text, text, text, timestamptz),
   crm.sweep_sla(), crm.claim_alerts(int), crm.run_data_quality(), crm.assign_lead(uuid), crm.refresh_task(uuid) to service_role;
 

@@ -24,7 +24,7 @@ const PROFILE_KEYS = ['Customer_Email','Customer_Line_ID','Customer_Address','Cu
   'Interest_Rate','Monthly_Payment','Loan_Term','Financing_Required','Financing_Status','Finance_Amount','Finance_Note','Financing_Bank',
   'Has_Trade_In','Trade_In_Brand','Trade_In_Model','Trade_In_Year','Trade_In_Expected_Price','Trade_In_Appraised_Price','Trade_In_Status',
   'Promotion_Name','Discount_Amount','Free_Items','Closing_Condition','Test_Drive_Date','Quotation_Date','Quotation_Amount','Competitor','Notes'];
-const STAGES = ['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON','LOST'];
+const STAGES = ['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST'];
 const STAGE_ALIAS = { PROSPECT: 'CONTACTED' };   // AI เคยสร้างค่านี้เอง (ไม่อยู่ใน prompt) — แมปเป็น CONTACTED + ติดธง DQ
 const TERMINAL = new Set(['WON', 'LOST']);
 
@@ -209,7 +209,7 @@ if (INCLUDE_MES_ONLY) {
 report.counts.leads_total = leads.length; report.counts.events = events.length;
 report.counts.dormant = leads.filter((l) => l.dormant).length;
 report.counts.by_stage = Object.fromEntries(STAGES.map((s) => [s, leads.filter((l) => l.stage === s).length]));
-report.counts.legacy_won_booking_unverified = leads.filter((l) => ['BOOKING', 'FINANCE_APPROVED', 'WON'].includes(l.stage)).length;
+report.counts.legacy_won_booking_unverified = leads.filter((l) => ['BOOKING', 'FINANCE_PENDING', 'FINANCE_APPROVED', 'READY_TO_DELIVER', 'WON'].includes(l.stage)).length;
 report.counts.events_by_type = events.reduce((a, e) => ((a[e.type] = (a[e.type] || 0) + 1), a), {});
 
 // ---------- SQL ----------

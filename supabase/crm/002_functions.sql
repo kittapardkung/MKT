@@ -92,7 +92,7 @@ create trigger audit_immutable before update or delete on crm.audit_log
   for each row execute function crm.audit_immutable();
 
 do $$ declare t text; begin
-  foreach t in array array['leads','tasks','deals','sales_team','sla_rules','settings'] loop
+  foreach t in array array['leads','tasks','deals','sales_team','sla_rules','settings','lead_stars'] loop
     execute format('drop trigger if exists audit on crm.%I', t);
     execute format('create trigger audit after insert or update or delete on crm.%I for each row execute function crm.audit_trg()', t);
   end loop;
@@ -105,13 +105,16 @@ declare need text;
 begin
   if tg_op = 'UPDATE' and new.stage is not distinct from old.stage then return new; end if;
   if current_setting('crm.migration_mode', true) = 'on' then
-    if new.stage in ('BOOKING','FINANCE_APPROVED','WON') and not exists
+    if new.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON') and not exists
        (select 1 from crm.deals d where d.lead_id = new.id and d.verified_at is not null) then
       new.legacy_unverified := true;
     end if;
     return new;
   end if;
-  need := case new.stage when 'BOOKING' then 'BOOKING' when 'FINANCE_APPROVED' then 'FINANCE' when 'WON' then 'BOOKING' end;
+  need := case new.stage
+            when 'BOOKING' then 'BOOKING' when 'FINANCE_PENDING' then 'BOOKING'     -- ยื่นสินเชื่อ/รอส่งมอบ ต้องมีการจองที่ตรวจสอบแล้ว
+            when 'FINANCE_APPROVED' then 'BOOKING'
+            when 'READY_TO_DELIVER' then 'BOOKING' when 'WON' then 'BOOKING' end;
   if need is not null and not exists
      (select 1 from crm.deals d where d.lead_id = new.id and d.kind = need and d.verified_at is not null) then
     raise exception 'evidence_required: stage % needs a verified % deal', new.stage, need using errcode = 'P0001';
@@ -376,7 +379,7 @@ end $$;
 
 create or replace function crm.verify_deal(p_deal uuid) returns void
 language plpgsql security definer set search_path = crm, pg_temp as $$
-declare a crm.sales_team; d crm.deals;
+declare a crm.sales_team; d crm.deals; l crm.leads;
 begin
   select * into a from crm.me();
   if a.role not in ('sales_manager','admin') then raise exception 'forbidden' using errcode = '42501'; end if;
@@ -384,6 +387,56 @@ begin
   if not found then raise exception 'deal_not_found'; end if;
   if d.created_by = a.id then raise exception 'four_eyes: ผู้บันทึกหลักฐานตรวจสอบเองไม่ได้'; end if;
   update crm.deals set verified_by = a.id, verified_at = now() where id = p_deal and verified_at is null;
+  -- ตรวจสอบการจองแล้ว → ขยับลีดเป็น BOOKING อัตโนมัติ (ถ้ายังไม่ถึงขั้นนี้)
+  if d.kind = 'BOOKING' then
+    select * into l from crm.leads where id = d.lead_id for update;
+    if l.stage in ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION') then
+      update crm.leads set stage = 'BOOKING' where id = l.id;
+      insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+      values (l.id, 'STAGE_CHANGE', a.id, 'ผู้จัดการตรวจสอบหลักฐานการจองแล้ว',
+              jsonb_build_object('from', l.stage, 'to', 'BOOKING', 'source', 'booking_verified', 'deal', d.id, 'doc_ref', d.doc_ref));
+    end if;
+  end if;
+end $$;
+
+-- เซลล์กด "จองแล้ว": บันทึกการจอง + รถ/รุ่น/เงื่อนไข รอผู้จัดการตรวจสอบ (ลีดยังไม่ขึ้น BOOKING จนกว่าจะตรวจสอบ)
+create or replace function crm.mark_booked(p_lead uuid, p_doc_ref text, p_amount numeric, p_details jsonb, p_booked_on date default null) returns uuid
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team; v_id uuid; l crm.leads;
+begin
+  a := crm._actor_for(p_lead);
+  select * into l from crm.leads where id = p_lead for update;
+  if l.stage in ('WON','LOST') then raise exception 'lead_closed'; end if;
+  if p_doc_ref is null or length(btrim(p_doc_ref)) < 3 then raise exception 'doc_ref_required: ต้องระบุเลขที่ใบจอง'; end if;
+  if coalesce(btrim(p_details->>'model'), '') = '' then raise exception 'model_required: ต้องระบุรถ/รุ่นที่จอง'; end if;
+  if coalesce(btrim(p_details->>'purchase_type'), '') not in ('CASH','FINANCE') then raise exception 'purchase_type_required: ต้องระบุเงื่อนไขการซื้อ (เงินสด/ผ่อน)'; end if;
+  if exists (select 1 from crm.deals where lead_id = p_lead and kind = 'BOOKING' and doc_ref = btrim(p_doc_ref)) then
+    raise exception 'duplicate_booking: เลขที่ใบจองนี้บันทึกไว้แล้ว';
+  end if;
+  insert into crm.deals(lead_id, kind, doc_ref, amount, details, booked_on, created_by)
+  values (p_lead, 'BOOKING', btrim(p_doc_ref), p_amount, coalesce(p_details, '{}'), coalesce(p_booked_on, (now() at time zone crm.setting('tz'))::date), a.id)
+  returning id into v_id;
+  insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+  values (p_lead, 'NOTE', a.id, 'แจ้งจอง ' || (p_details->>'model') || ' เลขที่ ' || btrim(p_doc_ref) || ' — รอผู้จัดการตรวจสอบ',
+          jsonb_build_object('deal', v_id, 'kind', 'BOOKING_REPORTED'));
+  return v_id;
+end $$;
+
+-- ติดดาว / เอาดาวออก (ลูกค้าเป้าหมายของตัวเอง)
+create or replace function crm.set_star(p_lead uuid, p_on boolean, p_note text default null) returns void
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team;
+begin
+  select * into a from crm.me();
+  if a.id is null then raise exception 'not_authenticated' using errcode = '28000'; end if;
+  perform 1 from crm.leads where id = p_lead and (a.role in ('sales_manager','admin') or owner_id = a.id);
+  if not found then raise exception 'forbidden' using errcode = '42501'; end if;
+  if p_on then
+    insert into crm.lead_stars(lead_id, sales_id, note) values (p_lead, a.id, nullif(btrim(coalesce(p_note, '')), ''))
+    on conflict (lead_id, sales_id) do update set note = coalesce(nullif(btrim(coalesce(excluded.note, '')), ''), crm.lead_stars.note);
+  else
+    delete from crm.lead_stars where lead_id = p_lead and sales_id = a.id;
+  end if;
 end $$;
 
 create or replace function crm.reassign_lead(p_lead uuid, p_new_owner uuid, p_reason text) returns void
@@ -487,7 +540,7 @@ begin
 
   insert into crm.data_quality_issues(entity, entity_id, code, severity, detail)
   select 'lead', id::text, 'STAGE_WITHOUT_EVIDENCE', 'ERROR', 'สถานะ '||stage||' ไม่มีหลักฐานธุรกรรมที่ตรวจสอบแล้ว' from crm.leads l
-   where stage in ('BOOKING','FINANCE_APPROVED','WON')
+   where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')
      and not exists (select 1 from crm.deals d where d.lead_id = l.id and d.verified_at is not null)
   on conflict (entity, entity_id, code) where status = 'OPEN' do nothing;
   get diagnostics c = row_count; n := n + c;

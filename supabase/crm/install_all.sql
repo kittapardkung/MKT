@@ -65,7 +65,7 @@ create table if not exists crm.leads (
   next_follow_up_at timestamptz,
   next_action       text,
   stage             text not null default 'NEW' check (stage in
-    ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON','LOST')),
+    ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST')),
   temperature       text check (temperature in ('HOT','WARM','COLD')),
   lost_reason       text,
   legacy_unverified boolean not null default false,    -- ลีดเก่าที่ WON/BOOKING แต่ไม่มีหลักฐาน
@@ -75,6 +75,10 @@ create table if not exists crm.leads (
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
 alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
+-- ฐานข้อมูลที่ติดตั้งไว้แล้วมี constraint แบบ 10 สถานะ → แทนที่ด้วย 13 สถานะ (ข้อมูลเดิมยังถูกต้องทุกแถว)
+alter table crm.leads drop constraint if exists leads_stage_check;
+alter table crm.leads add constraint leads_stage_check check (stage in
+  ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST'));
 create unique index if not exists leads_phone_uq on crm.leads(phone_norm) where phone_norm is not null;
 create unique index if not exists leads_fb_uq    on crm.leads(fb_user_id) where fb_user_id is not null;
 create index if not exists leads_owner_idx on crm.leads(owner_id, stage);
@@ -107,6 +111,17 @@ create table if not exists crm.deals (
   verified_at  timestamptz,
   created_at   timestamptz not null default now(),
   constraint verified_pair check ((verified_by is null) = (verified_at is null))
+);
+alter table crm.deals add column if not exists details jsonb not null default '{}';   -- รถ/รุ่น/สี/เงื่อนไขการซื้อ (สำหรับ BOOKING)
+alter table crm.deals add column if not exists booked_on date;
+
+-- ดาว = ลูกค้าเป้าหมายของเซลล์แต่ละคน (โอกาสสูง / deal ใหญ่) — ของใครของมัน
+create table if not exists crm.lead_stars (
+  lead_id    uuid not null references crm.leads(id) on delete cascade,
+  sales_id   uuid not null references crm.sales_team(id),
+  note       text,
+  created_at timestamptz not null default now(),
+  primary key (lead_id, sales_id)
 );
 
 -- ---------- Follow-up Task Engine ----------
@@ -274,7 +289,7 @@ create trigger audit_immutable before update or delete on crm.audit_log
   for each row execute function crm.audit_immutable();
 
 do $$ declare t text; begin
-  foreach t in array array['leads','tasks','deals','sales_team','sla_rules','settings'] loop
+  foreach t in array array['leads','tasks','deals','sales_team','sla_rules','settings','lead_stars'] loop
     execute format('drop trigger if exists audit on crm.%I', t);
     execute format('create trigger audit after insert or update or delete on crm.%I for each row execute function crm.audit_trg()', t);
   end loop;
@@ -287,13 +302,16 @@ declare need text;
 begin
   if tg_op = 'UPDATE' and new.stage is not distinct from old.stage then return new; end if;
   if current_setting('crm.migration_mode', true) = 'on' then
-    if new.stage in ('BOOKING','FINANCE_APPROVED','WON') and not exists
+    if new.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON') and not exists
        (select 1 from crm.deals d where d.lead_id = new.id and d.verified_at is not null) then
       new.legacy_unverified := true;
     end if;
     return new;
   end if;
-  need := case new.stage when 'BOOKING' then 'BOOKING' when 'FINANCE_APPROVED' then 'FINANCE' when 'WON' then 'BOOKING' end;
+  need := case new.stage
+            when 'BOOKING' then 'BOOKING' when 'FINANCE_PENDING' then 'BOOKING'     -- ยื่นสินเชื่อ/รอส่งมอบ ต้องมีการจองที่ตรวจสอบแล้ว
+            when 'FINANCE_APPROVED' then 'BOOKING'
+            when 'READY_TO_DELIVER' then 'BOOKING' when 'WON' then 'BOOKING' end;
   if need is not null and not exists
      (select 1 from crm.deals d where d.lead_id = new.id and d.kind = need and d.verified_at is not null) then
     raise exception 'evidence_required: stage % needs a verified % deal', new.stage, need using errcode = 'P0001';
@@ -558,7 +576,7 @@ end $$;
 
 create or replace function crm.verify_deal(p_deal uuid) returns void
 language plpgsql security definer set search_path = crm, pg_temp as $$
-declare a crm.sales_team; d crm.deals;
+declare a crm.sales_team; d crm.deals; l crm.leads;
 begin
   select * into a from crm.me();
   if a.role not in ('sales_manager','admin') then raise exception 'forbidden' using errcode = '42501'; end if;
@@ -566,6 +584,56 @@ begin
   if not found then raise exception 'deal_not_found'; end if;
   if d.created_by = a.id then raise exception 'four_eyes: ผู้บันทึกหลักฐานตรวจสอบเองไม่ได้'; end if;
   update crm.deals set verified_by = a.id, verified_at = now() where id = p_deal and verified_at is null;
+  -- ตรวจสอบการจองแล้ว → ขยับลีดเป็น BOOKING อัตโนมัติ (ถ้ายังไม่ถึงขั้นนี้)
+  if d.kind = 'BOOKING' then
+    select * into l from crm.leads where id = d.lead_id for update;
+    if l.stage in ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION') then
+      update crm.leads set stage = 'BOOKING' where id = l.id;
+      insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+      values (l.id, 'STAGE_CHANGE', a.id, 'ผู้จัดการตรวจสอบหลักฐานการจองแล้ว',
+              jsonb_build_object('from', l.stage, 'to', 'BOOKING', 'source', 'booking_verified', 'deal', d.id, 'doc_ref', d.doc_ref));
+    end if;
+  end if;
+end $$;
+
+-- เซลล์กด "จองแล้ว": บันทึกการจอง + รถ/รุ่น/เงื่อนไข รอผู้จัดการตรวจสอบ (ลีดยังไม่ขึ้น BOOKING จนกว่าจะตรวจสอบ)
+create or replace function crm.mark_booked(p_lead uuid, p_doc_ref text, p_amount numeric, p_details jsonb, p_booked_on date default null) returns uuid
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team; v_id uuid; l crm.leads;
+begin
+  a := crm._actor_for(p_lead);
+  select * into l from crm.leads where id = p_lead for update;
+  if l.stage in ('WON','LOST') then raise exception 'lead_closed'; end if;
+  if p_doc_ref is null or length(btrim(p_doc_ref)) < 3 then raise exception 'doc_ref_required: ต้องระบุเลขที่ใบจอง'; end if;
+  if coalesce(btrim(p_details->>'model'), '') = '' then raise exception 'model_required: ต้องระบุรถ/รุ่นที่จอง'; end if;
+  if coalesce(btrim(p_details->>'purchase_type'), '') not in ('CASH','FINANCE') then raise exception 'purchase_type_required: ต้องระบุเงื่อนไขการซื้อ (เงินสด/ผ่อน)'; end if;
+  if exists (select 1 from crm.deals where lead_id = p_lead and kind = 'BOOKING' and doc_ref = btrim(p_doc_ref)) then
+    raise exception 'duplicate_booking: เลขที่ใบจองนี้บันทึกไว้แล้ว';
+  end if;
+  insert into crm.deals(lead_id, kind, doc_ref, amount, details, booked_on, created_by)
+  values (p_lead, 'BOOKING', btrim(p_doc_ref), p_amount, coalesce(p_details, '{}'), coalesce(p_booked_on, (now() at time zone crm.setting('tz'))::date), a.id)
+  returning id into v_id;
+  insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+  values (p_lead, 'NOTE', a.id, 'แจ้งจอง ' || (p_details->>'model') || ' เลขที่ ' || btrim(p_doc_ref) || ' — รอผู้จัดการตรวจสอบ',
+          jsonb_build_object('deal', v_id, 'kind', 'BOOKING_REPORTED'));
+  return v_id;
+end $$;
+
+-- ติดดาว / เอาดาวออก (ลูกค้าเป้าหมายของตัวเอง)
+create or replace function crm.set_star(p_lead uuid, p_on boolean, p_note text default null) returns void
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team;
+begin
+  select * into a from crm.me();
+  if a.id is null then raise exception 'not_authenticated' using errcode = '28000'; end if;
+  perform 1 from crm.leads where id = p_lead and (a.role in ('sales_manager','admin') or owner_id = a.id);
+  if not found then raise exception 'forbidden' using errcode = '42501'; end if;
+  if p_on then
+    insert into crm.lead_stars(lead_id, sales_id, note) values (p_lead, a.id, nullif(btrim(coalesce(p_note, '')), ''))
+    on conflict (lead_id, sales_id) do update set note = coalesce(nullif(btrim(coalesce(excluded.note, '')), ''), crm.lead_stars.note);
+  else
+    delete from crm.lead_stars where lead_id = p_lead and sales_id = a.id;
+  end if;
 end $$;
 
 create or replace function crm.reassign_lead(p_lead uuid, p_new_owner uuid, p_reason text) returns void
@@ -669,7 +737,7 @@ begin
 
   insert into crm.data_quality_issues(entity, entity_id, code, severity, detail)
   select 'lead', id::text, 'STAGE_WITHOUT_EVIDENCE', 'ERROR', 'สถานะ '||stage||' ไม่มีหลักฐานธุรกรรมที่ตรวจสอบแล้ว' from crm.leads l
-   where stage in ('BOOKING','FINANCE_APPROVED','WON')
+   where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')
      and not exists (select 1 from crm.deals d where d.lead_id = l.id and d.verified_at is not null)
   on conflict (entity, entity_id, code) where status = 'OPEN' do nothing;
   get diagnostics c = row_count; n := n + c;
@@ -697,8 +765,11 @@ select
     when 'APPOINTMENT' then 'ยืนยันนัดหมายก่อนวันนัด'
     when 'TEST_DRIVE' then 'ถามความเห็นหลังทดลองขับ และเสนอราคา'
     when 'QUOTATION' then 'ติดตามผลการเสนอราคา และช่วยประเมินสินเชื่อ'
+    when 'NEGOTIATION' then 'เจรจาราคา/โปรโมชั่น/เงื่อนไข เพื่อปิดการขาย'
     when 'BOOKING' then 'ดำเนินการสินเชื่อ/เอกสารการจอง'
-    when 'FINANCE_APPROVED' then 'นัดวันส่งมอบรถ'
+    when 'FINANCE_PENDING' then 'ติดตามผลไฟแนนซ์และเอกสาร'
+    when 'FINANCE_APPROVED' then 'ยืนยันเงื่อนไขและเตรียมรถ'
+    when 'READY_TO_DELIVER' then 'นัดหมายวันรับรถ'
     when 'LOST' then 'ทบทวนสาเหตุที่เสีย และประเมินว่าควรกลับมาติดต่อหรือไม่'
     else 'ตรวจสอบสถานะลีด' end) as next_best_action,
   t.id as task_id, t.kind as task_kind, t.due_at as task_due_at, t.reminder_state, t.escalation_level,
@@ -709,7 +780,9 @@ select
     when 'OVERDUE_FOLLOWUP' = any(f.flags) and l.temperature = 'HOT' then 'HIGH'
     when cardinality(f.flags) > 0 then 'MEDIUM'
     else 'LOW' end as risk_level,
-  l.created_at, l.legacy_unverified
+  l.created_at, l.legacy_unverified,
+  l.first_contact_at, l.accepted_at, l.dormant, ev.last_msg as last_customer_message_at, ev.last_msg_body as last_customer_message,
+  (st.lead_id is not null) as starred, st.note as star_note
 from crm.leads l
 left join crm.sales_team s on s.id = l.owner_id
 left join crm.tasks t on t.lead_id = l.id and t.status = 'OPEN'
@@ -718,9 +791,11 @@ left join (
   select e.lead_id,
          max(e.occurred_at) as last_event,
          max(e.occurred_at) filter (where e.type = 'CUSTOMER_MESSAGE') as last_msg,
+         left((array_agg(e.body order by e.occurred_at desc) filter (where e.type = 'CUSTOMER_MESSAGE'))[1], 200) as last_msg_body,
          max(e.occurred_at) filter (where e.type = 'STAGE_CHANGE' and e.evidence->>'to' = 'LOST') as last_lost
   from crm.lead_events e group by e.lead_id
 ) ev on ev.lead_id = l.id
+left join (select ls.lead_id, ls.note from crm.lead_stars ls where ls.sales_id = (select crm.my_id())) st on st.lead_id = l.id
 left join (
   select q.entity_id from crm.data_quality_issues q
   where q.entity = 'lead' and q.status = 'OPEN' and q.severity <> 'INFO' group by q.entity_id
@@ -741,6 +816,18 @@ cross join lateral (
     case when dq.entity_id is not null then 'DATA_CONFLICT' end
   ], null), '{}'::text[]) as flags
 ) f;
+
+-- ลูกค้าจองแล้ว (รวมที่รอผู้จัดการตรวจสอบ)
+create or replace view crm.v_bookings with (security_invoker = true) as
+select d.id as deal_id, l.id as lead_id, l.lead_code, l.customer_name, l.phone_norm as phone, l.stage, l.interested_model,
+  d.doc_ref, d.amount, d.details, d.booked_on, d.created_at, d.verified_at, (d.verified_at is not null) as verified,
+  cb.display_name as reported_by, ow.display_name as responsible_sales, vb.display_name as verified_by_name
+from crm.deals d
+join crm.leads l on l.id = d.lead_id
+left join crm.sales_team cb on cb.id = d.created_by
+left join crm.sales_team ow on ow.id = l.owner_id
+left join crm.sales_team vb on vb.id = d.verified_by
+where d.kind = 'BOOKING';
 
 -- หน้าแรกของเซลล์: "วันนี้ต้องติดต่อใครก่อน เพราะอะไร ต้องทำอะไร"
 create or replace view crm.v_my_today with (security_invoker = true) as
@@ -783,10 +870,10 @@ select
   round(100.0 * (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'DONE' and k.completed_at <= k.due_at)
         / nullif((select count(*) from crm.tasks k where k.assignee_id = s.id and k.status in ('DONE') ), 0), 1) as followup_ontime_pct,
   -- อัตราตามสถานะปัจจุบัน (จะแม่นยำขึ้นเมื่อมี stage history)
-  round(100.0 * count(l.id) filter (where l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as appointment_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as test_drive_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as quotation_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as booking_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as appointment_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as test_drive_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as quotation_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as booking_rate_pct,
   count(l.id) filter (where l.stage = 'WON') as won,
   count(l.id) filter (where l.stage = 'LOST') as lost,
   round(avg(extract(epoch from (now() - l.created_at)) / 86400) filter (where l.stage not in ('WON','LOST')), 1) as pipeline_age_days,
@@ -805,7 +892,7 @@ select
   count(*) filter (where stage not in ('WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
-  count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,
+  count(*) filter (where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as booking_or_won,
   (select count(*) from crm.v_lead_control_center_all c where c.risk_level = 'HIGH') as leads_at_risk,
   round(100.0 * count(*) filter (where first_contact_at is not null and assigned_at is not null
       and first_contact_at <= crm.add_work_minutes(assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
@@ -829,7 +916,7 @@ where (select crm.is_leadership()) and c.risk_level = 'HIGH';
 
 do $$ declare t text; begin
   foreach t in array array['settings','sla_rules','sales_team','leads','lead_events','deals','tasks','alerts',
-                           'ai_insights','data_quality_issues','audit_log','ingest_log'] loop
+                           'ai_insights','data_quality_issues','audit_log','ingest_log','lead_stars'] loop
     execute format('alter table crm.%I enable row level security', t);
   end loop;
 end $$;
@@ -845,6 +932,9 @@ do $$ declare t text; begin
     execute format('create policy p_%1$s_sel on crm.%1$I for select to authenticated using ((select crm.is_manager()) or exists (select 1 from crm.leads l where l.id = lead_id and l.owner_id = (select crm.my_id())))', t);
   end loop;
 end $$;
+
+drop policy if exists p_stars_sel on crm.lead_stars;
+create policy p_stars_sel on crm.lead_stars for select to authenticated using (sales_id = (select crm.my_id()));   -- ดาวของใครของมัน
 
 drop policy if exists p_sales_team_sel on crm.sales_team;
 create policy p_sales_team_sel on crm.sales_team for select to authenticated using (true);
@@ -875,18 +965,19 @@ revoke all on all functions in schema crm from public, anon;
 
 grant usage on schema crm to authenticated, service_role;
 grant select on crm.leads, crm.lead_events, crm.deals, crm.tasks, crm.ai_insights, crm.sla_rules, crm.settings,
-                crm.alerts, crm.data_quality_issues, crm.audit_log to authenticated;
+                crm.alerts, crm.data_quality_issues, crm.audit_log, crm.lead_stars to authenticated;
 grant select (id, user_id, code, display_name, role, manager_id, active) on crm.sales_team to authenticated;  -- ไม่เปิด telegram_chat_id
 grant update (minutes, business_hours_only, remind_before_minutes, escalate_after_minutes) on crm.sla_rules to authenticated;
 grant update (value) on crm.settings to authenticated;
 grant select on crm.v_lead_control_center, crm.v_my_today, crm.v_sales_performance, crm.v_exec_summary,
-                crm.v_funnel, crm.v_exec_risk_leads to authenticated;
+                crm.v_funnel, crm.v_exec_risk_leads, crm.v_bookings to authenticated;
 
 grant execute on function crm.me(), crm.my_id(), crm.my_role(), crm.is_manager(), crm.is_leadership(), crm.setting(text),
   crm.add_work_minutes(timestamptz, int), crm.normalize_phone(text) to authenticated, service_role;
 grant execute on function crm.accept_lead(uuid), crm.log_contact(uuid, text, text, text, timestamptz, text),
   crm.change_stage(uuid, text, text, jsonb), crm.add_deal(uuid, text, text, numeric), crm.verify_deal(uuid),
-  crm.reassign_lead(uuid, uuid, text) to authenticated;
+  crm.reassign_lead(uuid, uuid, text),
+  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text) to authenticated;
 grant execute on function crm.ingest_message(text, text, text, text, text, text, timestamptz),
   crm.sweep_sla(), crm.claim_alerts(int), crm.run_data_quality(), crm.assign_lead(uuid), crm.refresh_task(uuid) to service_role;
 
@@ -911,7 +1002,7 @@ create or replace function crm._profile_keys() returns text[] language sql immut
     'Promotion_Name','Discount_Amount','Free_Items','Closing_Condition','Test_Drive_Date','Quotation_Date','Quotation_Amount','Competitor','Notes'] $$;
 
 create or replace function crm._stage_rank(s text) returns int language sql immutable as $$
-  select array_position(array['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON'], s) $$;
+  select array_position(array['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON'], s) $$;
 
 create or replace function crm.record_sales_reply(
   p_update_id bigint, p_lead_code text, p_telegram_user_id text, p_reply_text text, p_ai jsonb default '{}'
@@ -990,7 +1081,7 @@ begin
 
   -- 7) สถานะ: ไปข้างหน้าได้เฉพาะขั้นที่ไม่ต้องใช้หลักฐาน; ขั้นอื่น = ข้อเสนอให้ผู้จัดการตรวจ (AI ไม่ตัดสินเอง)
   if v_stage <> '' and v_stage <> l.stage then
-    if v_stage in ('FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','CONTACTED')
+    if v_stage in ('FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','CONTACTED')
        and crm._stage_rank(v_stage) > crm._stage_rank((select stage from crm.leads where id = l.id)) then
       update crm.leads set stage = v_stage where id = l.id;
       insert into crm.lead_events(lead_id, type, channel, actor_id, body, evidence)

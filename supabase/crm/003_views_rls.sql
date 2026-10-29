@@ -14,8 +14,11 @@ select
     when 'APPOINTMENT' then 'ยืนยันนัดหมายก่อนวันนัด'
     when 'TEST_DRIVE' then 'ถามความเห็นหลังทดลองขับ และเสนอราคา'
     when 'QUOTATION' then 'ติดตามผลการเสนอราคา และช่วยประเมินสินเชื่อ'
+    when 'NEGOTIATION' then 'เจรจาราคา/โปรโมชั่น/เงื่อนไข เพื่อปิดการขาย'
     when 'BOOKING' then 'ดำเนินการสินเชื่อ/เอกสารการจอง'
-    when 'FINANCE_APPROVED' then 'นัดวันส่งมอบรถ'
+    when 'FINANCE_PENDING' then 'ติดตามผลไฟแนนซ์และเอกสาร'
+    when 'FINANCE_APPROVED' then 'ยืนยันเงื่อนไขและเตรียมรถ'
+    when 'READY_TO_DELIVER' then 'นัดหมายวันรับรถ'
     when 'LOST' then 'ทบทวนสาเหตุที่เสีย และประเมินว่าควรกลับมาติดต่อหรือไม่'
     else 'ตรวจสอบสถานะลีด' end) as next_best_action,
   t.id as task_id, t.kind as task_kind, t.due_at as task_due_at, t.reminder_state, t.escalation_level,
@@ -26,7 +29,9 @@ select
     when 'OVERDUE_FOLLOWUP' = any(f.flags) and l.temperature = 'HOT' then 'HIGH'
     when cardinality(f.flags) > 0 then 'MEDIUM'
     else 'LOW' end as risk_level,
-  l.created_at, l.legacy_unverified
+  l.created_at, l.legacy_unverified,
+  l.first_contact_at, l.accepted_at, l.dormant, ev.last_msg as last_customer_message_at, ev.last_msg_body as last_customer_message,
+  (st.lead_id is not null) as starred, st.note as star_note
 from crm.leads l
 left join crm.sales_team s on s.id = l.owner_id
 left join crm.tasks t on t.lead_id = l.id and t.status = 'OPEN'
@@ -35,9 +40,11 @@ left join (
   select e.lead_id,
          max(e.occurred_at) as last_event,
          max(e.occurred_at) filter (where e.type = 'CUSTOMER_MESSAGE') as last_msg,
+         left((array_agg(e.body order by e.occurred_at desc) filter (where e.type = 'CUSTOMER_MESSAGE'))[1], 200) as last_msg_body,
          max(e.occurred_at) filter (where e.type = 'STAGE_CHANGE' and e.evidence->>'to' = 'LOST') as last_lost
   from crm.lead_events e group by e.lead_id
 ) ev on ev.lead_id = l.id
+left join (select ls.lead_id, ls.note from crm.lead_stars ls where ls.sales_id = (select crm.my_id())) st on st.lead_id = l.id
 left join (
   select q.entity_id from crm.data_quality_issues q
   where q.entity = 'lead' and q.status = 'OPEN' and q.severity <> 'INFO' group by q.entity_id
@@ -58,6 +65,18 @@ cross join lateral (
     case when dq.entity_id is not null then 'DATA_CONFLICT' end
   ], null), '{}'::text[]) as flags
 ) f;
+
+-- ลูกค้าจองแล้ว (รวมที่รอผู้จัดการตรวจสอบ)
+create or replace view crm.v_bookings with (security_invoker = true) as
+select d.id as deal_id, l.id as lead_id, l.lead_code, l.customer_name, l.phone_norm as phone, l.stage, l.interested_model,
+  d.doc_ref, d.amount, d.details, d.booked_on, d.created_at, d.verified_at, (d.verified_at is not null) as verified,
+  cb.display_name as reported_by, ow.display_name as responsible_sales, vb.display_name as verified_by_name
+from crm.deals d
+join crm.leads l on l.id = d.lead_id
+left join crm.sales_team cb on cb.id = d.created_by
+left join crm.sales_team ow on ow.id = l.owner_id
+left join crm.sales_team vb on vb.id = d.verified_by
+where d.kind = 'BOOKING';
 
 -- หน้าแรกของเซลล์: "วันนี้ต้องติดต่อใครก่อน เพราะอะไร ต้องทำอะไร"
 create or replace view crm.v_my_today with (security_invoker = true) as
@@ -100,10 +119,10 @@ select
   round(100.0 * (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'DONE' and k.completed_at <= k.due_at)
         / nullif((select count(*) from crm.tasks k where k.assignee_id = s.id and k.status in ('DONE') ), 0), 1) as followup_ontime_pct,
   -- อัตราตามสถานะปัจจุบัน (จะแม่นยำขึ้นเมื่อมี stage history)
-  round(100.0 * count(l.id) filter (where l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as appointment_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as test_drive_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('QUOTATION','BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as quotation_rate_pct,
-  round(100.0 * count(l.id) filter (where l.stage in ('BOOKING','FINANCE_APPROVED','WON')) / nullif(count(l.id), 0), 1) as booking_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as appointment_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as test_drive_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as quotation_rate_pct,
+  round(100.0 * count(l.id) filter (where l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) / nullif(count(l.id), 0), 1) as booking_rate_pct,
   count(l.id) filter (where l.stage = 'WON') as won,
   count(l.id) filter (where l.stage = 'LOST') as lost,
   round(avg(extract(epoch from (now() - l.created_at)) / 86400) filter (where l.stage not in ('WON','LOST')), 1) as pipeline_age_days,
@@ -122,7 +141,7 @@ select
   count(*) filter (where stage not in ('WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
-  count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,
+  count(*) filter (where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as booking_or_won,
   (select count(*) from crm.v_lead_control_center_all c where c.risk_level = 'HIGH') as leads_at_risk,
   round(100.0 * count(*) filter (where first_contact_at is not null and assigned_at is not null
       and first_contact_at <= crm.add_work_minutes(assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))

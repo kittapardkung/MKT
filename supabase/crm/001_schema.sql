@@ -65,7 +65,7 @@ create table if not exists crm.leads (
   next_follow_up_at timestamptz,
   next_action       text,
   stage             text not null default 'NEW' check (stage in
-    ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON','LOST')),
+    ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST')),
   temperature       text check (temperature in ('HOT','WARM','COLD')),
   lost_reason       text,
   legacy_unverified boolean not null default false,    -- ลีดเก่าที่ WON/BOOKING แต่ไม่มีหลักฐาน
@@ -75,6 +75,10 @@ create table if not exists crm.leads (
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
 alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
+-- ฐานข้อมูลที่ติดตั้งไว้แล้วมี constraint แบบ 10 สถานะ → แทนที่ด้วย 13 สถานะ (ข้อมูลเดิมยังถูกต้องทุกแถว)
+alter table crm.leads drop constraint if exists leads_stage_check;
+alter table crm.leads add constraint leads_stage_check check (stage in
+  ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST'));
 create unique index if not exists leads_phone_uq on crm.leads(phone_norm) where phone_norm is not null;
 create unique index if not exists leads_fb_uq    on crm.leads(fb_user_id) where fb_user_id is not null;
 create index if not exists leads_owner_idx on crm.leads(owner_id, stage);
@@ -107,6 +111,17 @@ create table if not exists crm.deals (
   verified_at  timestamptz,
   created_at   timestamptz not null default now(),
   constraint verified_pair check ((verified_by is null) = (verified_at is null))
+);
+alter table crm.deals add column if not exists details jsonb not null default '{}';   -- รถ/รุ่น/สี/เงื่อนไขการซื้อ (สำหรับ BOOKING)
+alter table crm.deals add column if not exists booked_on date;
+
+-- ดาว = ลูกค้าเป้าหมายของเซลล์แต่ละคน (โอกาสสูง / deal ใหญ่) — ของใครของมัน
+create table if not exists crm.lead_stars (
+  lead_id    uuid not null references crm.leads(id) on delete cascade,
+  sales_id   uuid not null references crm.sales_team(id),
+  note       text,
+  created_at timestamptz not null default now(),
+  primary key (lead_id, sales_id)
 );
 
 -- ---------- Follow-up Task Engine ----------

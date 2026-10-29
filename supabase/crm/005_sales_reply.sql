@@ -17,7 +17,7 @@ create or replace function crm._profile_keys() returns text[] language sql immut
     'Promotion_Name','Discount_Amount','Free_Items','Closing_Condition','Test_Drive_Date','Quotation_Date','Quotation_Amount','Competitor','Notes'] $$;
 
 create or replace function crm._stage_rank(s text) returns int language sql immutable as $$
-  select array_position(array['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','BOOKING','FINANCE_APPROVED','WON'], s) $$;
+  select array_position(array['NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON'], s) $$;
 
 create or replace function crm.record_sales_reply(
   p_update_id bigint, p_lead_code text, p_telegram_user_id text, p_reply_text text, p_ai jsonb default '{}'
@@ -96,7 +96,7 @@ begin
 
   -- 7) สถานะ: ไปข้างหน้าได้เฉพาะขั้นที่ไม่ต้องใช้หลักฐาน; ขั้นอื่น = ข้อเสนอให้ผู้จัดการตรวจ (AI ไม่ตัดสินเอง)
   if v_stage <> '' and v_stage <> l.stage then
-    if v_stage in ('FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','CONTACTED')
+    if v_stage in ('FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','CONTACTED')
        and crm._stage_rank(v_stage) > crm._stage_rank((select stage from crm.leads where id = l.id)) then
       update crm.leads set stage = v_stage where id = l.id;
       insert into crm.lead_events(lead_id, type, channel, actor_id, body, evidence)
