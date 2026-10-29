@@ -36,7 +36,7 @@ function Login({ onDone }: { onDone: () => void }) {
 
 function Logo() {
   // eslint-disable-next-line @next/next/no-img-element
-  return <span className="grid h-10 w-10 place-items-center rounded-xl bg-white p-1" aria-hidden="true"><img src="/logo-mark.svg" alt="" className="h-full w-full object-contain" /></span>;
+  return <span className="grid h-10 w-11 place-items-center" aria-hidden="true"><img src="/logo-mark.svg" alt="" className="h-full w-full object-contain" /></span>;
 }
 
 export default function App() {
