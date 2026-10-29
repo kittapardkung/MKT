@@ -1,4 +1,4 @@
-import type { Api, ContactInput, ExecSummary, LeadEvent, LeadRow, Me, SalesPerf, Stage, Temperature, TodayItem } from "./types";
+import type { Api, Booking, ContactInput, ExecSummary, LeadEvent, LeadRow, Me, SalesPerf, Stage, Temperature, TodayItem } from "./types";
 
 // ข้อมูลสมมติทั้งหมด (ชื่อ/เบอร์ไม่ใช่ลูกค้าจริง) — ใช้สาธิตหน้าจอเมื่อยังไม่เชื่อม Supabase
 const now = Date.now();
@@ -10,9 +10,11 @@ const NBA: Record<Stage, string> = {
   NEW: "โทรติดต่อลูกค้าครั้งแรก และสอบถามความต้องการ", CONTACTED: "สอบถามงบ/ระยะเวลาซื้อ และส่งรายละเอียดรุ่นรถ",
   FOLLOW_UP: "ส่งตารางผ่อน และชวนนัดทดลองขับ", APPOINTMENT: "ยืนยันนัดหมายก่อนวันนัด",
   TEST_DRIVE: "ถามความเห็นหลังทดลองขับ และเสนอราคา", QUOTATION: "ติดตามผลการเสนอราคา และช่วยประเมินสินเชื่อ",
-  BOOKING: "ดำเนินการสินเชื่อ/เอกสารการจอง", FINANCE_APPROVED: "นัดวันส่งมอบรถ", WON: "—",
+  NEGOTIATION: "เจรจาราคา/โปรโมชั่น/เงื่อนไข เพื่อปิดการขาย", BOOKING: "ดำเนินการสินเชื่อ/เอกสารการจอง",
+  FINANCE_PENDING: "ติดตามผลไฟแนนซ์และเอกสาร", FINANCE_APPROVED: "ยืนยันเงื่อนไขและเตรียมรถ", READY_TO_DELIVER: "นัดหมายวันรับรถ", WON: "—",
   LOST: "ทบทวนสาเหตุที่เสีย และประเมินว่าควรกลับมาติดต่อหรือไม่",
 };
+const GUARDED: Stage[] = ["BOOKING", "FINANCE_PENDING", "FINANCE_APPROVED", "READY_TO_DELIVER", "WON"];
 
 function mk(code: string, name: string | null, model: string | null, phone: string | null, sales: string | null,
   stage: Stage, temp: Temperature, nextMin: number | null, lastMin: number | null, flags: string[], risk: LeadRow["risk_level"],
@@ -22,6 +24,9 @@ function mk(code: string, name: string | null, model: string | null, phone: stri
     stage, temperature: temp, last_contact_at: lastMin === null ? null : iso(lastMin), next_follow_up_at: nextMin === null ? null : iso(nextMin),
     next_best_action: NBA[stage], task_status: stage === "WON" || stage === "LOST" ? "NONE" : "OPEN",
     task_due_at: nextMin === null ? null : iso(nextMin), risk_level: risk, flags, created_at: iso(-60 * 24 * 3),
+    first_contact_at: stage === "NEW" ? null : iso(lastMin ?? -60 * 24), accepted_at: stage === "NEW" && !flags.includes("NOT_ACCEPTED") ? iso(-5) : stage === "NEW" ? null : iso(-60 * 24),
+    dormant: false, last_customer_message: ev.filter((e) => e[0] === "CUSTOMER_MESSAGE").map((e) => e[3]).pop() ?? null,
+    last_customer_message_at: ev.filter((e) => e[0] === "CUSTOMER_MESSAGE").map((e) => iso(e[4])).pop() ?? null, starred: false, star_note: null,
     events: ev.map((e, i) => ({ id: i + 1, type: e[0], channel: e[1], outcome: e[2], body: e[3], occurred_at: iso(e[4]), actor: e[5] })),
   };
 }
@@ -55,11 +60,19 @@ const leads: DemoLead[] = [
     const age = Math.floor(rnd() * 60); const st = stages[Math.floor(rnd() * stages.length)]; const t = temps[Math.floor(rnd() * temps.length)];
     const l = mk(`DEMO-${String(i).padStart(4, "0")}`, `ลูกค้าตัวอย่าง ${i + 1}`, models[Math.floor(rnd() * models.length)], `08${String(10000000 + i * 7919).slice(0, 8)}`,
       rnd() < 0.5 ? "วิ" : "โอ๋", st, t, st === "LOST" || st === "WON" ? null : Math.floor(rnd() * 3000) + 60, st === "NEW" ? null : -age * 60, rnd() < 0.15 ? ["OVERDUE_FOLLOWUP"] : [], rnd() < 0.1 ? "HIGH" : rnd() < 0.3 ? "MEDIUM" : "LOW", []);
-    l.created_at = iso(-(age * 1440 + Math.floor(rnd() * 600)));
+    l.created_at = iso(-(age * 1440 + Math.floor(rnd() * 600))); l.dormant = st === "NEW" && age > 14; if (st === "NEW") { l.last_customer_message = "สนใจรถครับ ขอราคาหน่อย"; l.last_customer_message_at = l.created_at; }
     l.task_status = "NONE"; l.task_due_at = null; leads.push(l);
   }
 })();
 
+const bookings: Booking[] = [
+  { deal_id: "b1", lead_id: "20261015-000005", lead_code: "20261015-000005", customer_name: "คุณประเสริฐ (ตัวอย่าง)", phone: "0812345608", stage: "BOOKING", interested_model: "DARION",
+    doc_ref: "RES-DEMO-0001", amount: 20000, booked_on: iso(-60 * 24 * 2).slice(0, 10), created_at: iso(-60 * 24 * 2), verified_at: iso(-60 * 24), verified: true, reported_by: "โอ๋", responsible_sales: "โอ๋", verified_by_name: "หัวหน้า",
+    details: { model: "Darion", variant: "EV 7 ที่นั่ง", color: "ขาว", purchase_type: "FINANCE", down_payment: 150000, term_months: 60, bank: "KBank", vehicle_price: 689000 } },
+  { deal_id: "b2", lead_id: "20261028-000088", lead_code: "20261028-000088", customer_name: "คุณมาลี (ตัวอย่าง)", phone: "0812345602", stage: "TEST_DRIVE", interested_model: "PORTA",
+    doc_ref: "RES-DEMO-0002", amount: 10000, booked_on: iso(-60 * 5).slice(0, 10), created_at: iso(-60 * 5), verified_at: null, verified: false, reported_by: "วิ", responsible_sales: "วิ", verified_by_name: null,
+    details: { model: "Porta", color: "เทา", purchase_type: "CASH", vehicle_price: 549000, promo: "ฟรีประกันชั้น 1" } },
+];
 const sales: Record<string, string> = { sales: "วิ", manager: "หัวหน้า" };
 let role: "sales" | "manager" = "sales";
 
@@ -117,7 +130,7 @@ export function createDemoApi(): Api {
     },
     async changeStage(id, to, reason) {
       const l = leads.find((x) => x.lead_id === id); if (!l) return;
-      if (["BOOKING", "FINANCE_APPROVED", "WON"].includes(to)) throw new Error(`evidence_required: สถานะ ${to} ต้องมีหลักฐานธุรกรรมที่ผู้จัดการตรวจสอบแล้ว`);
+      if (GUARDED.includes(to) && !bookings.some((b) => b.lead_id === id && b.verified)) throw new Error(`evidence_required: สถานะ ${to} ต้องมีการจองที่ผู้จัดการตรวจสอบแล้ว`);
       if (to === "LOST" && reason.trim().length < 3) throw new Error("lost_reason_required");
       l.stage = to; l.next_best_action = NBA[to];
       l.events.push({ id: l.events.length + 1, type: "STAGE_CHANGE", channel: null, outcome: null, body: reason || to, occurred_at: iso(0), actor: sales[role] });
@@ -128,8 +141,27 @@ export function createDemoApi(): Api {
       return { total_leads: 128, active_leads: 47, unassigned_leads: 3, leads_at_risk: leads.filter((l) => l.risk_level === "HIGH").length * 6, overdue_followups: 11,
         contact_sla_pct: 61.8, booking_or_won: 9, won: 6, lost: 218, open_dq_issues: 37 };
     },
+    async bookings() { return role === "sales" ? bookings.filter((b) => b.responsible_sales === "วิ") : bookings.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)); },
+    async markBooked(id, b) {
+      const l = leads.find((x) => x.lead_id === id); if (!l) throw new Error("lead_not_found");
+      if (!b.doc_ref || b.doc_ref.trim().length < 3) throw new Error("doc_ref_required: ต้องระบุเลขที่ใบจอง");
+      if (!b.details.model) throw new Error("model_required: ต้องระบุรถ/รุ่นที่จอง");
+      if (bookings.some((x) => x.doc_ref === b.doc_ref.trim())) throw new Error("duplicate_booking: เลขที่ใบจองนี้บันทึกไว้แล้ว");
+      bookings.unshift({ deal_id: `b${bookings.length + 1}`, lead_id: id, lead_code: l.lead_code, customer_name: l.customer_name, phone: l.phone, stage: l.stage, interested_model: l.interested_model,
+        doc_ref: b.doc_ref.trim(), amount: b.amount, details: b.details, booked_on: b.booked_on, created_at: iso(0), verified_at: null, verified: false, reported_by: sales[role], responsible_sales: l.responsible_sales, verified_by_name: null });
+      l.events.push({ id: l.events.length + 1, type: "NOTE", channel: null, outcome: null, body: `แจ้งจอง ${b.details.model} เลขที่ ${b.doc_ref} — รอผู้จัดการตรวจสอบ`, occurred_at: iso(0), actor: sales[role] });
+    },
+    async verifyBooking(dealId) {
+      if (role === "sales") throw new Error("forbidden");
+      const b = bookings.find((x) => x.deal_id === dealId); if (!b) return;
+      if (b.reported_by === sales[role]) throw new Error("four_eyes: ผู้บันทึกหลักฐานตรวจสอบเองไม่ได้");
+      b.verified = true; b.verified_at = iso(0); b.verified_by_name = sales[role];
+      const l = leads.find((x) => x.lead_id === b.lead_id);
+      if (l && !GUARDED.includes(l.stage) && l.stage !== "LOST") { l.stage = "BOOKING"; l.next_best_action = NBA.BOOKING; b.stage = "BOOKING"; }
+    },
+    async setStar(id, on, note) { const l = leads.find((x) => x.lead_id === id); if (!l) return; l.starred = on; l.star_note = on ? (note ?? l.star_note) : null; },
     async funnel() {
-      return role === "sales" ? [] : ([["NEW", 14], ["CONTACTED", 38], ["FOLLOW_UP", 41], ["APPOINTMENT", 9], ["TEST_DRIVE", 21], ["QUOTATION", 8], ["BOOKING", 3], ["FINANCE_APPROVED", 2], ["WON", 6], ["LOST", 218]] as Array<[Stage, number]>).map(([stage, leads]) => ({ stage, leads }));
+      return role === "sales" ? [] : ([["NEW", 14], ["CONTACTED", 38], ["FOLLOW_UP", 41], ["APPOINTMENT", 9], ["TEST_DRIVE", 21], ["QUOTATION", 8], ["NEGOTIATION", 6], ["BOOKING", 3], ["FINANCE_PENDING", 1], ["FINANCE_APPROVED", 2], ["READY_TO_DELIVER", 1], ["WON", 6], ["LOST", 218]] as Array<[Stage, number]>).map(([stage, leads]) => ({ stage, leads }));
     },
   };
 }

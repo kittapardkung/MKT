@@ -2,11 +2,12 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Eye, LayoutGrid, Phone, Rows3, Search, SlidersHorizontal, X } from "lucide-react";
 import type { LeadRow, Risk, Stage, Temperature } from "@/lib/types";
-import { FLAG_TH, STAGE_TH, fmtDateTime, maskPhone } from "@/lib/format";
+import { FLAG_TH, STAGE_ORDER, STAGE_TH, STATUS_GUIDE, fmtDateTime, maskPhone } from "@/lib/format";
 import { modelOf } from "@/lib/analytics";
-import { Avatar, Empty, Flags, RiskPill, StagePill, StageChip, TempChip } from "./ui";
+import { Avatar, Empty, Flags, RiskPill, StagePill, StageChip, StarButton, TempChip } from "./ui";
+import StatusGuideButton from "./StatusGuide";
 
-const STAGES: Stage[] = ["NEW", "CONTACTED", "FOLLOW_UP", "APPOINTMENT", "TEST_DRIVE", "QUOTATION", "BOOKING", "FINANCE_APPROVED", "WON", "LOST"];
+const STAGES: Stage[] = STAGE_ORDER;
 const STAGE_RANK = Object.fromEntries(STAGES.map((s, i) => [s, i])) as Record<Stage, number>;
 const RISKS: Risk[] = ["HIGH", "MEDIUM", "LOW"];
 const RISK_TH: Record<Risk, string> = { HIGH: "เสี่ยงสูง", MEDIUM: "เสี่ยงกลาง", LOW: "ปกติ" };
@@ -26,7 +27,8 @@ const PRESETS: Array<{ key: string; label: string; test: (l: LeadRow) => boolean
   { key: "hot", label: "ลีดร้อน / อุ่น (ยังเปิด)", test: (l) => ACTIVE(l) && (l.temperature === "HOT" || l.temperature === "WARM") },
   { key: "noaction", label: "ไม่มีนัดถัดไป", test: (l) => l.flags.includes("NO_NEXT_FOLLOWUP") },
   { key: "signal", label: "LOST แต่ลูกค้ายังทัก", test: (l) => l.flags.includes("LOST_WITH_SIGNAL") },
-  { key: "deal", label: "จอง / ปิดการขาย", test: (l) => ["BOOKING", "FINANCE_APPROVED", "WON"].includes(l.stage) },
+  { key: "deal", label: "จองแล้ว / ปิดการขาย", test: (l) => ["BOOKING", "FINANCE_PENDING", "FINANCE_APPROVED", "READY_TO_DELIVER", "WON"].includes(l.stage) },
+  { key: "starred", label: "⭐ ลูกค้าเป้าหมาย", test: (l) => l.starred },
 ];
 
 type SortKey = "name" | "owner" | "stage" | "temp" | "risk" | "last" | "next" | "created";
@@ -49,9 +51,9 @@ function sortRows(rows: LeadRow[], key: SortKey, dir: 1 | -1) {
   return [...rows].sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || Date.parse(b.created_at) - Date.parse(a.created_at); });
 }
 
-function Chip({ label, on, onClick, n }: { label: string; on: boolean; onClick: () => void; n?: number }) {
+function Chip({ label, on, onClick, n, title }: { label: string; on: boolean; onClick: () => void; n?: number; title?: string }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick}
+    <button type="button" aria-pressed={on} onClick={onClick} title={title}
       className={`focus-ring min-h-9 rounded-full border px-3 text-sm ${on ? "border-dark bg-dark text-dark-ink" : "border-line text-muted hover:bg-bg"}`}>
       {label}{n !== undefined && <span className="num ml-1.5 text-xs opacity-60">{n}</span>}
     </button>
@@ -60,13 +62,13 @@ function Chip({ label, on, onClick, n }: { label: string; on: boolean; onClick: 
 
 function toggle(set: Sel, v: string): Sel { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); return n; }
 
-function LeadCard({ l, onOpen, showOwner }: { l: LeadRow; onOpen: (id: string) => void; showOwner: boolean }) {
+function LeadCard({ l, onOpen, showOwner, onStar }: { l: LeadRow; onOpen: (id: string) => void; showOwner: boolean; onStar: (id: string, on: boolean) => void }) {
   return (
-    <button onClick={() => onOpen(l.lead_id)} className="card focus-ring block w-full p-4 text-left transition hover:-translate-y-0.5">
+    <div role="button" tabIndex={0} onClick={() => onOpen(l.lead_id)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(l.lead_id); }} className="card focus-ring block w-full cursor-pointer p-4 text-left transition hover:-translate-y-0.5">
       <div className="flex items-start gap-3">
         <Avatar name={l.customer_name ?? l.lead_code} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2"><span className="truncate font-semibold">{l.customer_name ?? l.lead_code}</span><RiskPill r={l.risk_level} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="truncate font-semibold">{l.customer_name ?? l.lead_code}</span><span className="flex items-center gap-1"><RiskPill r={l.risk_level} /><StarButton on={l.starred} label={l.customer_name ?? l.lead_code} onToggle={() => onStar(l.lead_id, !l.starred)} /></span></div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
             <TempChip t={l.temperature} /><StageChip s={l.stage} />
             {l.interested_model && <span>· {l.interested_model}</span>}
@@ -76,16 +78,16 @@ function LeadCard({ l, onOpen, showOwner }: { l: LeadRow; onOpen: (id: string) =
       </div>
       <div className="mt-2 text-xs text-muted">ติดต่อล่าสุด {fmtDateTime(l.last_contact_at)} · นัดถัดไป {fmtDateTime(l.next_follow_up_at)} · {maskPhone(l.phone)}</div>
       <Flags flags={l.flags} />
-    </button>
+    </div>
   );
 }
 
-export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads: LeadRow[]; onOpen: (id: string) => void; showOwner: boolean; q: string; setQ: (v: string) => void }) {
+export default function LeadsView({ leads, onOpen, showOwner, q, setQ, onStar }: { leads: LeadRow[]; onOpen: (id: string) => void; showOwner: boolean; q: string; setQ: (v: string) => void; onStar: (id: string, on: boolean) => void }) {
   const [preset, setPreset] = useState("all");
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState<"table" | "cards">("table");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "risk", dir: 1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "created", dir: -1 });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [now] = useState(() => Date.now());
@@ -124,7 +126,7 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
     <section className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{showOwner ? "ลีดทั้งหมด" : "ลีดของฉัน"}</h1>
-        <p className="mt-0.5 text-sm text-muted">{rows.length} จาก {leads.length} ราย</p>
+        <p className="mt-0.5 text-sm text-muted">{rows.length} จาก {leads.length} ราย · เรียงจากใหม่ล่าสุดไปเก่า (คลิกหัวคอลัมน์เพื่อเปลี่ยนการเรียง)</p>
       </div>
 
       <div className="card p-3 lg:p-4">
@@ -140,6 +142,7 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted">▾</span>
           </label>
+          <StatusGuideButton />
           <div className="hidden rounded-xl border border-line p-0.5 md:flex" role="group" aria-label="รูปแบบการแสดงผล">
             {([["table", Rows3, "ตาราง"], ["cards", LayoutGrid, "การ์ด"]] as const).map(([k, Icon, label]) => (
               <button key={k} aria-label={label} aria-pressed={view === k} onClick={() => setView(k)} className={`focus-ring grid h-10 w-10 place-items-center rounded-lg ${view === k ? "bg-dark text-dark-ink" : "text-muted"}`}><Icon size={16} /></button>
@@ -154,7 +157,7 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
 
         {showFilters && (
           <div className="mt-4 grid gap-4 border-t border-line pt-4 md:grid-cols-2">
-            <Group title="สถานะ">{STAGES.map((s) => <Chip key={s} label={STAGE_TH[s]} n={count((l) => l.stage === s)} on={filters.stages.has(s)} onClick={() => upd({ stages: toggle(filters.stages, s) })} />)}</Group>
+            <Group title="สถานะ">{STAGES.map((s) => <Chip key={s} label={STAGE_TH[s]} title={STATUS_GUIDE[s].meaning} n={count((l) => l.stage === s)} on={filters.stages.has(s)} onClick={() => upd({ stages: toggle(filters.stages, s) })} />)}</Group>
             <Group title="ความสนใจ (Temperature)">{TEMPS.map((t) => <Chip key={t} label={t === "NONE" ? "ยังไม่ประเมิน" : t} n={count((l) => tempKey(l) === t)} on={filters.temps.has(t)} onClick={() => upd({ temps: toggle(filters.temps, t) })} />)}</Group>
             <Group title="ความเสี่ยง">{RISKS.map((r) => <Chip key={r} label={RISK_TH[r]} n={count((l) => l.risk_level === r)} on={filters.risks.has(r)} onClick={() => upd({ risks: toggle(filters.risks, r) })} />)}</Group>
             {showOwner && <Group title="ผู้ดูแล">{owners.map((o) => <Chip key={o} label={o} n={count((l) => (l.responsible_sales ?? NO_OWNER) === o)} on={filters.owners.has(o)} onClick={() => upd({ owners: toggle(filters.owners, o) })} />)}</Group>}
@@ -175,19 +178,20 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
         <>
           {/* การ์ด: มือถือ หรือเลือกมุมมองการ์ด */}
           <div className={`grid gap-3 lg:grid-cols-2 lg:gap-4 ${view === "table" ? "md:hidden" : ""}`}>
-            {slice.map((l) => <LeadCard key={l.lead_id} l={l} onOpen={onOpen} showOwner={showOwner} />)}
+            {slice.map((l) => <LeadCard key={l.lead_id} l={l} onOpen={onOpen} showOwner={showOwner} onStar={onStar} />)}
           </div>
           {/* ตาราง: จอ md ขึ้นไป */}
           {view === "table" && (
             <div className="card hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[920px] text-sm">
+              <table className="w-full min-w-[1040px] text-sm">
                 <thead className="border-b border-line bg-bg/50">
                   <tr>
-                    <SortTh k="name" sort={sort} onSort={doSort} className="pl-5">ลีด</SortTh>
+                    <th scope="col" className="w-10 py-3 pl-4 pr-0"><span className="sr-only">ดาว</span></th>
+                    <SortTh k="name" sort={sort} onSort={doSort}>ลีด</SortTh>
                     {showOwner && <SortTh k="owner" sort={sort} onSort={doSort}>ผู้ดูแล</SortTh>}
                     <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-muted">รุ่นที่สนใจ</th>
                     <SortTh k="stage" sort={sort} onSort={doSort}>สถานะ</SortTh><SortTh k="temp" sort={sort} onSort={doSort}>ความสนใจ</SortTh><SortTh k="risk" sort={sort} onSort={doSort}>ความเสี่ยง</SortTh>
-                    <SortTh k="last" sort={sort} onSort={doSort}>ติดต่อล่าสุด</SortTh><SortTh k="next" sort={sort} onSort={doSort}>นัดถัดไป</SortTh>
+                    <SortTh k="created" sort={sort} onSort={doSort}>เข้ามาเมื่อ</SortTh><SortTh k="last" sort={sort} onSort={doSort}>ติดต่อล่าสุด</SortTh><SortTh k="next" sort={sort} onSort={doSort}>นัดถัดไป</SortTh>
                     <th scope="col" className="px-3 py-3 pr-5 text-right text-xs font-medium text-muted">ดำเนินการ</th>
                   </tr>
                 </thead>
@@ -196,7 +200,8 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
                     const late = l.next_follow_up_at && ACTIVE(l) && Date.parse(l.next_follow_up_at) < now;
                     return (
                       <tr key={l.lead_id} className="border-b border-line last:border-0 hover:bg-bg/60">
-                        <td className="py-3 pl-5 pr-3">
+                        <td className="py-3 pl-3 pr-0"><StarButton on={l.starred} label={l.customer_name ?? l.lead_code} onToggle={() => onStar(l.lead_id, !l.starred)} /></td>
+                        <td className="py-3 pl-1 pr-3">
                           <button onClick={() => onOpen(l.lead_id)} className="focus-ring flex items-center gap-3 text-left">
                             <Avatar name={l.customer_name ?? l.lead_code} />
                             <span className="min-w-0"><span className="block max-w-[200px] truncate font-semibold">{l.customer_name ?? l.lead_code}</span><span className="block text-xs text-muted">{l.customer_name ? l.lead_code : maskPhone(l.phone)}</span></span>
@@ -207,6 +212,7 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ }: { leads
                         <td className="px-3 py-3"><StagePill s={l.stage} /></td>
                         <td className="px-3 py-3"><TempChip t={l.temperature} /></td>
                         <td className="px-3 py-3" title={l.flags.map((f) => FLAG_TH[f] ?? f).join(", ")}><RiskPill r={l.risk_level} /></td>
+                        <td className="px-3 py-3 whitespace-nowrap text-muted">{fmtDateTime(l.created_at)}</td>
                         <td className="px-3 py-3 whitespace-nowrap text-muted">{fmtDateTime(l.last_contact_at)}</td>
                         <td className={`px-3 py-3 whitespace-nowrap ${late ? "font-semibold text-danger" : "text-muted"}`}>{fmtDateTime(l.next_follow_up_at)}</td>
                         <td className="px-3 py-3 pr-5">

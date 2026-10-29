@@ -1,3 +1,4 @@
+import { Star } from "lucide-react";
 import type { Risk, Stage, Temperature } from "@/lib/types";
 import { FLAG_TH, STAGE_TH } from "@/lib/format";
 import { STAGE_GROUPS } from "@/lib/analytics";
@@ -45,3 +46,15 @@ export function StagePill({ s }: { s: Stage }) {
     </span>
   );
 }
+
+export function StarButton({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button type="button" aria-pressed={on} aria-label={on ? `เอาดาวออก: ${label}` : `ติดดาวลูกค้าเป้าหมาย: ${label}`} title={on ? "ลูกค้าเป้าหมาย — กดเพื่อเอาออก" : "ติดดาว = ลูกค้าเป้าหมาย (โอกาสสูง / deal ใหญ่)"}
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      className="focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-lg hover:bg-bg">
+      <Star size={18} className={on ? "fill-amber-400 text-amber-500" : "text-muted"} />
+    </button>
+  );
+}
+
+export const baht = (n: number | null | undefined) => (n === null || n === undefined ? "—" : `฿${n.toLocaleString("th-TH")}`);

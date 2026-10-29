@@ -1,7 +1,7 @@
 export type Role = "sales" | "sales_manager" | "executive" | "admin";
 export type Stage =
-  | "NEW" | "CONTACTED" | "FOLLOW_UP" | "APPOINTMENT" | "TEST_DRIVE"
-  | "QUOTATION" | "BOOKING" | "FINANCE_APPROVED" | "WON" | "LOST";
+  | "NEW" | "CONTACTED" | "FOLLOW_UP" | "APPOINTMENT" | "TEST_DRIVE" | "QUOTATION" | "NEGOTIATION"
+  | "BOOKING" | "FINANCE_PENDING" | "FINANCE_APPROVED" | "READY_TO_DELIVER" | "WON" | "LOST";
 export type Temperature = "HOT" | "WARM" | "COLD" | null;
 export type Risk = "HIGH" | "MEDIUM" | "LOW";
 
@@ -21,6 +21,22 @@ export interface LeadRow {
   last_contact_at: string | null; next_follow_up_at: string | null; phone: string | null;
   next_best_action: string; task_status: "OPEN" | "NONE"; task_due_at: string | null;
   risk_level: Risk; flags: string[]; created_at: string;
+  first_contact_at: string | null; accepted_at: string | null; dormant: boolean;
+  last_customer_message: string | null; last_customer_message_at: string | null;
+  starred: boolean; star_note: string | null;
+}
+
+export interface BookingDetails {
+  model: string; variant?: string; color?: string; vehicle_price?: number;
+  purchase_type: "CASH" | "FINANCE"; down_payment?: number; term_months?: number; bank?: string; promo?: string; note?: string;
+}
+
+export interface BookingInput { doc_ref: string; amount: number | null; booked_on: string; details: BookingDetails }
+
+export interface Booking {
+  deal_id: string; lead_id: string; lead_code: string; customer_name: string | null; phone: string | null; stage: Stage;
+  interested_model: string | null; doc_ref: string; amount: number | null; details: Partial<BookingDetails>; booked_on: string | null;
+  created_at: string; verified_at: string | null; verified: boolean; reported_by: string | null; responsible_sales: string | null; verified_by_name: string | null;
 }
 
 export interface LeadEvent {
@@ -62,4 +78,8 @@ export interface Api {
   performance(): Promise<SalesPerf[]>;
   summary(): Promise<ExecSummary | null>;
   funnel(): Promise<Funnel[]>;
+  bookings(): Promise<Booking[]>;
+  markBooked(leadId: string, b: BookingInput): Promise<void>;
+  verifyBooking(dealId: string): Promise<void>;
+  setStar(leadId: string, on: boolean, note?: string): Promise<void>;
 }

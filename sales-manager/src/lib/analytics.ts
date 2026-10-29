@@ -42,7 +42,8 @@ export const STAGE_GROUPS: StageGroup[] = [
   { key: "early", label: "ใหม่ / ติดต่อแล้ว", color: "#fbbf24", stages: ["NEW", "CONTACTED"] },
   { key: "follow", label: "ติดตาม", color: "#f59e0b", stages: ["FOLLOW_UP"] },
   { key: "appt", label: "นัดหมาย / ทดลองขับ", color: "#ea580c", stages: ["APPOINTMENT", "TEST_DRIVE"] },
-  { key: "deal", label: "เสนอราคา / จอง", color: "#8b5a2b", stages: ["QUOTATION", "BOOKING", "FINANCE_APPROVED"] },
+  { key: "deal", label: "เสนอราคา / ต่อรอง", color: "#b45309", stages: ["QUOTATION", "NEGOTIATION"] },
+  { key: "booked", label: "จองแล้ว / สินเชื่อ / รอส่งมอบ", color: "#7c2d12", stages: ["BOOKING", "FINANCE_PENDING", "FINANCE_APPROVED", "READY_TO_DELIVER"] },
   { key: "won", label: "ปิดการขาย", color: "#16a34a", stages: ["WON"] },
   { key: "lost", label: "เสียโอกาส", color: "#52525b", stages: ["LOST"] },
 ];

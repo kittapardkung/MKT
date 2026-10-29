@@ -1,14 +1,18 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Bell, ChevronDown, KanbanSquare, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Settings, Sparkles, Users } from "lucide-react";
+import { Bell, BookmarkCheck, ChevronDown, KanbanSquare, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Settings, Sparkles, Star, UserPlus, Users } from "lucide-react";
 import { api } from "@/lib/api";
-import type { ExecSummary, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
+import type { Booking, ExecSummary, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
+import { friendlyError } from "@/lib/format";
 import TodayView from "./TodayView";
 import LeadsView from "./LeadsView";
 import DashboardView from "./DashboardView";
 import LeadSheet from "./LeadSheet";
+import NewLeadsView, { isFreshLead } from "./NewLeadsView";
+import BookedView from "./BookedView";
+import TargetsView from "./TargetsView";
 
-type Tab = "dash" | "today" | "leads";
+type Tab = "dash" | "today" | "new" | "leads" | "targets" | "booked";
 const ROLE_TH: Record<Me["role"], string> = { sales: "พนักงานขาย", sales_manager: "ผู้จัดการฝ่ายขาย", executive: "ผู้บริหาร", admin: "ผู้ดูแลระบบ" };
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -41,6 +45,7 @@ export default function App() {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [perf, setPerf] = useState<SalesPerf[]>([]);
   const [summary, setSummary] = useState<ExecSummary | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -51,8 +56,8 @@ export default function App() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [t, l, p, s] = await Promise.all([api.today(), api.leads(), api.performance(), api.summary()]);
-      setToday(t); setLeads(l); setPerf(p); setSummary(s); setError(null); setUpdatedAt(new Date());
+      const [t, l, p, s, bk] = await Promise.all([api.today(), api.leads(), api.performance(), api.summary(), api.bookings()]);
+      setToday(t); setLeads(l); setPerf(p); setSummary(s); setBookings(bk); setError(null); setUpdatedAt(new Date());
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }, []);
@@ -80,11 +85,20 @@ export default function App() {
   const leadership = me.role !== "sales";
   const opened = leads.find((l) => l.lead_id === openId) ?? null;
   const overdue = today.filter((t) => t.overdue_minutes > 0).length;
-  const nav: Array<{ k: Tab; label: string; Icon: typeof Users; badge?: number }> = [
-    { k: "dash", label: leadership ? "ภาพรวม" : "ผลงาน", Icon: LayoutDashboard },
-    { k: "today", label: "วันนี้", Icon: ListChecks, badge: overdue },
-    { k: "leads", label: leadership ? "ลีดทั้งหมด" : "ลีดของฉัน", Icon: Users },
+  const freshCount = leads.filter((l) => isFreshLead(l) && !l.dormant).length;
+  const pendingBookings = bookings.filter((b) => !b.verified).length;
+  const nav: Array<{ k: Tab; label: string; short: string; Icon: typeof Users; badge?: number }> = [
+    { k: "dash", label: leadership ? "ภาพรวม" : "ผลงาน", short: leadership ? "ภาพรวม" : "ผลงาน", Icon: LayoutDashboard },
+    { k: "today", label: "วันนี้", short: "วันนี้", Icon: ListChecks, badge: overdue },
+    { k: "new", label: "LEAD ใหม่", short: "ใหม่", Icon: UserPlus, badge: freshCount },
+    { k: "leads", label: leadership ? "ลีดทั้งหมด" : "ลีดของฉัน", short: "ลีด", Icon: Users },
+    { k: "targets", label: "ลูกค้าเป้าหมาย", short: "เป้าหมาย", Icon: Star },
+    { k: "booked", label: "ลูกค้าจองแล้ว", short: "จองแล้ว", Icon: BookmarkCheck, badge: leadership ? pendingBookings : 0 },
   ];
+  const toggleStar = async (id: string, on: boolean, note?: string) => {
+    try { await api.setStar(id, on, note); await refresh(); } catch (e) { setError(friendlyError(e instanceof Error ? e.message : String(e))); }
+  };
+  const verifyBooking = async (dealId: string) => { await api.verifyBooking(dealId); await refresh(); };
   const soon = [{ label: "Pipeline Kanban", Icon: KanbanSquare }, { label: "AI Insights", Icon: Sparkles }, { label: "ตั้งค่า SLA", Icon: Settings }];
   const go = (k: Tab) => setTab(k);
   const logout = async () => { await api.signOut(); await boot(); };
@@ -144,16 +158,19 @@ export default function App() {
           {error && <div role="alert" className="mb-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดข้อมูลไม่สำเร็จ: {error}</div>}
           {tab === "dash" && <DashboardView leads={leads} today={today} summary={summary} perf={perf} leadership={leadership} range={range} onOpen={setOpenId} onGo={go} />}
           {tab === "today" && <TodayView items={today} onOpen={setOpenId} showOwner={leadership} />}
-          {tab === "leads" && <LeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} q={q} setQ={setQ} />}
+          {tab === "new" && <NewLeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} onStar={toggleStar} />}
+          {tab === "leads" && <LeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} q={q} setQ={setQ} onStar={toggleStar} />}
+          {tab === "targets" && <TargetsView leads={leads} onOpen={setOpenId} showOwner={leadership} onStar={toggleStar} />}
+          {tab === "booked" && <BookedView bookings={bookings} canVerify={leadership} onOpen={setOpenId} onVerify={verifyBooking} />}
         </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface lg:hidden" aria-label="เมนูหลัก">
-        <div className="mx-auto grid max-w-3xl grid-cols-3">
-          {nav.map(({ k, label, Icon, badge }) => (
-            <button key={k} onClick={() => go(k)} aria-current={tab === k ? "page" : undefined} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs ${tab === k ? "font-semibold text-ink" : "text-muted"}`}>
-              <span className={`grid h-7 w-12 place-items-center rounded-full ${tab === k ? "bg-accent text-black" : ""}`}><Icon size={19} /></span>{label}
-              {!!badge && <span className="num absolute right-[28%] top-1 rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-black">{badge}</span>}
+        <div className="mx-auto grid max-w-3xl grid-cols-6">
+          {nav.map(({ k, short, Icon, badge }) => (
+            <button key={k} onClick={() => go(k)} aria-current={tab === k ? "page" : undefined} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 ${tab === k ? "font-semibold text-ink" : "text-muted"}`}>
+              <span className={`grid h-7 w-10 place-items-center rounded-full ${tab === k ? "bg-accent text-black" : ""}`}><Icon size={18} /></span><span className="text-[11px]">{short}</span>
+              {!!badge && <span className="num absolute right-[14%] top-1 rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-black">{badge}</span>}
             </button>
           ))}
         </div>
