@@ -15,7 +15,7 @@ const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i
 if (!file) { console.error('usage: node import-legacy.mjs <file.xlsx> [--out dir] [--include-mes-only] [--dormant-days N]'); process.exit(1); }
 const OUT = opt('out', './out');
 const INCLUDE_MES_ONLY = args.includes('--include-mes-only');
-const DORMANT_DAYS = Number(opt('dormant-days', '30'));
+const DORMANT_DAYS = Number(opt('dormant-days', '14'));
 const NOW = new Date(opt('now', new Date().toISOString()));
 const CHUNK_BYTES = 200_000;
 
@@ -166,7 +166,7 @@ for (const t of tel) {
 
   const mesMsgs = fb ? (mesByFb.get(fb) || []) : [];
   const lastAt = Math.max(ms(created), ...acts.map((a) => ms(a.at)), ...mesMsgs.map((m) => ms(stamp(m.Created_Date, m.Created_Time))));
-  const dormant = !TERMINAL.has(stage) && (NOW - lastAt) / 86400000 > DORMANT_DAYS;
+  const dormant = !TERMINAL.has(stage) && (NOW - lastAt) / 86400000 > DORMANT_DAYS && !(nextFu && ms(nextFu) > NOW);   // มีนัดติดตามที่ยังไม่ถึงกำหนด = ไม่พัก
 
   leads.push({ lead_code: code, fb_user_id: fb, phone_raw: phoneRaw || null, use_phone: usePhone, customer_name: clean(t.Customer_Name) || null,
     interested_model: clean(t.Interested_Model) || null, source: clean(t.Source) || 'Facebook Messenger', owner_code: ownerCode, created_at: created,
