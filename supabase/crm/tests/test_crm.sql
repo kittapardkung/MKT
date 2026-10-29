@@ -145,6 +145,8 @@ begin
   perform t_reset();
 
   -- ===== SLA sweep / escalation / ไม่แจ้งซ้ำ =====
+  perform t_assert(crm.sweep_sla()->>'skipped' = 'alerts_disabled', 'SLA: alerts_enabled=false → sweep ไม่ทำอะไร (ป้องกันแจ้งเตือนท่วมตอนนำเข้า)');
+  update crm.settings set value = 'true' where key = 'alerts_enabled';
   delete from crm.alerts;
   update crm.tasks set due_at = now() - interval '20 minutes' where lead_id = l3 and status = 'OPEN';   -- NEW: overdue ที่ +15
   perform crm.sweep_sla();

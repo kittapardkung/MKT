@@ -134,7 +134,7 @@ declare
 begin
   select * into l from crm.leads where id = p_lead;
   if not found then return; end if;
-  if l.stage in ('WON','LOST') or l.owner_id is null then
+  if l.stage in ('WON','LOST') or l.owner_id is null or l.dormant then
     update crm.tasks set status = 'CANCELLED' where lead_id = p_lead and status = 'OPEN';
     return;
   end if;
@@ -174,7 +174,7 @@ end $$;
 create or replace function crm.lead_task_trg() returns trigger
 language plpgsql as $$ begin perform crm.refresh_task(new.id); return null; end $$;
 drop trigger if exists lead_task on crm.leads;
-create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at
+create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at, dormant
   on crm.leads for each row execute function crm.lead_task_trg();
 
 -- ---------- มอบหมายลีด (ยุติธรรม: ดูจำนวนลีดเข้าใน 7 วัน, tie-break ผู้ที่ได้ลีดนานสุด) ----------
@@ -237,6 +237,7 @@ begin
       phone_raw = coalesce(phone_raw, nullif(btrim(p_phone_raw), '')),
       customer_name = coalesce(customer_name, nullif(btrim(p_customer_name), '')),
       interested_model = coalesce(interested_model, nullif(btrim(p_model), '')),
+      dormant = false,
       fb_user_id = coalesce(fb_user_id, case when nullif(p_fb_user_id, '') is not null
                     and not exists (select 1 from crm.leads o where o.fb_user_id = p_fb_user_id) then p_fb_user_id end)
     where id = l.id returning * into l;
@@ -395,9 +396,12 @@ create or replace function crm.sweep_sla() returns jsonb
 language plpgsql security definer set search_path = crm, pg_temp as $$
 declare t record; v_level text; v_recipient uuid; v_n int := 0; v_created int := 0; v_mgr uuid;
 begin
+  if crm.setting('alerts_enabled') is distinct from 'true' then
+    return jsonb_build_object('skipped', 'alerts_disabled');
+  end if;
   -- งานที่ยังไม่มี (ลีดมีเจ้าของ แต่ไม่มี open task)
   for t in select l.id from crm.leads l
-            where l.owner_id is not null and l.stage not in ('WON','LOST')
+            where l.owner_id is not null and l.stage not in ('WON','LOST') and not l.dormant
               and not exists (select 1 from crm.tasks k where k.lead_id = l.id and k.status = 'OPEN') loop
     perform crm.refresh_task(t.id); v_created := v_created + 1;
   end loop;

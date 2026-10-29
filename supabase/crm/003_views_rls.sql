@@ -34,16 +34,16 @@ left join lateral (select next_best_action from crm.ai_insights i where i.lead_i
 cross join lateral (
   select coalesce(array_remove(array[
     case when l.owner_id is null and l.phone_norm is not null and l.stage not in ('WON','LOST') then 'UNASSIGNED' end,
-    case when l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
+    case when not l.dormant and l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
               and l.assigned_at < now() - make_interval(mins => (select minutes from crm.sla_rules where scope = 'NEW')) then 'NOT_ACCEPTED' end,
-    case when l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
-    case when l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
-    case when l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
-    case when l.stage not in ('WON','LOST') and l.owner_id is not null
+    case when not l.dormant and l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null
               and coalesce((select max(e.occurred_at) from crm.lead_events e where e.lead_id = l.id), l.updated_at) < now() - interval '7 days' then 'STALE' end,
     case when l.stage = 'LOST' and exists (select 1 from crm.lead_events e where e.lead_id = l.id and e.type = 'CUSTOMER_MESSAGE'
               and e.occurred_at > coalesce((select max(x.occurred_at) from crm.lead_events x where x.lead_id = l.id and x.type = 'STAGE_CHANGE' and x.evidence->>'to' = 'LOST'), l.created_at)) then 'LOST_WITH_SIGNAL' end,
-    case when exists (select 1 from crm.data_quality_issues q where q.entity = 'lead' and q.entity_id = l.id::text and q.status = 'OPEN') then 'DATA_CONFLICT' end
+    case when exists (select 1 from crm.data_quality_issues q where q.entity = 'lead' and q.entity_id = l.id::text and q.status = 'OPEN' and q.severity <> 'INFO') then 'DATA_CONFLICT' end
   ], null), '{}'::text[]) as flags
 ) f;
 
@@ -107,7 +107,7 @@ select
   count(*) as total_leads,
   count(*) filter (where stage not in ('WON','LOST')) as active_leads,
   count(*) filter (where owner_id is null and phone_norm is not null and stage not in ('WON','LOST')) as unassigned_leads,
-  count(*) filter (where stage not in ('WON','LOST') and next_follow_up_at < now()) as overdue_followups,
+  count(*) filter (where stage not in ('WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,

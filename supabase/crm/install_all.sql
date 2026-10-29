@@ -13,7 +13,8 @@ insert into crm.settings(key, value) values
   ('tz', 'Asia/Bangkok'),
   ('work_start_hour', '9'),        -- สมมติฐาน: ผู้บริหารแก้ได้
   ('work_end_hour', '18'),
-  ('default_temperature', 'WARM')  -- ลีดที่ยังไม่ระบุ temperature ใช้ SLA ของค่านี้ (ไม่เดาว่า COLD)
+  ('default_temperature', 'WARM'),  -- ลีดที่ยังไม่ระบุ temperature ใช้ SLA ของค่านี้ (ไม่เดาว่า COLD)
+  ('alerts_enabled', 'false')       -- เปิดเป็น 'true' ตอน cut-over; false = sweep_sla ไม่สร้างงาน/แจ้งเตือน
 on conflict (key) do nothing;
 
 create table if not exists crm.sla_rules (
@@ -73,6 +74,7 @@ create table if not exists crm.leads (
   updated_at        timestamptz not null default now(),
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
+alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
 create unique index if not exists leads_phone_uq on crm.leads(phone_norm) where phone_norm is not null;
 create unique index if not exists leads_fb_uq    on crm.leads(fb_user_id) where fb_user_id is not null;
 create index if not exists leads_owner_idx on crm.leads(owner_id, stage);
@@ -314,7 +316,7 @@ declare
 begin
   select * into l from crm.leads where id = p_lead;
   if not found then return; end if;
-  if l.stage in ('WON','LOST') or l.owner_id is null then
+  if l.stage in ('WON','LOST') or l.owner_id is null or l.dormant then
     update crm.tasks set status = 'CANCELLED' where lead_id = p_lead and status = 'OPEN';
     return;
   end if;
@@ -354,7 +356,7 @@ end $$;
 create or replace function crm.lead_task_trg() returns trigger
 language plpgsql as $$ begin perform crm.refresh_task(new.id); return null; end $$;
 drop trigger if exists lead_task on crm.leads;
-create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at
+create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at, dormant
   on crm.leads for each row execute function crm.lead_task_trg();
 
 -- ---------- มอบหมายลีด (ยุติธรรม: ดูจำนวนลีดเข้าใน 7 วัน, tie-break ผู้ที่ได้ลีดนานสุด) ----------
@@ -417,6 +419,7 @@ begin
       phone_raw = coalesce(phone_raw, nullif(btrim(p_phone_raw), '')),
       customer_name = coalesce(customer_name, nullif(btrim(p_customer_name), '')),
       interested_model = coalesce(interested_model, nullif(btrim(p_model), '')),
+      dormant = false,
       fb_user_id = coalesce(fb_user_id, case when nullif(p_fb_user_id, '') is not null
                     and not exists (select 1 from crm.leads o where o.fb_user_id = p_fb_user_id) then p_fb_user_id end)
     where id = l.id returning * into l;
@@ -575,9 +578,12 @@ create or replace function crm.sweep_sla() returns jsonb
 language plpgsql security definer set search_path = crm, pg_temp as $$
 declare t record; v_level text; v_recipient uuid; v_n int := 0; v_created int := 0; v_mgr uuid;
 begin
+  if crm.setting('alerts_enabled') is distinct from 'true' then
+    return jsonb_build_object('skipped', 'alerts_disabled');
+  end if;
   -- งานที่ยังไม่มี (ลีดมีเจ้าของ แต่ไม่มี open task)
   for t in select l.id from crm.leads l
-            where l.owner_id is not null and l.stage not in ('WON','LOST')
+            where l.owner_id is not null and l.stage not in ('WON','LOST') and not l.dormant
               and not exists (select 1 from crm.tasks k where k.lead_id = l.id and k.status = 'OPEN') loop
     perform crm.refresh_task(t.id); v_created := v_created + 1;
   end loop;
@@ -703,16 +709,16 @@ left join lateral (select next_best_action from crm.ai_insights i where i.lead_i
 cross join lateral (
   select coalesce(array_remove(array[
     case when l.owner_id is null and l.phone_norm is not null and l.stage not in ('WON','LOST') then 'UNASSIGNED' end,
-    case when l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
+    case when not l.dormant and l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
               and l.assigned_at < now() - make_interval(mins => (select minutes from crm.sla_rules where scope = 'NEW')) then 'NOT_ACCEPTED' end,
-    case when l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
-    case when l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
-    case when l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
-    case when l.stage not in ('WON','LOST') and l.owner_id is not null
+    case when not l.dormant and l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null
               and coalesce((select max(e.occurred_at) from crm.lead_events e where e.lead_id = l.id), l.updated_at) < now() - interval '7 days' then 'STALE' end,
     case when l.stage = 'LOST' and exists (select 1 from crm.lead_events e where e.lead_id = l.id and e.type = 'CUSTOMER_MESSAGE'
               and e.occurred_at > coalesce((select max(x.occurred_at) from crm.lead_events x where x.lead_id = l.id and x.type = 'STAGE_CHANGE' and x.evidence->>'to' = 'LOST'), l.created_at)) then 'LOST_WITH_SIGNAL' end,
-    case when exists (select 1 from crm.data_quality_issues q where q.entity = 'lead' and q.entity_id = l.id::text and q.status = 'OPEN') then 'DATA_CONFLICT' end
+    case when exists (select 1 from crm.data_quality_issues q where q.entity = 'lead' and q.entity_id = l.id::text and q.status = 'OPEN' and q.severity <> 'INFO') then 'DATA_CONFLICT' end
   ], null), '{}'::text[]) as flags
 ) f;
 
@@ -776,7 +782,7 @@ select
   count(*) as total_leads,
   count(*) filter (where stage not in ('WON','LOST')) as active_leads,
   count(*) filter (where owner_id is null and phone_norm is not null and stage not in ('WON','LOST')) as unassigned_leads,
-  count(*) filter (where stage not in ('WON','LOST') and next_follow_up_at < now()) as overdue_followups,
+  count(*) filter (where stage not in ('WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,

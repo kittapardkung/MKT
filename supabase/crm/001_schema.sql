@@ -13,7 +13,8 @@ insert into crm.settings(key, value) values
   ('tz', 'Asia/Bangkok'),
   ('work_start_hour', '9'),        -- สมมติฐาน: ผู้บริหารแก้ได้
   ('work_end_hour', '18'),
-  ('default_temperature', 'WARM')  -- ลีดที่ยังไม่ระบุ temperature ใช้ SLA ของค่านี้ (ไม่เดาว่า COLD)
+  ('default_temperature', 'WARM'),  -- ลีดที่ยังไม่ระบุ temperature ใช้ SLA ของค่านี้ (ไม่เดาว่า COLD)
+  ('alerts_enabled', 'false')       -- เปิดเป็น 'true' ตอน cut-over; false = sweep_sla ไม่สร้างงาน/แจ้งเตือน
 on conflict (key) do nothing;
 
 create table if not exists crm.sla_rules (
@@ -73,6 +74,7 @@ create table if not exists crm.leads (
   updated_at        timestamptz not null default now(),
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
+alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
 create unique index if not exists leads_phone_uq on crm.leads(phone_norm) where phone_norm is not null;
 create unique index if not exists leads_fb_uq    on crm.leads(fb_user_id) where fb_user_id is not null;
 create index if not exists leads_owner_idx on crm.leads(owner_id, stage);
