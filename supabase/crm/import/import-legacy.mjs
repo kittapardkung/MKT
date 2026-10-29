@@ -156,7 +156,9 @@ for (const t of tel) {
 
   const profile = {}; for (const k of PROFILE_KEYS) { const v = clean(t[k]); if (v) profile[k] = v; }
   if (t.Appointment_Date instanceof Date) { const w = wall(t.Appointment_Date); profile.Appointment_Date = `${w.y}-${p2(w.mo)}-${p2(w.d)}`; }
-  const legacy = {}; for (const [k, v] of Object.entries(t)) { if (v === null || v === undefined || v === '') continue; legacy[k] = v instanceof Date ? (wall(v) ? `${wall(v).y}-${p2(wall(v).mo)}-${p2(wall(v).d)} ${p2(wall(v).h)}:${p2(wall(v).mi)}:${p2(wall(v).s)}` : null) : clean(v); }
+  const fmtLegacy = (v) => { const w = wall(v); if (!w) return null; const hms = `${p2(w.h)}:${p2(w.mi)}:${p2(w.s)}`;
+    return v.getUTCFullYear() === 1899 ? hms : `${w.y}-${p2(w.mo)}-${p2(w.d)} ${hms}`; };   // เวลาล้วนใน Excel = 1899-12-30
+  const legacy = {}; for (const [k, v] of Object.entries(t)) { if (v === null || v === undefined || v === '') continue; legacy[k] = v instanceof Date ? fmtLegacy(v) : clean(v); }
 
   const mesMsgs = fb ? (mesByFb.get(fb) || []) : [];
   const lastAt = Math.max(ms(created), ...acts.map((a) => ms(a.at)), ...mesMsgs.map((m) => ms(stamp(m.Created_Date, m.Created_Time))));
