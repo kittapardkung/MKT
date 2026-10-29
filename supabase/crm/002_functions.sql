@@ -26,9 +26,12 @@ declare
   we int := crm.setting('work_end_hour')::int;
   loc timestamp := p_from at time zone tz;
   remaining int := p_minutes;
-  day_start timestamp; day_end timestamp; avail int;
+  day_start timestamp; day_end timestamp; avail int; guard int := 0;
 begin
+  if p_from is null or p_minutes is null then return null; end if;   -- ห้ามวนไม่รู้จบเมื่อไม่มีเวลาเริ่มต้น
   loop
+    guard := guard + 1;
+    if guard > 800 then return null; end if;                            -- กันลูปค้างเสมอ (เผื่อ settings ผิดพลาด)
     day_start := date_trunc('day', loc) + make_interval(hours => ws);
     day_end   := date_trunc('day', loc) + make_interval(hours => we);
     if loc < day_start then loc := day_start; end if;

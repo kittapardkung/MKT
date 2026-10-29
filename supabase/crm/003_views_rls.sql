@@ -91,7 +91,7 @@ select
   s.id as sales_id, s.code, s.display_name,
   count(l.id) as assigned_leads,
   count(l.id) filter (where l.accepted_at is not null) as accepted_leads,
-  round(100.0 * count(l.id) filter (where l.first_contact_at is not null
+  round(100.0 * count(l.id) filter (where l.first_contact_at is not null and l.assigned_at is not null
         and l.first_contact_at <= crm.add_work_minutes(l.assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
         / nullif(count(l.id) filter (where l.assigned_at is not null), 0), 1) as first_response_sla_pct,
   count(l.id) filter (where l.first_contact_at is not null) as contacted_leads,
@@ -124,7 +124,7 @@ select
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,
   (select count(*) from crm.v_lead_control_center_all c where c.risk_level = 'HIGH') as leads_at_risk,
-  round(100.0 * count(*) filter (where first_contact_at is not null
+  round(100.0 * count(*) filter (where first_contact_at is not null and assigned_at is not null
       and first_contact_at <= crm.add_work_minutes(assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
       / nullif(count(*) filter (where assigned_at is not null), 0), 1) as contact_sla_pct,
   (select count(*) from crm.data_quality_issues where status = 'OPEN') as open_dq_issues

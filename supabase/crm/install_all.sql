@@ -208,9 +208,12 @@ declare
   we int := crm.setting('work_end_hour')::int;
   loc timestamp := p_from at time zone tz;
   remaining int := p_minutes;
-  day_start timestamp; day_end timestamp; avail int;
+  day_start timestamp; day_end timestamp; avail int; guard int := 0;
 begin
+  if p_from is null or p_minutes is null then return null; end if;   -- ห้ามวนไม่รู้จบเมื่อไม่มีเวลาเริ่มต้น
   loop
+    guard := guard + 1;
+    if guard > 800 then return null; end if;                            -- กันลูปค้างเสมอ (เผื่อ settings ผิดพลาด)
     day_start := date_trunc('day', loc) + make_interval(hours => ws);
     day_end   := date_trunc('day', loc) + make_interval(hours => we);
     if loc < day_start then loc := day_start; end if;
@@ -771,7 +774,7 @@ select
   s.id as sales_id, s.code, s.display_name,
   count(l.id) as assigned_leads,
   count(l.id) filter (where l.accepted_at is not null) as accepted_leads,
-  round(100.0 * count(l.id) filter (where l.first_contact_at is not null
+  round(100.0 * count(l.id) filter (where l.first_contact_at is not null and l.assigned_at is not null
         and l.first_contact_at <= crm.add_work_minutes(l.assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
         / nullif(count(l.id) filter (where l.assigned_at is not null), 0), 1) as first_response_sla_pct,
   count(l.id) filter (where l.first_contact_at is not null) as contacted_leads,
@@ -804,7 +807,7 @@ select
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_APPROVED','WON')) as booking_or_won,
   (select count(*) from crm.v_lead_control_center_all c where c.risk_level = 'HIGH') as leads_at_risk,
-  round(100.0 * count(*) filter (where first_contact_at is not null
+  round(100.0 * count(*) filter (where first_contact_at is not null and assigned_at is not null
       and first_contact_at <= crm.add_work_minutes(assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
       / nullif(count(*) filter (where assigned_at is not null), 0), 1) as contact_sla_pct,
   (select count(*) from crm.data_quality_issues where status = 'OPEN') as open_dq_issues

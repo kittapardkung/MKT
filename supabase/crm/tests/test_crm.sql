@@ -175,4 +175,14 @@ begin
   perform crm.run_data_quality();
   perform t_assert(exists (select 1 from crm.data_quality_issues where code = 'STAGE_WITHOUT_EVIDENCE'), 'DQ: ตรวจพบสถานะไม่มีหลักฐาน');
   perform t_raises($q$insert into crm.leads(lead_code, stage) values ('X-1', 'WON')$q$, 'evidence_required', 'GUARD: เขียนตรงเป็น WON นอก migration ไม่ได้');
+
+  -- ===== regression: ลีดที่ติดต่อแล้วแต่ไม่มีเวลามอบหมาย (assigned_at ว่าง) เคยทำให้ view ภาพรวมวนไม่รู้จบ =====
+  perform t_assert(crm.add_work_minutes(null, 15) is null, 'work minutes: ไม่มีเวลาเริ่มต้น → คืน null (ไม่วนไม่รู้จบ)');
+  insert into crm.leads(lead_code, phone_norm, stage, first_contact_at) values ('LEGACY-NOOWNER', '0891112233', 'CONTACTED', now() - interval '3 days');
+  perform set_config('statement_timeout', '5s', false);
+  perform t_as('10000000-0000-0000-0000-0000000000c1');
+  perform t_assert((select count(*) from crm.v_exec_summary) = 1, 'exec summary: คำนวณได้แม้มีลีดไม่มีเวลามอบหมาย');
+  perform t_assert((select count(*) from crm.v_sales_performance) >= 1, 'performance: คำนวณได้แม้มีลีดไม่มีเวลามอบหมาย');
+  perform t_reset();
+  perform set_config('statement_timeout', '0', false);
 end $$;

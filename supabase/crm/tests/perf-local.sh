@@ -16,20 +16,19 @@ for f in $(ls "$DIR"/src/[1-3]*.sql | sort); do run "$P -d t -f $f" >/dev/null; 
 cat > "$DIR/q.sql" <<'SQL'
 \timing on
 begin; select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true); set local role authenticated;
-\echo == admin
-select count(*) from crm.v_my_today;
-select count(*) from crm.v_lead_control_center;
-select count(*) from crm.v_sales_performance;
-select count(*) from crm.v_exec_summary;
-select count(*) from crm.v_funnel;
-select count(*) from crm.lead_events where lead_id = (select id from crm.leads limit 1);
+\echo == admin (ดึงทุกคอลัมน์ เหมือนเว็บ)
+select md5(string_agg(x::text,'')) from crm.v_my_today x;
+select md5(string_agg(x::text,'')) from crm.v_lead_control_center x;
+select md5(string_agg(x::text,'')) from crm.v_sales_performance x;
+select md5(string_agg(x::text,'')) from crm.v_exec_summary x;
+select md5(string_agg(x::text,'')) from crm.v_funnel x;
 rollback;
 begin; select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-0000000000a1',true); set local role authenticated;
 \echo == sales SA0001
-select count(*) from crm.v_my_today;
-select count(*) from crm.v_lead_control_center;
-select count(*) from crm.v_sales_performance;
+select md5(string_agg(x::text,'')) from crm.v_my_today x;
+select md5(string_agg(x::text,'')) from crm.v_lead_control_center x;
+select md5(string_agg(x::text,'')) from crm.v_sales_performance x;
 rollback;
 SQL
 chmod a+r "$DIR/q.sql"
-if [ -n "${PLAN:-}" ]; then printf "begin; select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true); set local role authenticated;\n\\\\timing on\nselect count(*) from crm.leads;\nselect count(*) from crm.v_my_today;\nselect count(*) from crm.v_my_today;\nselect count(*) from crm.leads;\nrollback;\n" > "$DIR/p.sql"; chmod a+r "$DIR/p.sql"; run "$P -d t -f $DIR/p.sql" 2>&1 2>&1 | head -60; else run "$P -d t -f $DIR/q.sql" 2>&1 | grep -E "==|Time:|count|^ +[0-9]"; fi
+if [ -n "${PLAN:-}" ]; then printf "begin; select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true); set local role authenticated;\n\\\\timing on\nselect count(*) from crm.leads;\nselect count(*) from crm.v_my_today;\nselect count(*) from crm.v_my_today;\nselect count(*) from crm.leads;\nrollback;\n" > "$DIR/p.sql"; chmod a+r "$DIR/p.sql"; run "$P -d t -f $DIR/p.sql" 2>&1 2>&1 | head -60; else run "$P -d t -f $DIR/q.sql" 2>&1 | grep -E "==|Time:"; fi
