@@ -1,5 +1,6 @@
 import type { Risk, Stage, Temperature } from "@/lib/types";
 import { FLAG_TH, STAGE_TH } from "@/lib/format";
+import { STAGE_GROUPS } from "@/lib/analytics";
 
 export function TempChip({ t }: { t: Temperature }) {
   if (!t) return <span className="rounded-full bg-line px-2 py-0.5 text-[11px] text-muted">ยังไม่ประเมิน</span>;
@@ -33,4 +34,14 @@ export function Empty({ children }: { children: React.ReactNode }) {
 export function Avatar({ name }: { name: string | null }) {
   const t = (name ?? "?").trim().replace(/^คุณ\s*/, "").slice(0, 2).toUpperCase();
   return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-warn">{t}</span>;
+}
+
+export const stageColor = (s: Stage) => STAGE_GROUPS.find((g) => g.stages.includes(s))?.color ?? "#9ca3af";
+
+export function StagePill({ s }: { s: Stage }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line px-2.5 py-1 text-xs font-medium">
+      <span className="h-2 w-2 rounded-full" style={{ background: stageColor(s) }} />{STAGE_TH[s]}
+    </span>
+  );
 }
