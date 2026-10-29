@@ -11,7 +11,7 @@ run "$PGBIN/pg_ctl -D $DIR/data -o '-p $PORT -k $DIR' -l $DIR/log -w start >/dev
 trap 'run "$PGBIN/pg_ctl -D $DIR/data -m immediate stop >/dev/null" || true' EXIT
 P="psql -h $DIR -p $PORT -U postgres -v ON_ERROR_STOP=1 -q"
 run "$P -d postgres -c 'create database t'"
-for f in tests/00_supabase_stub.sql 001_schema.sql 002_functions.sql 003_views_rls.sql 004_rls_grants.sql tests/test_crm.sql; do
+for f in tests/00_supabase_stub.sql 001_schema.sql 002_functions.sql 003_views_rls.sql 004_rls_grants.sql 005_sales_reply.sql tests/test_crm.sql tests/test_reply.sql; do
   echo "== $f"; run "$P -d t -f $HERE/$f"
 done
 echo "ALL TESTS PASSED"

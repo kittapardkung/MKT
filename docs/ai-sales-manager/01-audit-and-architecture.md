@@ -80,13 +80,42 @@ Webhook (GET+POST, responseNode)
 
 **PDPA:** ข้อความลูกค้าทั้งก้อนถูกส่งไป OpenAI เพื่อสกัดชื่อ/เบอร์ (จำเป็นต่อวัตถุประสงค์นี้ แต่ควรบันทึกไว้ในนโยบายความเป็นส่วนตัว) และ Telegram กลุ่มได้รับชื่อ+เบอร์เต็ม — ควรยืนยันว่าเป็นกลุ่มเฉพาะทีมขาย
 
+### 2.2 workflow รับ reply จาก Telegram (`TELEGRAM_SA001_DEMO(NEED)`, `TELEGRAM_SA002` — ทั้งคู่ `active: true`)
+
+โครงเหมือนกัน (โค้ดต่างกันแค่ชื่อ node): เซลล์ตอบกลับ (reply) การ์ดลีดใน Telegram → ดึง Lead ID ด้วย regex `\d{8}-\d{6}` → ค้น `SHEET_1_TEL` → **AI (gpt) สกัดข้อมูล ~75 ฟิลด์จากข้อความ** → รวมกับแถวเดิม → append `ACTIVITY_LOG` → update `SHEET_1_TEL` → ส่งข้อความยืนยัน นี่คือที่มาของ `Accepted_*`, `Response_Minutes`, `Sales_Reply`, `Lead_Status` และ ACTIVITY_LOG ทั้งหมด
+
+| # | ปัญหา | หลักฐานใน JSON | ผลกระทบ |
+|---|---|---|---|
+| T1 | **Response_Minutes ติดลบ — พบรากเหตุแล้ว** | `new Date(\`${Created_Date}T${Created_Time}\`)` ถูกตีความเป็นเวลาของเซิร์ฟเวอร์ (UTC) ทั้งที่ค่าเป็นเวลาไทย; ลบกับ `now` จริง → คลาดเคลื่อน −420 นาที | ลีด `20260810-884615`: จริง 117 นาที → −303 ✔ ตรง; ลีด `20260811-523198`: จริง 17 นาที → −403 ✔ ตรง — **ทุกค่าที่รายงาน SLA การตอบกลับใน Sheet ผิดทั้งหมด** |
+| T2 | `Accepted_Time` สร้างด้วย `toLocaleString('th-TH')` | ได้ `10/08/2569 19:28:36` (พ.ศ. + dd/mm) | ที่มาของวันที่ปี พ.ศ. ในชีต |
+| T3 | **Prompt ไม่บอกวันที่ปัจจุบัน** AI จึงเดาปี | ไม่มีวันที่ใน system message | ที่มาของ Appointment/Next_Follow_Up เป็นปี 2024 |
+| T4 | Node IF 4 ตัว (`Check If Reply`, `Validate Lead ID`, `Check Lead Found`, `Check If Already Accepted`) **ไม่มีเงื่อนไขจริง** (เปรียบเทียบ "" กับ "" หรือไม่มี conditions) | พารามิเตอร์ใน export | ข้อความใดๆ ที่ส่งเข้าบอท (ไม่ใช่ reply / ไม่พบ Lead ID / ลีดที่รับแล้ว) ผ่านเข้า AI และเขียนชีตได้ทั้งหมด — ตรวจใน n8n UI ว่าการ export ตรงกับของจริงหรือไม่ |
+| T5 | **AI เขียนทับฟิลด์สำคัญได้** `getValue(ai, เดิม)` ใช้ค่า AI ถ้าไม่ว่าง รวมถึง `Assigned_Sales`, `Lead_Status` (รวม WON/BOOKING), `Phone_Number`, `Customer_Name` | โค้ด Merge | ขัดข้อกำหนด "ห้ามเปลี่ยนเป็น BOOKING/WON โดยไม่มีหลักฐาน" และ "การเปลี่ยนเจ้าของต้องเป็นมนุษย์" |
+| T6 | ไม่ตรวจว่าผู้ตอบเป็นเจ้าของลีดหรือไม่; ไม่มี allowlist ผู้ส่ง; `Accepted_By` = ชื่อ Telegram (`Sale Two`, `เซลล์ One`) | โค้ด Extract Lead ID | ใครก็ตอบแทนลีดของคนอื่นได้, ชื่อไม่ผูกกับ `Assigned_Sales` |
+| T7 | "ตอบครั้งแรก" = รับลีด = ติดต่อสำเร็จ (ปนกัน) | `Accepted_Time` ตั้งเมื่อว่าง | ขัดกฎ "กดรับลีดไม่ถือว่าติดต่อลูกค้าสำเร็จ" |
+| T8 | ข้อความยืนยันฝั่ง SA002 อ้าง node `Google Sheets Lookup by Lead ID` / `Append to ACTIVITY_LOG` ซึ่ง**ไม่มีใน workflow นี้** (ชื่อจริงลงท้าย `1`) | Telegram node `WLC_LEAD_S0002_โอ๋2` | ข้อความยืนยันถึงโอ๋ error/ว่าง (copy-paste จาก SA001) |
+| T9 | อ่าน-แก้-เขียนชีตแบบไม่ล็อก; เขียน ACTIVITY_LOG ก่อนแล้วค่อย update SHEET_1_TEL (ไม่ atomic) | Connections | reply ซ้อนกันทับกัน / ข้อมูล 2 แท็บไม่ตรงกัน (ACTIVITY_LOG 1,123 แถว vs SHEET_1_TEL) |
+| T10 | Lead_Score 1–10 ไม่มีเหตุผลประกอบ; ค่าตัวเลขเชื่อใจ AI คำนวณเป็นค่าสุดท้าย | System prompt | แทนด้วย scoring 0–100 พร้อมเหตุผลตามสเปก (Phase 5) |
+
+**ของที่ดีและเก็บไว้ใน design ใหม่:** กฎ "อย่าเปลี่ยนสถานะ/อุณหภูมิ/คะแนน ถ้าข้อความเป็นแค่ข้อมูล Customer Card", กฎตัวเลข "คืนค่าสุดท้ายไม่ใช่ส่วนต่าง", และรายการฟิลด์ Customer Card ทั้งหมด
+
+**วิธีแก้ที่ทำแล้วใน DB (`supabase/crm/005_sales_reply.sql`, ทดสอบผ่าน):** n8n ส่งผล AI + ข้อความ + `telegram_user_id` ผู้ตอบ + `update_id` เข้า `crm.record_sales_reply()` แล้ว DB ตัดสินใจเอง —
+- ผู้ตอบต้องเป็นเจ้าของลีดหรือผู้จัดการ (ผูกด้วย `sales_team.telegram_user_id`) (T6)
+- เวลา/Response time คำนวณใน DB เป็น `timestamptz` (T1, T2); `update_id` กันซ้ำ (T9)
+- "รับลีด" แยกจาก "ติดต่อสำเร็จ"; ติดต่อสำเร็จนับเมื่อเซลล์รายงานผลชัดเจนเท่านั้น (T7)
+- AI เติม Customer Card ได้เฉพาะฟิลด์ที่อนุญาตและไม่ว่าง; **ไม่แตะ** เจ้าของ/เบอร์/ชื่อ (T5)
+- สถานะ: เลื่อนไปข้างหน้าเฉพาะขั้นที่ไม่ต้องใช้หลักฐาน; BOOKING/FINANCE_APPROVED/WON/LOST = เป็น "ข้อเสนอของ AI" รอมนุษย์ (T5)
+- วันนัดต้องอยู่ในอนาคตไม่เกิน 1 ปี มิฉะนั้นไม่ใช้และบันทึกเป็น DQ issue (T3)
+
+ฝั่ง n8n ที่ต้องแก้ตาม: ใส่วันที่/เวลาปัจจุบัน (Asia/Bangkok) ใน prompt, ตั้งเงื่อนไข IF ให้ถูก, ใช้ workflow เดียวสำหรับเซลล์ทุกคน (แยกด้วย `telegram_user_id` แทนการก๊อป workflow ต่อคน) และแก้ T8
+
 ---
 
 ## 3. ปัญหาคุณภาพข้อมูลที่พบจากตัวอย่าง (Module G)
 
 | ปัญหา | ตัวอย่างจริง | แนวทาง |
 |---|---|---|
-| Response_Minutes **ติดลบ** | `-303`, `-403`, `-175` | คำนวณใหม่เป็น `accepted_at - created_at` ใน Supabase; เก็บค่าเดิมเป็น `raw` + flag DQ |
+| Response_Minutes **ติดลบ** | `-303`, `-403`, `-175` | **สาเหตุคือบั๊ก timezone ใน n8n (T1)** — คำนวณใหม่ใน Supabase; ค่าเดิมเก็บใน `legacy` ห้ามใช้รายงาน SLA |
 | วันที่ผิดปี | Appointment `2024-02-16`, Next_Follow_Up `2024-06-16` ในลีดที่สร้าง 2026-08 | flag `DATE_IMPLAUSIBLE` ไม่แก้อัตโนมัติ |
 | วันที่ปี พ.ศ. + รูปแบบ dd/mm | `Accepted_Time = 10/08/2569 19:28:36` | parser แปลง พ.ศ.→ ค.ศ. เก็บ `timestamptz` (Asia/Bangkok) |
 | วันที่รูปแบบปนกัน | `8/8/2026` (MES) vs `2026-08-08` (TEL) | normalize ตอน import |
@@ -199,9 +228,9 @@ Webhook (GET+POST, responseNode)
 
 ## 8. สิ่งที่ยังต้องขอจากผู้ใช้ก่อนเริ่ม Phase 3
 
-~~1. n8n workflow JSON~~ ได้รับแล้ว (ดูหัวข้อ 2.1)
+~~1. n8n workflow รับลีด~~ ได้รับแล้ว (2.1) · ~~workflow รับ reply Telegram~~ ได้รับแล้ว (2.2)
 
-1. **Workflow/สคริปต์ที่รับ reply จาก Telegram และเขียน `Accepted_*`, `Sales_Reply`, `Lead_Status`, `ACTIVITY_LOG`** (ไม่อยู่ใน export นี้) — จำเป็นมากเพื่อไม่ให้ logic การรับลีด/ติดต่อลีดหาย
+1. **Telegram user id ของเซลล์/หัวหน้าแต่ละคน** (ใช้ผูก `sales_team.telegram_user_id`; ไม่ใช่ chat id ของกลุ่ม)
 2. **Workflow production ที่ใช้อยู่จริง** (เวอร์ชัน Google Sheets) เพื่อใช้เป็นฐานเทียบใน shadow mode
 3. **Supabase project**: ใช้โปรเจกต์เดียวกับ MKT Content Manager หรือแยกใหม่? (ตาราง `leads` ปัจจุบันมี policy เปิดสาธารณะ — แนะนำแยกใหม่ หรือล็อกก่อน)
 4. **หัวหน้าฝ่ายขาย + Telegram chat ID ที่ใช้ escalate** และ **เวลาทำการ** (SLA ชั่วโมงทำการ) — รายชื่อเซลล์ตอนนี้เห็น 2 คน (SA0001 วิ, SA0002 โอ๋)
