@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, ListChecks, LogOut, Users } from "lucide-react";
+import { BarChart3, ListChecks, LogOut, RefreshCw, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ExecSummary, Funnel, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
 import TodayView from "./TodayView";
@@ -40,12 +40,16 @@ export default function App() {
   const [funnel, setFunnel] = useState<Funnel[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
       const [t, l, p, s, f] = await Promise.all([api.today(), api.leads(), api.performance(), api.summary(), api.funnel()]);
-      setToday(t); setLeads(l); setPerf(p); setSummary(s); setFunnel(f); setError(null);
+      setToday(t); setLeads(l); setPerf(p); setSummary(s); setFunnel(f); setError(null); setUpdatedAt(new Date());
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
   }, []);
 
   const boot = useCallback(async () => {
@@ -61,7 +65,8 @@ export default function App() {
       setMe(m);
       if (m) await refresh();
     });
-    return () => { alive = false; };
+    const timer = setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 120000);   // รีเฟรชทุก 2 นาที
+    return () => { alive = false; clearInterval(timer); };
   }, [refresh]);
 
   if (me === undefined) return <main className="grid min-h-screen place-items-center text-muted">กำลังโหลด…</main>;
@@ -78,7 +83,11 @@ export default function App() {
       )}
       <header className="flex items-center justify-between px-4 py-3">
         <div><div className="font-bold">AI Sales Manager</div><div className="text-xs text-muted">{me.name} · {me.role === "sales" ? "พนักงานขาย" : me.role === "sales_manager" ? "ผู้จัดการฝ่ายขาย" : me.role === "executive" ? "ผู้บริหาร" : "ผู้ดูแลระบบ"}</div></div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs text-muted sm:inline">{updatedAt ? `อัปเดต ${updatedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" })}` : ""}</span>
+          <button aria-label="รีเฟรชข้อมูล" onClick={() => void refresh()} className="grid h-11 w-11 place-items-center rounded-full border border-line"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
         <button aria-label="ออกจากระบบ / สลับมุมมอง" onClick={async () => { await api.signOut(); await boot(); }} className="grid h-11 w-11 place-items-center rounded-full border border-line"><LogOut size={18} /></button>
+        </div>
       </header>
       <main className="px-4">
         {error && <div role="alert" className="mb-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดข้อมูลไม่สำเร็จ: {error}</div>}

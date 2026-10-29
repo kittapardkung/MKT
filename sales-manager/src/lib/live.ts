@@ -26,8 +26,15 @@ export function createLiveApi(url: string, key: string): Api {
       fail(error); return (data ?? []) as TodayItem[];
     },
     async leads() {
-      const { data, error } = await sb.from("v_lead_control_center").select("*").order("created_at", { ascending: false }).limit(200);
-      fail(error); return (data ?? []) as LeadRow[];
+      const out: LeadRow[] = [];
+      for (let from = 0; from < 10000; from += 1000) {   // PostgREST จำกัด 1,000 แถว/คำขอ
+        const { data, error } = await sb.from("v_lead_control_center").select("*")
+          .order("created_at", { ascending: false }).range(from, from + 999);
+        fail(error);
+        out.push(...((data ?? []) as LeadRow[]));
+        if (!data || data.length < 1000) break;
+      }
+      return out;
     },
     async events(leadId) {
       const { data, error } = await sb.from("lead_events")
