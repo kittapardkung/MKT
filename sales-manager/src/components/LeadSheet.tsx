@@ -39,7 +39,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-bg p-4 sm:rounded-2xl">
+        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-bg p-4 sm:rounded-3xl">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold">{lead.customer_name ?? lead.lead_code}</h2>
@@ -50,7 +50,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
           <button aria-label="ปิด" onClick={onClose} className="grid h-11 w-11 place-items-center rounded-full border border-line"><X size={18} /></button>
         </div>
 
-        <div className="mt-3 rounded-xl border border-line bg-surface p-3 text-sm">
+        <div className="mt-3 card p-3 text-sm">
           <div>รุ่นที่สนใจ: {lead.interested_model ?? "—"} · เบอร์: {maskPhone(lead.phone)} · ผู้รับผิดชอบ: {lead.responsible_sales ?? "—"}</div>
           <div className="mt-1 text-muted">ติดต่อล่าสุด {fmtDateTime(lead.last_contact_at)} · นัดถัดไป {fmtDateTime(lead.next_follow_up_at)}</div>
           <div className="mt-2"><b>Next Best Action:</b> {lead.next_best_action}</div>
@@ -58,7 +58,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
         </div>
 
         {!closed && (
-          <form className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-3"
+          <form className="mt-3 space-y-2 card p-3"
             onSubmit={(e) => { e.preventDefault(); run(() => api.logContact(lead.lead_id, { channel, outcome, note, next_follow_up: next, temperature: temp }), "บันทึกผลการติดต่อแล้ว"); }}>
             <h3 className="font-semibold">บันทึกผลการติดต่อ (หลักฐาน)</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -82,12 +82,12 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
                   <option value="">ไม่เปลี่ยน</option><option value="HOT">HOT</option><option value="WARM">WARM</option><option value="COLD">COLD</option>
                 </select></label>
             </div>
-            <button disabled={busy} className="min-h-11 w-full rounded-xl bg-brand font-semibold text-white disabled:opacity-60">{busy ? "กำลังบันทึก…" : "บันทึกผลการติดต่อ"}</button>
+            <button disabled={busy} className="btn-dark min-h-11 w-full disabled:opacity-60">{busy ? "กำลังบันทึก…" : "บันทึกผลการติดต่อ"}</button>
           </form>
         )}
 
         {!closed && (
-          <div className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-3">
+          <div className="mt-3 space-y-2 card p-3">
             <h3 className="font-semibold">เปลี่ยนสถานะ</h3>
             <div className="flex gap-2">
               <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className="min-h-11 flex-1 rounded-lg border border-line bg-surface px-2">
@@ -116,7 +116,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
         </ol>
         {!closed && lead.flags.includes("NOT_ACCEPTED") && (
           <button disabled={busy} onClick={() => run(() => api.accept(lead.lead_id), "รับลีดแล้ว (ยังต้องติดต่อลูกค้าและบันทึกผล)")}
-            className="mt-4 min-h-11 w-full rounded-xl border border-brand font-semibold text-brand">กดรับลีด</button>
+            className="mt-4 min-h-11 w-full rounded-[14px] border border-line font-semibold">กดรับลีด</button>
         )}
       </div>
     </div>

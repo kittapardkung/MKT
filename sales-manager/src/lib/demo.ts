@@ -45,6 +45,21 @@ const leads: DemoLead[] = [
     [["STAGE_CHANGE", null, null, "ลูกค้าวางมัดจำ (หลักฐาน RES-0001 ตรวจสอบแล้ว)", -60 * 5, "โอ๋"]]),
 ];
 
+// ข้อมูลสังเคราะห์สำหรับสาธิตกราฟ (ไม่ใช่ลูกค้าจริง) — เลขสุ่มแบบกำหนดผลได้
+(function seedDemo() {
+  let x = 7; const rnd = () => ((x = (x * 1664525 + 1013904223) % 4294967296) / 4294967296);
+  const models = ["DARION", "Porta", "บิงโก", "darion", "PORTA ev", null];
+  const stages: Stage[] = ["NEW", "CONTACTED", "CONTACTED", "FOLLOW_UP", "FOLLOW_UP", "APPOINTMENT", "TEST_DRIVE", "QUOTATION", "LOST", "LOST", "LOST", "BOOKING", "WON"];
+  const temps: Temperature[] = [null, "COLD", "COLD", "WARM", "WARM", "HOT"];
+  for (let i = 0; i < 110; i++) {
+    const age = Math.floor(rnd() * 60); const st = stages[Math.floor(rnd() * stages.length)]; const t = temps[Math.floor(rnd() * temps.length)];
+    const l = mk(`DEMO-${String(i).padStart(4, "0")}`, `ลูกค้าตัวอย่าง ${i + 1}`, models[Math.floor(rnd() * models.length)], `08${String(10000000 + i * 7919).slice(0, 8)}`,
+      rnd() < 0.5 ? "วิ" : "โอ๋", st, t, st === "LOST" || st === "WON" ? null : Math.floor(rnd() * 3000) + 60, st === "NEW" ? null : -age * 60, rnd() < 0.15 ? ["OVERDUE_FOLLOWUP"] : [], rnd() < 0.1 ? "HIGH" : rnd() < 0.3 ? "MEDIUM" : "LOW", []);
+    l.created_at = iso(-(age * 1440 + Math.floor(rnd() * 600)));
+    l.task_status = "NONE"; l.task_due_at = null; leads.push(l);
+  }
+})();
+
 const sales: Record<string, string> = { sales: "วิ", manager: "หัวหน้า" };
 let role: "sales" | "manager" = "sales";
 
