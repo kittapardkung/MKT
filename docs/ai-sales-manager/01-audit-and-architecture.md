@@ -8,7 +8,7 @@
 
 ## 1. ข้อค้นพบสำคัญ (อ่านส่วนนี้ก่อน)
 
-1. **n8n workflow ครึ่งทางไปที่ Supabase แล้ว** — จากภาพ มี Supabase node 5 ตัว (Lookup / Insert / Insert No Phone / Update / Get All Leads) แต่ยังมี `Append row in sheet` 2 ตัว และ Supabase node ทุกตัวมีเครื่องหมายเตือนสีแดง (น่าจะ credential/ตั้งค่าไม่ครบ — ต้องเปิดดูใน n8n จริง ยืนยันจากภาพอย่างเดียวไม่ได้)
+1. **n8n workflow (export `WULING_Facebook_Lead Capture&CRM + supabase`) เป็นสำเนาที่แทน Google Sheets ด้วย Supabase แล้ว แต่ยังใช้งานไม่ได้** — `active: false`, Supabase node ทั้ง 5 ตัว**ไม่มี credential ผูกอยู่เลย** (นี่คือสาเหตุของเครื่องหมายเตือนสีแดงในภาพ) และ Google Sheets node 5 ตัวถูกทิ้งลอยไม่มีเส้นเชื่อม ดังนั้นเวอร์ชันนี้ไม่ได้เขียน Sheet เลย (ไม่มี dual-write) รายละเอียดช่องโหว่/บั๊กดูหัวข้อ 2.1
 2. **ตาราง `leads` ในรีโปนี้ไม่ใช่ CRM เต็มรูปแบบ** — `supabase/schema_leads.sql` มีเพียง 12 คอลัมน์ (จาก 53 คอลัมน์ของ `SHEET_1_TEL`) และมี policy `leads_select_public` (อ่านได้โดยไม่ล็อกอิน) ซึ่ง **เปิดเบอร์โทรลูกค้าสู่สาธารณะ ขัด PDPA** ในสถานะทดสอบ ต้องปิดก่อนใช้งานจริง
 3. **CRM Web App เดิม (Apps Script) ไม่อยู่ในรีโปนี้** — `Code.gs`/`Index.html` ในรีโปคือ MKT Content Manager ไม่ใช่ระบบ Lead CRM จึงยังตรวจ Business Logic ฝั่ง Lead CRM เดิมไม่ได้ (ต้องขอโค้ด/สำเนา)
 4. **รีโปมี Next.js + Supabase Auth พร้อมแล้ว** (`web/`) → ใช้เป็น Presentation Layer ของ AI Sales Manager ได้เลย ไม่ต้องสร้าง HTML/GAS ใหม่
@@ -32,25 +32,53 @@
 
 **สถานะที่พบจริงใน `Lead_Status`:** `NEW, CONTACTED, FOLLOW_UP, TEST_DRIVE, LOST, WON` — **ยังไม่พบ** `APPOINTMENT, QUOTATION, BOOKING, FINANCE_APPROVED` ในตัวอย่าง จึงต้อง map ตอน migrate
 
-### n8n workflow ปัจจุบัน (อ่านจากภาพ)
+### n8n workflow ที่ export มา (ยืนยันจาก JSON)
 
 ```
-Webhook ─┬─ Respond to Webhook
-         └─ Edit Fields1 → Remove Duplicates → Workflow Configuration
-              → Extract Customer Data (AI Agent + OpenAI Chat Model + Structured Output Parser)
-              → Normalize Phone Number (Code)
-              → Supabase Lookup Lead → HAVE TEL Y/N?
-                   ├─ ไม่มีเบอร์ → Create New Lead1 → Supabase Insert Lead (No Phone)
-                   └─ มีเบอร์   → IF Phone Exists?
-                          ├─ มีแล้ว  → Supabase Update Lead
-                          └─ ยังไม่มี → Create New Lead → Supabase Get All Leads
-                                → Assign Sales1 (Code) → Supabase Insert New Lead
-                                → Switch → Telegram LEAD1 → Append row in sheet
-                                         → Telegram LEAD2 → Append row in sheet (Mobile)
-(แยกลอย) Append row in sheet 2
+Webhook (GET+POST, responseNode)
+ ├─ GET  → Respond to Webhook (hub.challenge)
+ └─ POST → Edit Fields7 (chatinput,userid,message_id,timestamp จาก entry[0].messaging[0])
+        → Remove Duplicates (message_id, ข้าม execution)
+        → Workflow Configuration (salespeople="SA0001 - วิ ,SA0002 - โอ๋")
+        → Extract Customer Data (AI Agent gpt-4.1-mini + Structured Output Parser)
+        → Normalize Phone Number (Code: ตัดเลข, 66→0, วัน/เวลา Asia/Bangkok)
+        → Supabase Lookup Lead (leads where Phone_Number = เบอร์)
+        → HAVE TEL Y/N ?  (switch ตาม normalizedPhone ว่าง/ไม่ว่าง)
+             ├─ NO  → Create New Lead1 → Supabase Insert Lead (No Phone)        [จบ]
+             └─ YES → IF Phone Exists? (Phone_Number มีใน lookup?)
+                    ├─ ใช่  → Supabase Update Lead                               [จบ]
+                    └─ ไม่  → Create New Lead (สร้าง Lead_ID) → Supabase Get All Leads
+                            → Assign Sales1 (round-robin) → Supabase Insert New Lead
+                            → Switch (Assigned_Sales)
+                                 ├─ SA0001 → Telegram กลุ่ม LEAD1 → Telegram ส่วนตัว วิ
+                                 └─ SA0002 → Telegram กลุ่ม LEAD  → Telegram ส่วนตัว โอ๋
+(ลอย ไม่เชื่อมต่อ: Google Sheets ×5 — Update Existing Lead, Lookup, Append row, Get row(s), Append row in sheet2)
 ```
 
-ข้อสังเกต: การกระจายเซลล์ (`Assign Sales1`) อ่านลีดทั้งหมดมานับเอง และ Supabase Insert/Update ไม่มี idempotency key (webhook ซ้ำอาจสร้างลีดซ้ำ — มี `Remove Duplicates` แต่เป็น in-memory ต่อ execution)
+> แก้ไขจากร่างก่อนหน้า: ร่างแรกอ่านจากภาพและเข้าใจว่า Sheet append ต่อท้าย Telegram — JSON ยืนยันว่าไม่เชื่อมต่อ
+
+**ส่วนที่ไม่อยู่ใน export นี้แต่ต้องมีอยู่จริง:** ข้อความ Telegram บอกให้เซลล์ "ตอบกลับข้อความนี้เพื่อติดต่อลูกค้า" และชีตมี `Accepted_Time/Accepted_By/Response_Minutes/Sales_Reply/Lead_Status` กับ `ACTIVITY_LOG` — แปลว่ามี workflow/สคริปต์อื่นรับ reply จาก Telegram แล้วอัปเดตสถานะ (น่าจะเป็นต้นทางของ Response_Minutes ติดลบด้วย) **ต้องขอ workflow นั้นเพิ่ม** เพราะเป็นหัวใจของการรับ/ติดต่อลีด
+
+### 2.1 ผลตรวจ workflow (เรียงตามความรุนแรง)
+
+| # | ปัญหา | ผลกระทบ | แนวทางแก้ใน design ใหม่ |
+|---|---|---|---|
+| W1 | Supabase node ไม่มี credential, workflow ปิดอยู่ | รันไม่ได้ | ใช้ HTTP Request → RPC พร้อม credential เดียว (service role เก็บใน n8n) |
+| W2 | **ไม่ตรวจลายเซ็น Facebook** (`X-Hub-Signature-256`) | ใครก็ POST ลีดปลอม/ยิงสแปมเข้าระบบ + เข้า OpenAI/Telegram ได้ | ตรวจ HMAC ก่อนทำอะไรต่อ |
+| W3 | Supabase Lookup ไม่ตั้ง `alwaysOutputData` (ฝั่ง Sheets ตั้งไว้) | เบอร์ใหม่/ไม่พบ = 0 item → flow หยุด **ลีดใหม่ไม่ถูกสร้างและไม่แจ้งเตือน** | ย้าย lookup+insert ไปไว้ใน RPC เดียว (atomic) |
+| W4 | `Supabase Update Lead` เขียนทับด้วยค่าเดิมของ `$json` (แถวที่ lookup เจอ) ไม่ใช่ข้อความใหม่ | ลูกค้าเก่าทักมาอีก → **ข้อความใหม่ไม่ถูกบันทึก ไม่แจ้งเซลล์** | บันทึกเป็น `lead_events` ใหม่ + reopen/สร้าง task ติดต่อ |
+| W5 | เคส "ไม่มีเบอร์" insert ทุกข้อความเป็นลีดใหม่ ไม่ dedupe ด้วย `Facebook_User_ID`, ไม่ assign, ไม่แจ้ง | เป็นที่มาของ `SHEET_1_MES` ~2,766 แถว, ลีดไร้เจ้าของจำนวนมาก | 1 FB user = 1 lead; ข้อความถัดไปเป็น event; ได้เบอร์ภายหลัง → ผูกเข้าลีดเดิม |
+| W6 | Round-robin อ่านลีดทั้งตาราง (ไม่เรียงลำดับ) แล้วดู "แถวสุดท้าย" | แถวไม่มีเจ้าของ (W5) ทำให้ `indexOf=-1` → รีเซ็ตเป็น SA0001 เสมอ → **แจกไม่เท่ากัน**; ช้าลงเมื่อข้อมูลโต; แข่งกันเมื่อมีลีดพร้อมกัน | `assign_lead()` ใน DB ใช้ตัวนับ/ลีดเปิดน้อยสุด + lock, รองรับเซลล์ลา/เพิ่มคน |
+| W7 | Lead_ID = `YYYYMMDD-` + 6 หลักท้ายของ ms | ชนกันได้ (รอบ 1,000 วินาที), ไม่ idempotent | `lead_code` unique + `idempotency_key = message_id` |
+| W8 | POST ไม่ถูกตอบทันที (Respond to Webhook ต่อเฉพาะ GET) แต่ต้องรอ AI+DB | Facebook timeout แล้วส่งซ้ำ → ลีดซ้ำ (Remove Duplicates เป็นเพียงชั้นเดียว) | ตอบ 200 ทันที แล้วประมวลผลต่อ; dedupe ที่ DB |
+| W9 | อ่านเฉพาะ `entry[0].messaging[0].message.text`; ไม่กรอง echo/attachment/read receipt/postback | batch event ถูกทิ้ง; event ไม่มี text ถูกส่งเข้า AI | วนทุก entry/messaging; กรอง `is_echo`, ไม่มี text |
+| W10 | AI extract ไม่ validate; Normalize ไม่ตรวจความยาว/รูปแบบเบอร์ | เบอร์ 11 หลัก/เลขขยะเข้าฐาน (พบจริง `08968660966`) | validate ใน DB (`^0[689]\d{8}$` + เก็บ `phone_raw`) → ผิดรูป = DQ issue ไม่ทิ้ง |
+| W11 | Code node ใช้ `new Date(toLocaleString(...))` + `toISOString()` | ถูกต้องเฉพาะเมื่อเซิร์ฟเวอร์ n8n ตั้ง TZ=UTC | ใช้ `timestamptz` ใน DB (`now()`), ให้ DB เป็นผู้กำหนดเวลา |
+| W12 | เลขเซลล์/ชื่อ (`SA0001 - วิ`) เป็น string ฮาร์ดโค้ด, ใช้เป็นคีย์ใน Switch และ Telegram chat id ฮาร์ดโค้ด | เพิ่ม/ลาเซลล์ต้องแก้ workflow | ตาราง `sales_team` (+ `telegram_chat_id`) |
+| W13 | ไม่มี Error Workflow / retry / บันทึกความล้มเหลว | ลีดหายเงียบ | `ingest_log` + Error Trigger → Telegram ผู้ดูแล |
+| W14 | ชื่อคอลัมน์ใน Supabase node เป็น `Lead_ID`, `Phone_Number`, `Customer_Message`, `Facebook_User_ID`, `Telegram_Status` ฯลฯ | **ไม่ตรงกับตาราง `leads` ของรีโป** (snake_case, 12 คอลัมน์, ไม่มี Customer_Message/Facebook_User_ID/Telegram_Status) → insert จะพังถ้าชี้มาที่โปรเจกต์นี้ | ไม่เขียนตรง ให้ผ่าน RPC ของ schema `crm` |
+
+**PDPA:** ข้อความลูกค้าทั้งก้อนถูกส่งไป OpenAI เพื่อสกัดชื่อ/เบอร์ (จำเป็นต่อวัตถุประสงค์นี้ แต่ควรบันทึกไว้ในนโยบายความเป็นส่วนตัว) และ Telegram กลุ่มได้รับชื่อ+เบอร์เต็ม — ควรยืนยันว่าเป็นกลุ่มเฉพาะทีมขาย
 
 ---
 
@@ -104,7 +132,7 @@ Webhook ─┬─ Respond to Webhook
 | D1 | Supabase (Postgres) เป็น **Source of Truth เดียว**; Apps Script ไม่ใช้เป็น backend อีก | SLA/Task/Audit ต้อง transaction + trigger; Sheets ไม่รองรับ |
 | D2 | Business rules อยู่ใน **Postgres functions/triggers** ไม่ใช่ใน n8n | บังคับ "ห้ามเปลี่ยน BOOKING/WON ไม่มีหลักฐาน" ได้ทุกช่องทางรวมทั้ง UI และ n8n |
 | D3 | n8n ทำแค่ ingest + แจ้งเตือน + เรียก AI | ลดความซับซ้อน; logic ไม่กระจาย |
-| D4 | Google Sheet คง **read-only mirror** ช่วง cut-over (n8n เขียนทั้งสองที่) แล้วค่อยเลิก | ไม่ทำ workflow เดิมหยุด / rollback ได้ |
+| D4 | **Workflow production เดิมที่เขียน Google Sheets ไม่แตะ** จนกว่าชุดใหม่ผ่านทดสอบ; ชุดใหม่ทดสอบด้วย webhook แยก (Facebook test) แล้วค่อยสลับ; Sheet เก็บเป็น archive | ไม่ทำ workflow เดิมหยุด / rollback ได้ |
 | D5 | ใช้ `web/` (Next.js) เป็น UI | มี Auth/Supabase client แล้ว |
 | D6 | AI แนะนำอย่างเดียว; การเปลี่ยน owner/อนุมัติ/ขึ้น BOOKING ต้องมีมนุษย์กดผ่าน RPC ที่เช็ก role | ตามข้อกำหนดผู้บริหาร |
 
@@ -148,9 +176,9 @@ Webhook ─┬─ Respond to Webhook
 | M1 | สร้างสคีมา `crm` ใน Supabase (ไม่กระทบตารางเดิม) | drop schema crm |
 | M2 | Import แบบ dry-run: `SHEET_1_TEL`→`leads`, `ACTIVITY_LOG`→`lead_events`; ออกรายงาน reconciliation (จำนวนแถว, Lead_ID ซ้ำ/ขาด, DQ issues) | ล้างตารางแล้วรันใหม่ (idempotent ด้วย `lead_code`/`idempotency_key`) |
 | M3 | ผู้ใช้ตรวจรายงาน → import จริง | — |
-| M4 | แก้ n8n: เขียน `crm.*` ผ่าน RPC **ควบคู่** กับ Sheet (dual-write) ใช้ webhook ทดสอบก่อน | ปิดสาขาใหม่ |
-| M5 | รัน dual-write 1–2 สัปดาห์ เทียบผลทุกวัน (Sheet vs Supabase) | สลับกลับไปอ่าน Sheet |
-| M6 | Cut-over: UI/Telegram อ่านจาก Supabase; Sheet เป็น read-only archive | เปิด Sheet เขียนอีกครั้ง |
+| M4 | สร้าง ingest workflow ใหม่ (เรียก RPC `crm.ingest_message`) แทนเวอร์ชัน `+ supabase` ที่ชำรุด; ทดสอบด้วย webhook ทดสอบ | ปิด workflow ใหม่ |
+| M5 | รัน **shadow mode** 1–2 สัปดาห์: ให้ workflow เดิมเขียน Sheet ต่อ + ให้ workflow ใหม่รับ event เดียวกันเขียน Supabase (ไม่ส่ง Telegram ซ้ำ) แล้วเทียบผลรายวัน | ปิด shadow |
+| M6 | Cut-over: เปิด Telegram ของ workflow ใหม่ ปิด workflow เดิม; Sheet เป็น read-only archive | เปิด workflow เดิมคืน |
 
 ข้อมูลที่ **ไม่ย้าย**: `DAY_LOG` (derived → ทำเป็น view), `KPI` (โดเมน MKT)
 
@@ -169,10 +197,13 @@ Webhook ─┬─ Respond to Webhook
 
 ---
 
-## 8. สิ่งที่ต้องขอจากผู้ใช้ก่อนเริ่ม Phase 3
+## 8. สิ่งที่ยังต้องขอจากผู้ใช้ก่อนเริ่ม Phase 3
 
-1. **n8n workflow JSON** (Export จาก n8n) — ภาพอ่านได้แค่โครงสร้าง ไม่เห็น config/expression/credential และสาเหตุเครื่องหมายเตือนสีแดง
-2. **Supabase project**: ใช้โปรเจกต์เดียวกับ MKT Content Manager หรือแยกใหม่? (ตอนนี้ข้อมูลลูกค้ามี policy เปิดสาธารณะอยู่ — แนะนำแยกหรือล็อกก่อน)
-3. **รายชื่อเซลล์ + หัวหน้า + Telegram chat ID** และ **เวลาทำการ** (สำหรับ SLA ชั่วโมงทำการ)
-4. โค้ด/สำเนา **Apps Script ของ Lead CRM เดิม** (ถ้ามี) เพื่อไม่ทำ logic เดิมหาย
-5. ยืนยันการตัดสินใจ D1–D6 ข้างต้น
+~~1. n8n workflow JSON~~ ได้รับแล้ว (ดูหัวข้อ 2.1)
+
+1. **Workflow/สคริปต์ที่รับ reply จาก Telegram และเขียน `Accepted_*`, `Sales_Reply`, `Lead_Status`, `ACTIVITY_LOG`** (ไม่อยู่ใน export นี้) — จำเป็นมากเพื่อไม่ให้ logic การรับลีด/ติดต่อลีดหาย
+2. **Workflow production ที่ใช้อยู่จริง** (เวอร์ชัน Google Sheets) เพื่อใช้เป็นฐานเทียบใน shadow mode
+3. **Supabase project**: ใช้โปรเจกต์เดียวกับ MKT Content Manager หรือแยกใหม่? (ตาราง `leads` ปัจจุบันมี policy เปิดสาธารณะ — แนะนำแยกใหม่ หรือล็อกก่อน)
+4. **หัวหน้าฝ่ายขาย + Telegram chat ID ที่ใช้ escalate** และ **เวลาทำการ** (SLA ชั่วโมงทำการ) — รายชื่อเซลล์ตอนนี้เห็น 2 คน (SA0001 วิ, SA0002 โอ๋)
+5. โค้ด **Apps Script ของ Lead CRM เดิม** (ถ้ามี)
+6. ยืนยันการตัดสินใจ D1–D6 ข้างต้น
