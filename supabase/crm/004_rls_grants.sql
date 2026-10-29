@@ -64,7 +64,8 @@ grant execute on function crm.me(), crm.my_id(), crm.my_role(), crm.is_manager()
 grant execute on function crm.accept_lead(uuid), crm.log_contact(uuid, text, text, text, timestamptz, text),
   crm.change_stage(uuid, text, text, jsonb), crm.add_deal(uuid, text, text, numeric), crm.verify_deal(uuid),
   crm.reassign_lead(uuid, uuid, text),
-  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text) to authenticated;
+  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text),
+  crm.update_lead_info(uuid, text, text, text, jsonb) to authenticated;
 grant execute on function crm.ingest_message(text, text, text, text, text, text, timestamptz),
   crm.sweep_sla(), crm.claim_alerts(int), crm.run_data_quality(), crm.assign_lead(uuid), crm.refresh_task(uuid) to service_role;
 

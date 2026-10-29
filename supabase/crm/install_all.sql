@@ -75,6 +75,7 @@ create table if not exists crm.leads (
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
 alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
+alter table crm.leads add column if not exists profile jsonb not null default '{}';
 -- ฐานข้อมูลที่ติดตั้งไว้แล้วมี constraint แบบ 10 สถานะ → แทนที่ด้วย 13 สถานะ (ข้อมูลเดิมยังถูกต้องทุกแถว)
 alter table crm.leads drop constraint if exists leads_stage_check;
 alter table crm.leads add constraint leads_stage_check check (stage in
@@ -523,7 +524,7 @@ declare a crm.sales_team; l crm.leads; v_success boolean; v_ev bigint;
 begin
   a := crm._actor_for(p_lead);
   select * into l from crm.leads where id = p_lead for update;
-  if l.stage in ('WON','LOST') then raise exception 'lead_closed'; end if;
+  if l.stage = 'WON' then raise exception 'lead_closed'; end if;
   if p_channel not in ('PHONE','LINE','FACEBOOK','SMS','WALK_IN') then raise exception 'invalid_channel'; end if;
   if p_outcome not in ('CONNECTED','REPLIED','NO_ANSWER','MESSAGE_SENT','WRONG_NUMBER') then raise exception 'invalid_outcome'; end if;
   if p_note is null or length(btrim(p_note)) < 5 then raise exception 'note_required: ต้องบันทึกผลการติดต่ออย่างน้อย 5 ตัวอักษร'; end if;
@@ -556,13 +557,14 @@ begin
   a := crm._actor_for(p_lead);
   select * into l from crm.leads where id = p_lead for update;
   if p_to = l.stage then return; end if;
-  if l.stage in ('WON','LOST') and a.role not in ('sales_manager','admin') then raise exception 'forbidden: ลีดที่ปิดแล้วเปิดใหม่ได้เฉพาะผู้จัดการ' using errcode = '42501'; end if;
+  if l.stage = 'WON' and a.role not in ('sales_manager','admin') then raise exception 'forbidden: ลีดที่ปิดการขายแล้วเปิดใหม่ได้เฉพาะผู้จัดการ' using errcode = '42501'; end if;
   if p_to = 'LOST' and (p_reason is null or length(btrim(p_reason)) < 3) then raise exception 'lost_reason_required'; end if;
   update crm.leads set stage = p_to,
          lost_reason = case when p_to = 'LOST' then p_reason else null end
    where id = p_lead;                                 -- stage_guard ตรวจหลักฐานให้
   insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
-  values (p_lead, 'STAGE_CHANGE', a.id, p_reason, p_evidence || jsonb_build_object('from', l.stage, 'to', p_to));
+  values (p_lead, 'STAGE_CHANGE', a.id, p_reason,
+          p_evidence || jsonb_build_object('from', l.stage, 'to', p_to) || case when l.stage = 'LOST' then '{"reopened": true}'::jsonb else '{}'::jsonb end);
 end $$;
 
 create or replace function crm.add_deal(p_lead uuid, p_kind text, p_doc_ref text, p_amount numeric default null) returns uuid
@@ -587,8 +589,8 @@ begin
   -- ตรวจสอบการจองแล้ว → ขยับลีดเป็น BOOKING อัตโนมัติ (ถ้ายังไม่ถึงขั้นนี้)
   if d.kind = 'BOOKING' then
     select * into l from crm.leads where id = d.lead_id for update;
-    if l.stage in ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION') then
-      update crm.leads set stage = 'BOOKING' where id = l.id;
+    if l.stage in ('NEW','CONTACTED','FOLLOW_UP','APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','LOST') then
+      update crm.leads set stage = 'BOOKING', lost_reason = null where id = l.id;
       insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
       values (l.id, 'STAGE_CHANGE', a.id, 'ผู้จัดการตรวจสอบหลักฐานการจองแล้ว',
               jsonb_build_object('from', l.stage, 'to', 'BOOKING', 'source', 'booking_verified', 'deal', d.id, 'doc_ref', d.doc_ref));
@@ -603,7 +605,7 @@ declare a crm.sales_team; v_id uuid; l crm.leads;
 begin
   a := crm._actor_for(p_lead);
   select * into l from crm.leads where id = p_lead for update;
-  if l.stage in ('WON','LOST') then raise exception 'lead_closed'; end if;
+  if l.stage = 'WON' then raise exception 'lead_closed'; end if;
   if p_doc_ref is null or length(btrim(p_doc_ref)) < 3 then raise exception 'doc_ref_required: ต้องระบุเลขที่ใบจอง'; end if;
   if coalesce(btrim(p_details->>'model'), '') = '' then raise exception 'model_required: ต้องระบุรถ/รุ่นที่จอง'; end if;
   if coalesce(btrim(p_details->>'purchase_type'), '') not in ('CASH','FINANCE') then raise exception 'purchase_type_required: ต้องระบุเงื่อนไขการซื้อ (เงินสด/ผ่อน)'; end if;
@@ -617,6 +619,47 @@ begin
   values (p_lead, 'NOTE', a.id, 'แจ้งจอง ' || (p_details->>'model') || ' เลขที่ ' || btrim(p_doc_ref) || ' — รอผู้จัดการตรวจสอบ',
           jsonb_build_object('deal', v_id, 'kind', 'BOOKING_REPORTED'));
   return v_id;
+end $$;
+
+-- แก้ไขข้อมูลลูกค้า (ชื่อ/เบอร์/รุ่นที่สนใจ/Customer Card) — เจ้าของลีดหรือผู้จัดการ ทุกสถานะรวมถึง LOST
+create or replace function crm.update_lead_info(p_lead uuid, p_name text, p_phone text, p_model text, p_profile jsonb default '{}') returns void
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team; l crm.leads; v_norm text; v_dup text; k text; v text; v_prof jsonb; v_changed text[] := '{}';
+begin
+  a := crm._actor_for(p_lead);
+  select * into l from crm.leads where id = p_lead for update;
+  v_prof := l.profile;
+  if nullif(btrim(coalesce(p_phone, '')), '') is not null and btrim(p_phone) is distinct from coalesce(l.phone_raw, '') then
+    v_norm := crm.normalize_phone(p_phone);
+    if v_norm is null then raise exception 'phone_invalid: เบอร์โทรไม่ถูกต้อง (ต้องเป็นเบอร์ไทย 9–10 หลัก)'; end if;
+    select lead_code into v_dup from crm.leads where phone_norm = v_norm and id <> p_lead limit 1;
+    if v_dup is not null then raise exception 'phone_duplicate: เบอร์นี้มีอยู่แล้วในลีด %', v_dup; end if;
+    update crm.leads set phone_raw = btrim(p_phone), phone_norm = v_norm where id = p_lead;
+    v_changed := v_changed || 'phone'::text;
+  end if;
+  if p_name is not null and btrim(p_name) is distinct from coalesce(l.customer_name, '') then
+    update crm.leads set customer_name = nullif(btrim(p_name), '') where id = p_lead; v_changed := v_changed || 'name'::text;
+  end if;
+  if p_model is not null and btrim(p_model) is distinct from coalesce(l.interested_model, '') then
+    update crm.leads set interested_model = nullif(btrim(p_model), '') where id = p_lead; v_changed := v_changed || 'model'::text;
+  end if;
+  for k in select unnest(crm._profile_keys()) loop      -- เฉพาะฟิลด์ที่อนุญาต; ค่าว่าง = ลบ
+    if p_profile ? k then
+      v := btrim(coalesce(p_profile->>k, ''));
+      if v = '' then
+        if v_prof ? k then v_prof := v_prof - k; v_changed := v_changed || k; end if;
+      elsif v is distinct from coalesce(v_prof->>k, '') then
+        v_prof := v_prof || jsonb_build_object(k, v); v_changed := v_changed || k;
+      end if;
+    end if;
+  end loop;
+  if v_prof is distinct from l.profile then update crm.leads set profile = v_prof where id = p_lead; end if;
+  if cardinality(v_changed) > 0 then
+    insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+    values (p_lead, 'NOTE', a.id, 'แก้ไขข้อมูลลูกค้า: ' || array_to_string(v_changed, ', '), jsonb_build_object('kind', 'INFO_UPDATED', 'fields', to_jsonb(v_changed)));
+  end if;
+  select * into l from crm.leads where id = p_lead;
+  if l.owner_id is null and l.phone_norm is not null and l.stage not in ('WON','LOST') then perform crm.assign_lead(p_lead); end if;
 end $$;
 
 -- ติดดาว / เอาดาวออก (ลูกค้าเป้าหมายของตัวเอง)
@@ -782,7 +825,7 @@ select
     else 'LOW' end as risk_level,
   l.created_at, l.legacy_unverified,
   l.first_contact_at, l.accepted_at, l.dormant, ev.last_msg as last_customer_message_at, ev.last_msg_body as last_customer_message,
-  (st.lead_id is not null) as starred, st.note as star_note
+  (st.lead_id is not null) as starred, st.note as star_note, l.lost_reason, l.profile
 from crm.leads l
 left join crm.sales_team s on s.id = l.owner_id
 left join crm.tasks t on t.lead_id = l.id and t.status = 'OPEN'
@@ -977,7 +1020,8 @@ grant execute on function crm.me(), crm.my_id(), crm.my_role(), crm.is_manager()
 grant execute on function crm.accept_lead(uuid), crm.log_contact(uuid, text, text, text, timestamptz, text),
   crm.change_stage(uuid, text, text, jsonb), crm.add_deal(uuid, text, text, numeric), crm.verify_deal(uuid),
   crm.reassign_lead(uuid, uuid, text),
-  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text) to authenticated;
+  crm.mark_booked(uuid, text, numeric, jsonb, date), crm.set_star(uuid, boolean, text),
+  crm.update_lead_info(uuid, text, text, text, jsonb) to authenticated;
 grant execute on function crm.ingest_message(text, text, text, text, text, text, timestamptz),
   crm.sweep_sla(), crm.claim_alerts(int), crm.run_data_quality(), crm.assign_lead(uuid), crm.refresh_task(uuid) to service_role;
 
@@ -1030,7 +1074,7 @@ begin
     insert into crm.ingest_log(message_id, result, error) values (v_key, 'rejected', 'forbidden sender for ' || p_lead_code);
     return jsonb_build_object('status', 'forbidden');
   end if;
-  if l.stage in ('WON','LOST') then
+  if l.stage = 'WON' then
     insert into crm.lead_events(lead_id, type, channel, body, actor_id, idempotency_key) values (l.id, 'SALES_REPLY', 'TELEGRAM', left(p_reply_text, 2000), s.id, v_key);
     return jsonb_build_object('status', 'closed_lead_noted');
   end if;

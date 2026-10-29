@@ -19,7 +19,7 @@ function Login({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState(""); const [pw, setPw] = useState(""); const [err, setErr] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <div className="mb-6 flex items-center gap-3"><Logo /><div><h1 className="text-xl font-bold">AI Sales Manager</h1><p className="text-sm text-muted">WULING CHONBURI</p></div></div>
+      <div className="mb-6 flex items-center gap-3"><Logo /><div><h1 className="text-xl font-bold">WULING Sale Lead</h1><p className="text-sm text-muted">WULING CHONBURI</p></div></div>
       <form className="card space-y-3 p-5" onSubmit={async (e) => {
         e.preventDefault(); setBusy(true); setErr(null);
         const m = await api.signIn?.(email, pw); setBusy(false);
@@ -35,7 +35,8 @@ function Login({ onDone }: { onDone: () => void }) {
 }
 
 function Logo() {
-  return <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-lg font-black text-black" aria-hidden="true">W</span>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <span className="grid h-10 w-10 place-items-center rounded-xl bg-white p-1" aria-hidden="true"><img src="/logo-mark.svg" alt="" className="h-full w-full object-contain" /></span>;
 }
 
 export default function App() {
@@ -107,7 +108,7 @@ export default function App() {
   return (
     <div className="min-h-screen lg:flex">
       <aside className="hidden w-64 shrink-0 flex-col bg-side p-4 text-white lg:sticky lg:top-0 lg:flex lg:h-screen">
-        <div className="flex items-center gap-3 px-2 py-3"><Logo /><div><div className="text-lg font-bold leading-tight">AI Sales</div><div className="text-xs text-white/60">WULING CHONBURI</div></div></div>
+        <div className="flex items-center gap-3 px-2 py-3"><Logo /><div><div className="text-lg font-bold leading-tight">Sale Lead</div><div className="text-xs text-white/60">WULING CHONBURI</div></div></div>
         <nav className="mt-4 space-y-1" aria-label="เมนูหลัก">
           {nav.map(({ k, label, Icon, badge }) => (
             <button key={k} onClick={() => go(k)} aria-current={tab === k ? "page" : undefined}
@@ -128,7 +129,7 @@ export default function App() {
       <div className="min-w-0 flex-1 pb-24 lg:pb-8">
         {api.mode === "demo" && <div className="bg-warn-soft px-4 py-2 text-center text-xs text-warn">โหมดสาธิต — ข้อมูลตัวอย่าง ไม่ใช่ข้อมูลลูกค้าจริง · ปุ่มออกจากระบบ = สลับมุมมองเซลล์/ผู้จัดการ</div>}
         <header className="flex items-center gap-3 px-4 py-3 lg:px-8 lg:py-5">
-          <div className="flex items-center gap-2 lg:hidden"><Logo /><span className="font-bold">AI Sales</span></div>
+          <div className="flex items-center gap-2 lg:hidden"><Logo /><span className="font-bold">Sale Lead</span></div>
           <label className="card focus-within:ring-2 focus-within:ring-accent hidden min-h-11 max-w-md flex-1 items-center gap-2 px-4 lg:flex">
             <Search size={16} className="text-muted" />
             <input value={q} onChange={(e) => { setQ(e.target.value); setTab("leads"); }} placeholder="ค้นหาชื่อ เบอร์โทร รหัสลีด รุ่นรถ…" className="min-h-11 flex-1 bg-transparent text-sm outline-none" />

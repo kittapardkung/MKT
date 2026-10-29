@@ -9,11 +9,12 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
-  title: "AI Sales Manager",
+  title: "WULING Sale Lead",
+  manifest: "/manifest.webmanifest",
   description: "ระบบผู้จัดการฝ่ายขาย AI — WULING CHONBURI",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#F25A0A" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

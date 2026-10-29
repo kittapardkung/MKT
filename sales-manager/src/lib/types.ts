@@ -24,7 +24,10 @@ export interface LeadRow {
   first_contact_at: string | null; accepted_at: string | null; dormant: boolean;
   last_customer_message: string | null; last_customer_message_at: string | null;
   starred: boolean; star_note: string | null;
+  lost_reason?: string | null; profile?: Record<string, string>;
 }
+
+export interface LeadInfoInput { name: string; phone: string; model: string; profile: Record<string, string> }
 
 export interface BookingDetails {
   model: string; variant?: string; color?: string; vehicle_price?: number;
@@ -82,4 +85,5 @@ export interface Api {
   markBooked(leadId: string, b: BookingInput): Promise<void>;
   verifyBooking(dealId: string): Promise<void>;
   setStar(leadId: string, on: boolean, note?: string): Promise<void>;
+  updateLeadInfo(leadId: string, i: LeadInfoInput): Promise<void>;
 }

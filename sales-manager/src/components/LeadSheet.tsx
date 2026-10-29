@@ -14,6 +14,8 @@ const tomorrow10 = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 const inputCls = "mt-1 min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-ink";
+const PROFILE_FIELDS: Array<[string, string]> = [["Occupation", "อาชีพ"], ["Customer_Province", "จังหวัด"], ["Budget", "งบประมาณ"], ["Purchase_Type", "รูปแบบการซื้อ"],
+  ["Down_Payment", "เงินดาวน์"], ["Has_Trade_In", "มีรถเทิร์น"], ["Trade_In_Model", "รุ่นรถเทิร์น"], ["Preferred_Color", "สีที่ชอบ"], ["Customer_Line_ID", "LINE ID"], ["Notes", "หมายเหตุ"]];
 const num = (v: string) => (v.trim() === "" ? undefined : Number(v.replace(/,/g, "")));
 
 export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow; onClose: () => void; onChanged: () => void }) {
@@ -30,7 +32,12 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
   const [booking, setBooking] = useState(false);
   const [bk, setBk] = useState({ doc_ref: "", amount: "", booked_on: dayKey(new Date()), model: lead.interested_model ?? "", variant: "", color: "", vehicle_price: "",
     purchase_type: "" as "" | "CASH" | "FINANCE", down_payment: "", term_months: "", bank: "", promo: "", note: "" });
-  const closed = lead.stage === "WON" || lead.stage === "LOST";
+  const closed = lead.stage === "WON";
+  const lost = lead.stage === "LOST";
+  const cantReach = lost && /ติดต่อไม่ได้|ไม่รับสาย|ไม่ได้รับสาย/.test(lead.lost_reason ?? "");
+  const [editing, setEditing] = useState(false);
+  const [info, setInfo] = useState(() => ({ name: lead.customer_name ?? "", phone: lead.phone ?? "", model: lead.interested_model ?? "",
+    profile: Object.fromEntries(PROFILE_FIELDS.map(([k]) => [k, lead.profile?.[k] ?? ""])) as Record<string, string> }));
 
   const load = useCallback(() => api.events(lead.lead_id).then(setEvents).catch(() => setEvents([])), [lead.lead_id]);
   useEffect(() => { load(); }, [load]);
@@ -73,6 +80,32 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
           {lead.last_customer_message && <div className="mt-2 rounded-xl bg-bg p-2 text-xs text-muted">ลูกค้าพิมพ์ล่าสุด: “{lead.last_customer_message}”</div>}
           <div className="mt-2"><b>Next Best Action:</b> {lead.next_best_action}</div>
           <Flags flags={lead.flags} />
+        </div>
+
+        {lost && (
+          <div role="note" className="mt-3 rounded-2xl bg-warn-soft p-3 text-sm text-warn">
+            <b>ลีดนี้ถูกปิดเป็น “เสียลูกค้า”</b>{lead.lost_reason ? ` — ${lead.lost_reason}` : ""}<br />
+            ถ้าลูกค้าเปลี่ยนใจ บันทึกผลการติดต่อหรือเลือก “เปิดลีดกลับมา” ด้านล่างได้เลย
+            {cantReach && <div className="mt-1 font-semibold">⚠ “ติดต่อไม่ได้” ยังไม่ใช่เหตุผลให้ปิดลีด — ควรคงสถานะติดตามและโทรซ้ำตามรอบ</div>}
+          </div>
+        )}
+        {closed && <div role="note" className="mt-3 rounded-2xl bg-ok-soft p-3 text-sm text-ok">ลีดนี้ปิดการขายแล้ว (WON) — แก้ไขสถานะได้เฉพาะผู้จัดการ</div>}
+
+        <div className="card mt-3 p-3">
+          <button type="button" aria-expanded={editing} onClick={() => setEditing((v) => !v)} className="focus-ring w-full text-left font-semibold">{editing ? "▾" : "▸"} แก้ไขข้อมูลลูกค้า</button>
+          {editing && (
+            <form className="mt-2 space-y-2" onSubmit={(e) => { e.preventDefault(); void run(() => api.updateLeadInfo(lead.lead_id, info), "บันทึกข้อมูลลูกค้าแล้ว", () => setEditing(false)); }}>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-muted">ชื่อลูกค้า<input value={info.name} onChange={(e) => setInfo({ ...info, name: e.target.value })} className={inputCls} /></label>
+                <label className="text-xs text-muted">เบอร์โทร<input inputMode="tel" value={info.phone} onChange={(e) => setInfo({ ...info, phone: e.target.value })} className={inputCls} /></label>
+                <label className="col-span-2 text-xs text-muted">รุ่นที่สนใจ<input value={info.model} onChange={(e) => setInfo({ ...info, model: e.target.value })} className={inputCls} /></label>
+                {PROFILE_FIELDS.map(([k, label]) => (
+                  <label key={k} className="text-xs text-muted">{label}<input value={info.profile[k]} onChange={(e) => setInfo({ ...info, profile: { ...info.profile, [k]: e.target.value } })} className={inputCls} /></label>
+                ))}
+              </div>
+              <button disabled={busy} className="btn-dark min-h-11 w-full disabled:opacity-60">{busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"}</button>
+            </form>
+          )}
         </div>
 
         {!closed && (
@@ -134,10 +167,10 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
 
         {!closed && (
           <div className="card mt-3 space-y-2 p-3">
-            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">เปลี่ยนสถานะ</h3><StatusGuideButton className="!min-h-9" /></div>
+            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{lost ? "เปิดลีดกลับมา / เปลี่ยนสถานะ" : "เปลี่ยนสถานะ"}</h3><StatusGuideButton className="!min-h-9" /></div>
             <label className="block text-xs text-muted">เลือกสถานะใหม่
               <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className={inputCls}>
-                <option value="">เลือกสถานะ…</option>
+                <option value="">{lost ? "เลือกสถานะที่จะเปิดกลับมา…" : "เลือกสถานะ…"}</option>
                 {STAGE_ORDER.filter((s) => s !== lead.stage).map((s) => (
                   <option key={s} value={s} disabled={s === "BOOKING"}>{STAGE_TH[s]} — {s === "BOOKING" ? "ใช้ปุ่ม “จองแล้ว”" : STATUS_GUIDE[s].meaning}</option>
                 ))}

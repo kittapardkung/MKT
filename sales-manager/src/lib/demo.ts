@@ -132,6 +132,8 @@ export function createDemoApi(): Api {
       const l = leads.find((x) => x.lead_id === id); if (!l) return;
       if (GUARDED.includes(to) && !bookings.some((b) => b.lead_id === id && b.verified)) throw new Error(`evidence_required: สถานะ ${to} ต้องมีการจองที่ผู้จัดการตรวจสอบแล้ว`);
       if (to === "LOST" && reason.trim().length < 3) throw new Error("lost_reason_required");
+      if (l.stage === "WON" && role === "sales") throw new Error("forbidden");
+      if (l.stage === "LOST" && to !== "LOST") l.lost_reason = null; else if (to === "LOST") l.lost_reason = reason;
       l.stage = to; l.next_best_action = NBA[to];
       l.events.push({ id: l.events.length + 1, type: "STAGE_CHANGE", channel: null, outcome: null, body: reason || to, occurred_at: iso(0), actor: sales[role] });
     },
@@ -158,6 +160,14 @@ export function createDemoApi(): Api {
       b.verified = true; b.verified_at = iso(0); b.verified_by_name = sales[role];
       const l = leads.find((x) => x.lead_id === b.lead_id);
       if (l && !GUARDED.includes(l.stage) && l.stage !== "LOST") { l.stage = "BOOKING"; l.next_best_action = NBA.BOOKING; b.stage = "BOOKING"; }
+    },
+    async updateLeadInfo(id, i) {
+      const l = leads.find((x) => x.lead_id === id); if (!l) return;
+      const ph = i.phone.replace(/\D/g, "");
+      if (ph && !/^0\d{8,9}$/.test(ph)) throw new Error("phone_invalid");
+      l.customer_name = i.name.trim() || l.customer_name; l.interested_model = i.model.trim() || null; if (ph) l.phone = ph;
+      const p = { ...(l.profile ?? {}) }; for (const [k, v] of Object.entries(i.profile)) { if (v.trim()) p[k] = v.trim(); else delete p[k]; } l.profile = p;
+      l.events.push({ id: l.events.length + 1, type: "NOTE", channel: null, outcome: null, body: "แก้ไขข้อมูลลูกค้า", occurred_at: iso(0), actor: sales[role] });
     },
     async setStar(id, on, note) { const l = leads.find((x) => x.lead_id === id); if (!l) return; l.starred = on; l.star_note = on ? (note ?? l.star_note) : null; },
     async funnel() {

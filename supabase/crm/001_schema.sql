@@ -75,6 +75,7 @@ create table if not exists crm.leads (
   constraint lost_needs_reason check (stage <> 'LOST' or lost_reason is not null)
 );
 alter table crm.leads add column if not exists dormant boolean not null default false;  -- ลีดเก่าที่นำเข้า ไม่สร้างงาน/แจ้งเตือนจนกว่าลูกค้าจะทักมาใหม่
+alter table crm.leads add column if not exists profile jsonb not null default '{}';
 -- ฐานข้อมูลที่ติดตั้งไว้แล้วมี constraint แบบ 10 สถานะ → แทนที่ด้วย 13 สถานะ (ข้อมูลเดิมยังถูกต้องทุกแถว)
 alter table crm.leads drop constraint if exists leads_stage_check;
 alter table crm.leads add constraint leads_stage_check check (stage in

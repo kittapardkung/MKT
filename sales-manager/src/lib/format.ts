@@ -32,7 +32,9 @@ export function friendlyError(msg: string): string {
   if (msg.startsWith("evidence_required")) return "สถานะนี้ต้องมีการจองที่ผู้จัดการตรวจสอบแล้วก่อน — กดปุ่ม “จองแล้ว” ให้ครบ แล้วให้ผู้จัดการตรวจสอบหลักฐาน";
   if (msg.startsWith("lost_reason_required")) return "ต้องระบุเหตุผลที่เสียลูกค้า";
   if (msg.startsWith("forbidden")) return "คุณไม่มีสิทธิ์ทำรายการนี้กับลีดนี้";
-  if (msg.startsWith("lead_closed")) return "ลีดนี้ปิดแล้ว ไม่สามารถแก้ไขได้";
+  if (msg.startsWith("lead_closed")) return "ลีดนี้ปิดการขายแล้ว (WON) — ติดต่อผู้จัดการเพื่อแก้ไข";
+  if (msg.startsWith("phone_invalid")) return "เบอร์โทรไม่ถูกต้อง (ต้องเป็นเบอร์ไทย 9–10 หลัก)";
+  if (msg.startsWith("phone_duplicate")) return "เบอร์นี้มีอยู่ในลีดอื่นแล้ว";
   return msg.replace(/^[a-z_]+: /, "");
 }
 

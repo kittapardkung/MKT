@@ -72,3 +72,53 @@ begin
   perform t_reset();
   perform set_config('statement_timeout', '0', false);
 end $$;
+
+-- LOST ต้องยังแก้ไข/เปิดกลับได้ และแก้ข้อมูลลูกค้าได้
+do $$
+declare r jsonb; l uuid; o uuid; ou uuid; other_user uuid; l2 uuid; dl uuid; mgr uuid := '10000000-0000-0000-0000-0000000000b1';
+begin
+  r := crm.ingest_message('lost1', 'fbLost1', 'สนใจ Porta', 'คุณปุ้ย', '0866660001', 'Porta');
+  l := (r->>'lead_id')::uuid; o := (r->'owner'->>'id')::uuid;
+  select user_id into ou from crm.sales_team where id = o;
+  select user_id into other_user from crm.sales_team where role = 'sales' and id <> o limit 1;
+  perform t_as(ou);
+  perform crm.change_stage(l, 'LOST', 'ติดต่อไม่ได้');
+  perform t_assert((select stage = 'LOST' from crm.leads where id = l), 'LOST: ปิดลีดได้');
+  perform crm.log_contact(l, 'PHONE', 'CONNECTED', 'ลูกค้าโทรกลับ เปลี่ยนใจแล้ว', now() + interval '1 day', 'WARM');
+  perform t_assert(true, 'LOST: บันทึกผลการติดต่อได้');
+  perform crm.change_stage(l, 'FOLLOW_UP', 'ลูกค้าเปลี่ยนใจ');
+  perform t_assert((select stage = 'FOLLOW_UP' and lost_reason is null from crm.leads where id = l), 'LOST: เปิดกลับเป็น FOLLOW_UP และล้างเหตุผลเสีย');
+  perform t_assert(exists (select 1 from crm.lead_events where lead_id = l and type = 'STAGE_CHANGE' and evidence->>'reopened' = 'true'), 'LOST: event ระบุว่าเปิดกลับ');
+
+  perform crm.update_lead_info(l, 'คุณปุ้ย ใจดี', '0866660001', 'Darion', '{"Occupation":"ครู","Budget":"800000","Evil":"x"}');
+  perform t_assert((select customer_name = 'คุณปุ้ย ใจดี' and interested_model = 'Darion' and profile->>'Occupation' = 'ครู' and not profile ? 'Evil' from crm.leads where id = l), 'แก้ข้อมูล: ชื่อ/รุ่น/profile ถูกบันทึก และ key นอก whitelist ถูกทิ้ง');
+  perform crm.update_lead_info(l, 'คุณปุ้ย ใจดี', '0866660001', 'Darion', '{"Occupation":""}');
+  perform t_assert((select not profile ? 'Occupation' from crm.leads where id = l), 'แก้ข้อมูล: ค่าว่างลบ field');
+  perform t_raises(format($q$select crm.update_lead_info(%L, 'x', '123', 'Darion', '{}')$q$, l), 'phone_invalid', 'แก้ข้อมูล: เบอร์ไม่ถูกต้อง');
+  perform t_reset();
+  perform t_as(other_user);
+  perform t_raises(format($q$select crm.update_lead_info(%L, 'x', '0866660001', 'Darion', '{}')$q$, l), 'forbidden', 'แก้ข้อมูล: เซลล์คนอื่นแก้ไม่ได้');
+  perform t_reset();
+
+  -- จองลีดที่ LOST แล้ว manager ยืนยัน → BOOKING
+  r := crm.ingest_message('lost2', 'fbLost2', 'จองครับ', 'คุณโล', '0866660002', 'Bingo');
+  l2 := (r->>'lead_id')::uuid; select user_id into ou from crm.sales_team where id = (r->'owner'->>'id')::uuid;
+  perform t_as(ou);
+  perform crm.change_stage(l2, 'LOST', 'ไม่สนใจ');
+  dl := crm.mark_booked(l2, 'RES-LOST-1', 5000, '{"model":"Bingo","purchase_type":"CASH"}', null);
+  perform t_reset();
+  perform t_as(mgr);
+  perform crm.verify_deal(dl);
+  perform t_assert((select stage = 'BOOKING' and lost_reason is null from crm.leads where id = l2), 'LOST: จอง+ตรวจสอบแล้วขึ้น BOOKING');
+  perform t_reset();
+
+  -- WON: เซลล์แก้ไม่ได้ ผู้จัดการแก้ได้
+  update crm.leads set stage = 'WON' where id = l2;
+  perform t_as(ou);
+  perform t_raises(format($q$select crm.change_stage(%L, 'FOLLOW_UP', 'x')$q$, l2), 'forbidden', 'WON: เซลล์เปลี่ยนสถานะไม่ได้');
+  perform t_reset();
+  perform t_as(mgr);
+  perform crm.change_stage(l2, 'READY_TO_DELIVER', 'ผู้จัดการแก้');
+  perform t_assert((select stage = 'READY_TO_DELIVER' from crm.leads where id = l2), 'WON: ผู้จัดการเปลี่ยนสถานะได้');
+  perform t_reset();
+end $$;

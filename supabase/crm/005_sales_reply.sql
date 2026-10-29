@@ -45,7 +45,7 @@ begin
     insert into crm.ingest_log(message_id, result, error) values (v_key, 'rejected', 'forbidden sender for ' || p_lead_code);
     return jsonb_build_object('status', 'forbidden');
   end if;
-  if l.stage in ('WON','LOST') then
+  if l.stage = 'WON' then
     insert into crm.lead_events(lead_id, type, channel, body, actor_id, idempotency_key) values (l.id, 'SALES_REPLY', 'TELEGRAM', left(p_reply_text, 2000), s.id, v_key);
     return jsonb_build_object('status', 'closed_lead_noted');
   end if;

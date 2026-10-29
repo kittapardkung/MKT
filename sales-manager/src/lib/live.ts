@@ -69,6 +69,7 @@ export function createLiveApi(url: string, key: string): Api {
       fail((await sb.rpc("mark_booked", { p_lead: leadId, p_doc_ref: b.doc_ref, p_amount: b.amount, p_details: b.details, p_booked_on: b.booked_on || null })).error);
     },
     async verifyBooking(dealId) { fail((await sb.rpc("verify_deal", { p_deal: dealId })).error); },
+    async updateLeadInfo(leadId, i) { fail((await sb.rpc("update_lead_info", { p_lead: leadId, p_name: i.name, p_phone: i.phone, p_model: i.model, p_profile: i.profile })).error); },
     async setStar(leadId, on, note) { fail((await sb.rpc("set_star", { p_lead: leadId, p_on: on, p_note: note ?? null })).error); },
     async funnel() {
       const { data, error } = await sb.from("v_funnel").select("*");

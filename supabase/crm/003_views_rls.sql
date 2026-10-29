@@ -31,7 +31,7 @@ select
     else 'LOW' end as risk_level,
   l.created_at, l.legacy_unverified,
   l.first_contact_at, l.accepted_at, l.dormant, ev.last_msg as last_customer_message_at, ev.last_msg_body as last_customer_message,
-  (st.lead_id is not null) as starred, st.note as star_note
+  (st.lead_id is not null) as starred, st.note as star_note, l.lost_reason, l.profile
 from crm.leads l
 left join crm.sales_team s on s.id = l.owner_id
 left join crm.tasks t on t.lead_id = l.id and t.status = 'OPEN'
