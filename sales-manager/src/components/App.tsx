@@ -180,7 +180,7 @@ export default function App() {
           ))}
         </div>
       </nav>
-      {opened && <LeadSheet lead={opened} onClose={() => setOpenId(null)} onChanged={refresh} />}
+      {opened && <LeadSheet lead={opened} onClose={() => setOpenId(null)} onChanged={refresh} isManager={leadership} onGoDelivery={() => setTab("delivery")} />}
     </div>
   );
 }

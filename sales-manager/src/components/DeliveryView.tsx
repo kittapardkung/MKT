@@ -28,11 +28,11 @@ export default function DeliveryView({ bookings, onOpen, onStep }: { bookings: B
   const [err, setErr] = useState<string | null>(null);
 
   const verified = useMemo(() => bookings.filter((b) => b.verified && POST.includes(b.stage)), [bookings]);
-  const count = (k: Filter) => verified.filter((b) => (k === "active" ? b.stage !== "WON" : k === "BOOKING" ? b.stage === "BOOKING" || b.stage === "FINANCE_PENDING" : b.stage === k)).length;
+  const count = (k: Filter) => verified.filter((b) => (k === "active" ? (b.stage !== "WON" || !b.details.vin) : k === "BOOKING" ? b.stage === "BOOKING" || b.stage === "FINANCE_PENDING" : b.stage === k)).length;
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return verified
-      .filter((b) => (f === "active" ? b.stage !== "WON" : f === "BOOKING" ? b.stage === "BOOKING" || b.stage === "FINANCE_PENDING" : b.stage === f))
+      .filter((b) => (f === "active" ? (b.stage !== "WON" || !b.details.vin) : f === "BOOKING" ? b.stage === "BOOKING" || b.stage === "FINANCE_PENDING" : b.stage === f))
       .filter((b) => !needle || [b.customer_name, b.lead_code, b.details.vin, b.doc_ref, b.details.model].some((x) => (x ?? "").toLowerCase().includes(needle)))
       .sort((a, b) => (f === "WON" ? (b.details.delivered_on ?? "").localeCompare(a.details.delivered_on ?? "") : (a.details.delivery_date ?? a.booked_on ?? "").localeCompare(b.details.delivery_date ?? b.booked_on ?? "")));
   }, [verified, f, q]);

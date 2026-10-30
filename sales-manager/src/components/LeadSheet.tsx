@@ -19,7 +19,7 @@ const PROFILE_FIELDS: Array<[string, string]> = [["Occupation", "อาชีพ
 const DELIVERY_STAGES: Stage[] = ["FINANCE_APPROVED", "READY_TO_DELIVER", "WON"];
 const num = (v: string) => (v.trim() === "" ? undefined : Number(v.replace(/,/g, "")));
 
-export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow; onClose: () => void; onChanged: () => void }) {
+export default function LeadSheet({ lead, onClose, onChanged, isManager, onGoDelivery }: { lead: LeadRow; onClose: () => void; onChanged: () => void; isManager: boolean; onGoDelivery: () => void }) {
   const [events, setEvents] = useState<LeadEvent[]>([]);
   const [channel, setChannel] = useState("PHONE");
   const [outcome, setOutcome] = useState("CONNECTED");
@@ -33,7 +33,8 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
   const [booking, setBooking] = useState(false);
   const [bk, setBk] = useState({ doc_ref: "", amount: "", booked_on: dayKey(new Date()), model: lead.interested_model ?? "", variant: "", color: "", vehicle_price: "",
     purchase_type: "" as "" | "CASH" | "FINANCE", down_payment: "", term_months: "", bank: "", promo: "", note: "" });
-  const closed = lead.stage === "WON";
+  const closed = lead.stage === "WON" && !isManager;
+  const postBooking = DELIVERY_STAGES.includes(lead.stage) || lead.stage === "BOOKING" || lead.stage === "FINANCE_PENDING";
   const lost = lead.stage === "LOST";
   const cantReach = lost && /ติดต่อไม่ได้|ไม่รับสาย|ไม่ได้รับสาย/.test(lead.lost_reason ?? "");
   const [editing, setEditing] = useState(false);
@@ -91,6 +92,11 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
           </div>
         )}
         {closed && <div role="note" className="mt-3 rounded-2xl bg-ok-soft p-3 text-sm text-ok">ลีดนี้ปิดการขายแล้ว (WON) — แก้ไขสถานะได้เฉพาะผู้จัดการ</div>}
+        {postBooking && (
+          <button type="button" onClick={() => { onClose(); onGoDelivery(); }} className="focus-ring mt-3 min-h-11 w-full rounded-[14px] bg-accent font-bold text-black">
+            {lead.stage === "WON" ? "ดู/บันทึกข้อมูลส่งมอบ (เลขตัวถัง)" : "ไปเมนู “สถานะส่งมอบ” เพื่อเดินขั้นต่อไป"}
+          </button>
+        )}
 
         <div className="card mt-3 p-3">
           <button type="button" aria-expanded={editing} onClick={() => setEditing((v) => !v)} className="focus-ring w-full text-left font-semibold">{editing ? "▾" : "▸"} แก้ไขข้อมูลลูกค้า</button>
@@ -109,14 +115,14 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
           )}
         </div>
 
-        {!closed && (
+        {lead.stage !== "WON" && (
           <div className="mt-3 grid grid-cols-2 gap-2">
             {lead.phone ? <a href={`tel:${lead.phone}`} className="btn-dark focus-ring flex min-h-11 items-center justify-center gap-2 no-underline"><Phone size={16} />โทร</a> : <span />}
             <button onClick={() => setBooking((v) => !v)} aria-expanded={booking} className="focus-ring flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-accent font-bold text-black"><BookmarkCheck size={16} />จองแล้ว</button>
           </div>
         )}
 
-        {booking && !closed && (
+        {booking && lead.stage !== "WON" && (
           <form className="card mt-3 space-y-3 p-3" onSubmit={(e) => { e.preventDefault(); void submitBooking(); }}>
             <div><h3 className="font-semibold">บันทึกการจอง</h3><p className="text-xs text-muted">ระบุรถ รุ่น และเงื่อนไขการซื้อ — ผู้จัดการจะตรวจสอบหลักฐานก่อน สถานะจึงเปลี่ยนเป็น “จองแล้ว”</p></div>
             <div className="grid grid-cols-2 gap-2">
@@ -143,7 +149,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
           </form>
         )}
 
-        {!closed && (
+        {lead.stage !== "WON" && (
           <form className="card mt-3 space-y-2 p-3"
             onSubmit={(e) => { e.preventDefault(); run(() => api.logContact(lead.lead_id, { channel, outcome, note, next_follow_up: next, temperature: temp }), "บันทึกผลการติดต่อแล้ว"); }}>
             <h3 className="font-semibold">บันทึกผลการติดต่อ (หลักฐาน)</h3>
@@ -173,7 +179,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
               <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className={inputCls}>
                 <option value="">{lost ? "เลือกสถานะที่จะเปิดกลับมา…" : "เลือกสถานะ…"}</option>
                 {STAGE_ORDER.filter((s) => s !== lead.stage).map((s) => (
-                  <option key={s} value={s} disabled={s === "BOOKING" || DELIVERY_STAGES.includes(s)}>{STAGE_TH[s]} — {s === "BOOKING" ? "ใช้ปุ่ม “จองแล้ว”" : DELIVERY_STAGES.includes(s) ? "ใช้เมนู “สถานะส่งมอบ”" : STATUS_GUIDE[s].meaning}</option>
+                  <option key={s} value={s} disabled={s === "BOOKING" || (!isManager && DELIVERY_STAGES.includes(s))}>{STAGE_TH[s]} — {s === "BOOKING" ? "ใช้ปุ่ม “จองแล้ว”" : !isManager && DELIVERY_STAGES.includes(s) ? "ใช้เมนู “สถานะส่งมอบ”" : STATUS_GUIDE[s].meaning}</option>
                 ))}
               </select></label>
             {stage && <StatusGuideCard stage={stage} />}
