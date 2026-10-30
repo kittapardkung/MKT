@@ -343,7 +343,8 @@ declare
 begin
   select * into l from crm.leads where id = p_lead;
   if not found then return; end if;
-  if l.stage in ('WON','LOST') or l.owner_id is null or l.dormant then
+  -- จองแล้วเป็นต้นไป/ปิดแล้ว = ไม่ต้องติดตามการขาย → ไม่มีงานติดตาม
+  if l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') or l.owner_id is null or l.dormant then
     update crm.tasks set status = 'CANCELLED' where lead_id = p_lead and status = 'OPEN';
     return;
   end if;
@@ -382,6 +383,9 @@ end $$;
 
 create or replace function crm.lead_task_trg() returns trigger
 language plpgsql as $$ begin perform crm.refresh_task(new.id); return null; end $$;
+-- ล้างงานติดตามที่ค้างของลีดที่จองแล้ว (แก้สถานะงานเท่านั้น ไม่ลบข้อมูล)
+update crm.tasks k set status = 'CANCELLED' from crm.leads l
+ where l.id = k.lead_id and k.status = 'OPEN' and l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST');
 drop trigger if exists lead_task on crm.leads;
 create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at, dormant
   on crm.leads for each row execute function crm.lead_task_trg();
@@ -851,9 +855,9 @@ cross join lateral (
     case when not l.dormant and l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
               and l.assigned_at < now() - make_interval(mins => sla.new_minutes) then 'NOT_ACCEPTED' end,
     case when not l.dormant and l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
-    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
-    case when not l.dormant and l.stage not in ('WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
-    case when not l.dormant and l.stage not in ('WON','LOST') and l.owner_id is not null
+    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.owner_id is not null
               and coalesce(ev.last_event, l.updated_at) < now() - interval '7 days' then 'STALE' end,
     case when l.stage = 'LOST' and ev.last_msg is not null and ev.last_msg > coalesce(ev.last_lost, l.created_at) then 'LOST_WITH_SIGNAL' end,
     case when dq.entity_id is not null then 'DATA_CONFLICT' end
@@ -908,7 +912,7 @@ select
         and l.first_contact_at <= crm.add_work_minutes(l.assigned_at, (select minutes from crm.sla_rules where scope = 'NEW')))
         / nullif(count(l.id) filter (where l.assigned_at is not null), 0), 1) as first_response_sla_pct,
   count(l.id) filter (where l.first_contact_at is not null) as contacted_leads,
-  count(l.id) filter (where l.stage not in ('WON','LOST') and l.first_contact_at is not null and l.next_follow_up_at is null) as leads_without_next_action,
+  count(l.id) filter (where l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.first_contact_at is not null and l.next_follow_up_at is null) as leads_without_next_action,
   (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now()) as overdue_tasks,
   round(100.0 * (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'DONE' and k.completed_at <= k.due_at)
         / nullif((select count(*) from crm.tasks k where k.assignee_id = s.id and k.status in ('DONE') ), 0), 1) as followup_ontime_pct,
@@ -932,7 +936,7 @@ select
   count(*) as total_leads,
   count(*) filter (where stage not in ('WON','LOST')) as active_leads,
   count(*) filter (where owner_id is null and phone_norm is not null and stage not in ('WON','LOST')) as unassigned_leads,
-  count(*) filter (where stage not in ('WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
+  count(*) filter (where stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as booking_or_won,

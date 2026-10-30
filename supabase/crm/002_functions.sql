@@ -145,7 +145,8 @@ declare
 begin
   select * into l from crm.leads where id = p_lead;
   if not found then return; end if;
-  if l.stage in ('WON','LOST') or l.owner_id is null or l.dormant then
+  -- จองแล้วเป็นต้นไป/ปิดแล้ว = ไม่ต้องติดตามการขาย → ไม่มีงานติดตาม
+  if l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') or l.owner_id is null or l.dormant then
     update crm.tasks set status = 'CANCELLED' where lead_id = p_lead and status = 'OPEN';
     return;
   end if;
@@ -184,6 +185,9 @@ end $$;
 
 create or replace function crm.lead_task_trg() returns trigger
 language plpgsql as $$ begin perform crm.refresh_task(new.id); return null; end $$;
+-- ล้างงานติดตามที่ค้างของลีดที่จองแล้ว (แก้สถานะงานเท่านั้น ไม่ลบข้อมูล)
+update crm.tasks k set status = 'CANCELLED' from crm.leads l
+ where l.id = k.lead_id and k.status = 'OPEN' and l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST');
 drop trigger if exists lead_task on crm.leads;
 create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at, dormant
   on crm.leads for each row execute function crm.lead_task_trg();

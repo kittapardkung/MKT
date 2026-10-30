@@ -122,3 +122,17 @@ begin
   perform t_assert((select stage = 'READY_TO_DELIVER' from crm.leads where id = l2), 'WON: ผู้จัดการเปลี่ยนสถานะได้');
   perform t_reset();
 end $$;
+
+-- ลีดที่จองแล้ว (BOOKING ขึ้นไป) ต้องไม่มีงานติดตาม
+do $$
+declare r jsonb; l uuid;
+begin
+  r := crm.ingest_message('bk-task', 'fbBkTask', 'สนใจ', 'คุณบีเค', '0877770001', 'Darion');
+  l := (r->>'lead_id')::uuid;
+  perform t_assert(exists (select 1 from crm.tasks where lead_id = l and status = 'OPEN'), 'งาน: ลีดปกติมีงานติดตาม');
+  perform set_config('crm.migration_mode', 'on', true);
+  update crm.leads set stage = 'BOOKING' where id = l;
+  perform set_config('crm.migration_mode', 'off', true);
+  perform t_assert(not exists (select 1 from crm.tasks where lead_id = l and status = 'OPEN'), 'งาน: ลีดที่จองแล้วไม่มีงานติดตามค้าง');
+  perform t_assert(not exists (select 1 from crm.v_my_today where lead_id = l), 'วันนี้: ลีดที่จองแล้วไม่แสดง');
+end $$;
