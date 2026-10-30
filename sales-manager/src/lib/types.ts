@@ -32,7 +32,11 @@ export interface LeadInfoInput { name: string; phone: string; model: string; pro
 export interface BookingDetails {
   model: string; variant?: string; color?: string; vehicle_price?: number;
   purchase_type: "CASH" | "FINANCE"; down_payment?: number; term_months?: number; bank?: string; promo?: string; note?: string;
+  finance_approved_on?: string; delivery_date?: string; delivered_on?: string; vin?: string; delivery_note?: string; delivered_by?: string;
 }
+
+export type DeliveryStep = "FINANCE_APPROVED" | "READY_TO_DELIVER" | "DELIVERED";
+export interface DeliveryInput { date?: string; vin?: string; note?: string }
 
 export interface BookingInput { doc_ref: string; amount: number | null; booked_on: string; details: BookingDetails }
 
@@ -85,5 +89,6 @@ export interface Api {
   markBooked(leadId: string, b: BookingInput): Promise<void>;
   verifyBooking(dealId: string): Promise<void>;
   setStar(leadId: string, on: boolean, note?: string): Promise<void>;
+  setDeliveryStep(dealId: string, step: DeliveryStep, i?: DeliveryInput): Promise<void>;
   updateLeadInfo(leadId: string, i: LeadInfoInput): Promise<void>;
 }

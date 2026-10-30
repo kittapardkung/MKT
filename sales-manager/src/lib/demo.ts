@@ -65,6 +65,7 @@ const leads: DemoLead[] = [
   }
 })();
 
+const dayStr = () => new Date().toISOString().slice(0, 10);
 const bookings: Booking[] = [
   { deal_id: "b1", lead_id: "20261015-000005", lead_code: "20261015-000005", customer_name: "คุณประเสริฐ (ตัวอย่าง)", phone: "0812345608", stage: "BOOKING", interested_model: "DARION",
     doc_ref: "RES-DEMO-0001", amount: 20000, booked_on: iso(-60 * 24 * 2).slice(0, 10), created_at: iso(-60 * 24 * 2), verified_at: iso(-60 * 24), verified: true, reported_by: "โอ๋", responsible_sales: "โอ๋", verified_by_name: "หัวหน้า",
@@ -160,6 +161,33 @@ export function createDemoApi(): Api {
       b.verified = true; b.verified_at = iso(0); b.verified_by_name = sales[role];
       const l = leads.find((x) => x.lead_id === b.lead_id);
       if (l && !GUARDED.includes(l.stage) && l.stage !== "LOST") { l.stage = "BOOKING"; l.next_best_action = NBA.BOOKING; b.stage = "BOOKING"; }
+    },
+    async setDeliveryStep(dealId, step, i) {
+      const b = bookings.find((x) => x.deal_id === dealId); if (!b) throw new Error("deal_not_found");
+      if (!b.verified) throw new Error("evidence_required: การจองนี้ยังไม่ได้รับการตรวจสอบจากผู้จัดการ");
+      const l = leads.find((x) => x.lead_id === b.lead_id);
+      const to: Stage = step === "DELIVERED" ? "WON" : step;
+      const st = l?.stage ?? b.stage;
+      if (step === "FINANCE_APPROVED" && !["BOOKING", "FINANCE_PENDING"].includes(st)) throw new Error("invalid_step: ข้ามขั้นหรือทำไปแล้ว");
+      if (step === "READY_TO_DELIVER") {
+        if (!["BOOKING", "FINANCE_PENDING", "FINANCE_APPROVED"].includes(st)) throw new Error("invalid_step: ข้ามขั้นหรือทำไปแล้ว");
+        if (st !== "FINANCE_APPROVED" && b.details.purchase_type === "FINANCE") throw new Error("finance_not_approved: ลูกค้าผ่อน ต้องกด “สินเชื่ออนุมัติ” ก่อน");
+        if (!i?.date) throw new Error("date_required: ต้องระบุวันที่นัดรับรถ");
+        b.details.delivery_date = i.date;
+      }
+      if (step === "FINANCE_APPROVED") b.details.finance_approved_on = i?.date || dayStr();
+      if (step === "DELIVERED") {
+        if (!(st === "READY_TO_DELIVER" || (st === "WON" && !b.details.vin))) throw new Error("invalid_step: ต้องอยู่ในสถานะ “พร้อมส่งมอบ” ก่อน");
+        const vin = (i?.vin ?? "").trim().toUpperCase();
+        if (vin.length < 5) throw new Error("vin_required: ต้องระบุเลขตัวถัง/เลขถัง (VIN)");
+        if (!i?.date) throw new Error("date_required: ต้องระบุวันที่ส่งมอบ");
+        if (i.date > dayStr()) throw new Error("date_future: วันที่ส่งมอบต้องไม่เกินวันนี้");
+        if (bookings.some((x) => x.deal_id !== dealId && x.details.vin === vin)) throw new Error("duplicate_vin: เลขตัวถังนี้ถูกบันทึกกับลูกค้าอื่นแล้ว");
+        b.details.vin = vin; b.details.delivered_on = i.date; b.details.delivered_by = sales[role];
+      }
+      if (i?.note?.trim()) b.details.delivery_note = i.note.trim();
+      b.stage = to;
+      if (l) { l.stage = to; l.next_best_action = NBA[to]; l.events.push({ id: l.events.length + 1, type: "STAGE_CHANGE", channel: null, outcome: null, body: `ส่งมอบ: ${step}`, occurred_at: iso(0), actor: sales[role] }); }
     },
     async updateLeadInfo(id, i) {
       const l = leads.find((x) => x.lead_id === id); if (!l) return;

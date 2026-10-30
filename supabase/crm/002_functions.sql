@@ -427,6 +427,60 @@ begin
   return v_id;
 end $$;
 
+-- ติดตามสถานะส่งมอบ: สินเชื่ออนุมัติ → พร้อมส่งมอบ (ลงวันที่รับรถ) → ปิดการขาย (ส่งมอบสำเร็จ + เลขตัวถัง)
+-- ใช้ได้เฉพาะลีดที่มีการจองซึ่งผู้จัดการตรวจสอบแล้ว (หลักฐานการจอง) — เจ้าของลีดหรือผู้จัดการ
+create or replace function crm.set_delivery_step(p_deal uuid, p_step text, p_date date default null, p_vin text default null, p_note text default null) returns void
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare a crm.sales_team; d crm.deals; l crm.leads; v_to text; v_today date := (now() at time zone crm.setting('tz'))::date;
+        v_vin text := upper(btrim(coalesce(p_vin, ''))); v_patch jsonb; v_body text;
+begin
+  select * into d from crm.deals where id = p_deal;
+  if not found or d.kind <> 'BOOKING' then raise exception 'deal_not_found'; end if;
+  a := crm._actor_for(d.lead_id);
+  if d.verified_at is null then raise exception 'evidence_required: การจองนี้ยังไม่ได้รับการตรวจสอบจากผู้จัดการ'; end if;
+  select * into l from crm.leads where id = d.lead_id for update;
+  if l.stage = 'LOST' then raise exception 'lead_closed: ลีดนี้เป็น LOST — เปิดลีดกลับมาก่อน'; end if;
+
+  if p_step = 'FINANCE_APPROVED' then
+    if l.stage not in ('BOOKING','FINANCE_PENDING') then raise exception 'invalid_step: ข้ามขั้นหรือทำไปแล้ว'; end if;
+    v_to := 'FINANCE_APPROVED';
+    v_patch := jsonb_build_object('finance_approved_on', coalesce(p_date, v_today));
+    v_body := 'สินเชื่ออนุมัติ';
+  elsif p_step = 'READY_TO_DELIVER' then
+    if l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED') then raise exception 'invalid_step: ข้ามขั้นหรือทำไปแล้ว'; end if;
+    if l.stage <> 'FINANCE_APPROVED' and d.details->>'purchase_type' = 'FINANCE' then
+      raise exception 'finance_not_approved: ลูกค้าผ่อน ต้องกด “สินเชื่ออนุมัติ” ก่อน';
+    end if;
+    if p_date is null then raise exception 'date_required: ต้องระบุวันที่นัดรับรถ'; end if;
+    v_to := 'READY_TO_DELIVER';
+    v_patch := jsonb_build_object('delivery_date', p_date);
+    v_body := 'พร้อมส่งมอบ นัดรับรถ ' || p_date::text;
+  elsif p_step = 'DELIVERED' then
+    -- WON ที่ยังไม่มีเลขตัวถัง (ข้อมูลเก่า) บันทึกย้อนหลังได้
+    if not (l.stage = 'READY_TO_DELIVER' or (l.stage = 'WON' and coalesce(d.details->>'vin', '') = '')) then
+      raise exception 'invalid_step: ต้องอยู่ในสถานะ “พร้อมส่งมอบ” ก่อน';
+    end if;
+    if length(v_vin) < 5 then raise exception 'vin_required: ต้องระบุเลขตัวถัง/เลขถัง (VIN)'; end if;
+    if p_date is null then raise exception 'date_required: ต้องระบุวันที่ส่งมอบ'; end if;
+    if p_date > v_today then raise exception 'date_future: วันที่ส่งมอบต้องไม่เกินวันนี้'; end if;
+    if exists (select 1 from crm.deals x where x.id <> d.id and upper(x.details->>'vin') = v_vin) then
+      raise exception 'duplicate_vin: เลขตัวถังนี้ถูกบันทึกกับลูกค้าอื่นแล้ว';
+    end if;
+    v_to := 'WON';
+    v_patch := jsonb_build_object('vin', v_vin, 'delivered_on', p_date, 'delivered_by', a.display_name);
+    v_body := 'ส่งมอบรถสำเร็จ เลขตัวถัง ' || v_vin || ' วันที่ ' || p_date::text;
+  else
+    raise exception 'invalid_step';
+  end if;
+
+  if nullif(btrim(p_note), '') is not null then v_patch := v_patch || jsonb_build_object('delivery_note', btrim(p_note)); end if;
+  update crm.deals set details = details || v_patch where id = d.id;
+  if v_to <> l.stage then update crm.leads set stage = v_to where id = l.id; end if;   -- stage_guard ตรวจหลักฐานการจองให้
+  insert into crm.lead_events(lead_id, type, actor_id, body, evidence)
+  values (l.id, case when v_to = l.stage then 'NOTE' else 'STAGE_CHANGE' end, a.id, v_body || coalesce(' — ' || nullif(btrim(p_note), ''), ''),
+          jsonb_build_object('from', l.stage, 'to', v_to, 'source', 'delivery_step', 'step', p_step, 'deal', d.id));
+end $$;
+
 -- แก้ไขข้อมูลลูกค้า (ชื่อ/เบอร์/รุ่นที่สนใจ/Customer Card) — เจ้าของลีดหรือผู้จัดการ ทุกสถานะรวมถึง LOST
 create or replace function crm.update_lead_info(p_lead uuid, p_name text, p_phone text, p_model text, p_profile jsonb default '{}') returns void
 language plpgsql security definer set search_path = crm, pg_temp as $$

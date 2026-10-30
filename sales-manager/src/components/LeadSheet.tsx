@@ -16,6 +16,7 @@ const tomorrow10 = () => {
 const inputCls = "mt-1 min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-ink";
 const PROFILE_FIELDS: Array<[string, string]> = [["Occupation", "อาชีพ"], ["Customer_Province", "จังหวัด"], ["Budget", "งบประมาณ"], ["Purchase_Type", "รูปแบบการซื้อ"],
   ["Down_Payment", "เงินดาวน์"], ["Has_Trade_In", "มีรถเทิร์น"], ["Trade_In_Model", "รุ่นรถเทิร์น"], ["Preferred_Color", "สีที่ชอบ"], ["Customer_Line_ID", "LINE ID"], ["Notes", "หมายเหตุ"]];
+const DELIVERY_STAGES: Stage[] = ["FINANCE_APPROVED", "READY_TO_DELIVER", "WON"];
 const num = (v: string) => (v.trim() === "" ? undefined : Number(v.replace(/,/g, "")));
 
 export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow; onClose: () => void; onChanged: () => void }) {
@@ -172,7 +173,7 @@ export default function LeadSheet({ lead, onClose, onChanged }: { lead: LeadRow;
               <select value={stage} onChange={(e) => setStage(e.target.value as Stage)} className={inputCls}>
                 <option value="">{lost ? "เลือกสถานะที่จะเปิดกลับมา…" : "เลือกสถานะ…"}</option>
                 {STAGE_ORDER.filter((s) => s !== lead.stage).map((s) => (
-                  <option key={s} value={s} disabled={s === "BOOKING"}>{STAGE_TH[s]} — {s === "BOOKING" ? "ใช้ปุ่ม “จองแล้ว”" : STATUS_GUIDE[s].meaning}</option>
+                  <option key={s} value={s} disabled={s === "BOOKING" || DELIVERY_STAGES.includes(s)}>{STAGE_TH[s]} — {s === "BOOKING" ? "ใช้ปุ่ม “จองแล้ว”" : DELIVERY_STAGES.includes(s) ? "ใช้เมนู “สถานะส่งมอบ”" : STATUS_GUIDE[s].meaning}</option>
                 ))}
               </select></label>
             {stage && <StatusGuideCard stage={stage} />}

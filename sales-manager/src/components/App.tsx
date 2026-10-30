@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BookmarkCheck, ChevronDown, KanbanSquare, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Settings, Sparkles, Star, UserPlus, Users } from "lucide-react";
+import { Bell, BookmarkCheck, ChevronDown, KanbanSquare, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Settings, Sparkles, Star, Truck, UserPlus, Users } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Booking, ExecSummary, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
+import type { Booking, DeliveryInput, DeliveryStep, ExecSummary, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
 import { friendlyError } from "@/lib/format";
 import TodayView from "./TodayView";
 import LeadsView from "./LeadsView";
@@ -10,9 +10,10 @@ import DashboardView from "./DashboardView";
 import LeadSheet from "./LeadSheet";
 import NewLeadsView, { isFreshLead } from "./NewLeadsView";
 import BookedView from "./BookedView";
+import DeliveryView from "./DeliveryView";
 import TargetsView from "./TargetsView";
 
-type Tab = "dash" | "today" | "new" | "leads" | "targets" | "booked";
+type Tab = "dash" | "today" | "new" | "leads" | "targets" | "booked" | "delivery";
 const ROLE_TH: Record<Me["role"], string> = { sales: "พนักงานขาย", sales_manager: "ผู้จัดการฝ่ายขาย", executive: "ผู้บริหาร", admin: "ผู้ดูแลระบบ" };
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -95,10 +96,12 @@ export default function App() {
     { k: "leads", label: leadership ? "ลีดทั้งหมด" : "ลีดของฉัน", short: "ลีด", Icon: Users },
     { k: "targets", label: "ลูกค้าเป้าหมาย", short: "เป้าหมาย", Icon: Star },
     { k: "booked", label: "ลูกค้าจองแล้ว", short: "จองแล้ว", Icon: BookmarkCheck, badge: leadership ? pendingBookings : 0 },
+    { k: "delivery", label: "สถานะส่งมอบ", short: "ส่งมอบ", Icon: Truck },
   ];
   const toggleStar = async (id: string, on: boolean, note?: string) => {
     try { await api.setStar(id, on, note); await refresh(); } catch (e) { setError(friendlyError(e instanceof Error ? e.message : String(e))); }
   };
+  const deliveryStep = async (dealId: string, step: DeliveryStep, i?: DeliveryInput) => { await api.setDeliveryStep(dealId, step, i); await refresh(); };
   const verifyBooking = async (dealId: string) => { await api.verifyBooking(dealId); await refresh(); };
   const soon = [{ label: "Pipeline Kanban", Icon: KanbanSquare }, { label: "AI Insights", Icon: Sparkles }, { label: "ตั้งค่า SLA", Icon: Settings }];
   const go = (k: Tab) => setTab(k);
@@ -162,12 +165,13 @@ export default function App() {
           {tab === "new" && <NewLeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} onStar={toggleStar} />}
           {tab === "leads" && <LeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} q={q} setQ={setQ} onStar={toggleStar} />}
           {tab === "targets" && <TargetsView leads={leads} onOpen={setOpenId} showOwner={leadership} onStar={toggleStar} />}
+          {tab === "delivery" && <DeliveryView bookings={bookings} onOpen={setOpenId} onStep={deliveryStep} />}
           {tab === "booked" && <BookedView bookings={bookings} canVerify={leadership} onOpen={setOpenId} onVerify={verifyBooking} />}
         </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface lg:hidden" aria-label="เมนูหลัก">
-        <div className="mx-auto grid max-w-3xl grid-cols-6">
+        <div className="mx-auto grid max-w-3xl grid-cols-7">
           {nav.map(({ k, short, Icon, badge }) => (
             <button key={k} onClick={() => go(k)} aria-current={tab === k ? "page" : undefined} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 ${tab === k ? "font-semibold text-ink" : "text-muted"}`}>
               <span className={`grid h-7 w-10 place-items-center rounded-full ${tab === k ? "bg-accent text-black" : ""}`}><Icon size={18} /></span><span className="text-[11px]">{short}</span>

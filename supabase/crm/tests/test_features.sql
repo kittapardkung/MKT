@@ -136,3 +136,45 @@ begin
   perform t_assert(not exists (select 1 from crm.tasks where lead_id = l and status = 'OPEN'), 'งาน: ลีดที่จองแล้วไม่มีงานติดตามค้าง');
   perform t_assert(not exists (select 1 from crm.v_my_today where lead_id = l), 'วันนี้: ลีดที่จองแล้วไม่แสดง');
 end $$;
+
+-- สถานะส่งมอบ: สินเชื่ออนุมัติ → พร้อมส่งมอบ → ปิดการขาย (เลขตัวถัง)
+do $$
+declare r jsonb; l uuid; ou uuid; other_user uuid; dl uuid; l2 uuid; dl2 uuid; mgr uuid := '10000000-0000-0000-0000-0000000000b1'; ou2 uuid;
+begin
+  r := crm.ingest_message('dv1', 'fbDv1', 'จองครับ', 'คุณดีวี', '0899990001', 'Darion');
+  l := (r->>'lead_id')::uuid; select user_id into ou from crm.sales_team where id = (r->'owner'->>'id')::uuid;
+  select user_id into other_user from crm.sales_team where role = 'sales' and user_id <> ou limit 1;
+  perform t_as(ou);
+  dl := crm.mark_booked(l, 'RES-DV-1', 5000, '{"model":"Darion","purchase_type":"FINANCE"}', null);
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'FINANCE_APPROVED')$q$, dl), 'evidence_required', 'ส่งมอบ: การจองที่ยังไม่ตรวจสอบเดินขั้นต่อไม่ได้');
+  perform t_reset();
+  perform t_as(mgr); perform crm.verify_deal(dl); perform t_reset();
+  perform t_as(other_user);
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'FINANCE_APPROVED')$q$, dl), 'forbidden', 'ส่งมอบ: เซลล์คนอื่นทำไม่ได้');
+  perform t_reset();
+  perform t_as(ou);
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'READY_TO_DELIVER', current_date)$q$, dl), 'finance_not_approved', 'ส่งมอบ: ลูกค้าผ่อนข้ามสินเชื่อไม่ได้');
+  perform crm.set_delivery_step(dl, 'FINANCE_APPROVED');
+  perform t_assert((select stage = 'FINANCE_APPROVED' from crm.leads where id = l), 'ส่งมอบ: สินเชื่ออนุมัติ');
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'READY_TO_DELIVER')$q$, dl), 'date_required', 'ส่งมอบ: ต้องระบุวันนัดรับรถ');
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'DELIVERED', current_date, 'VIN12345')$q$, dl), 'invalid_step', 'ส่งมอบ: ปิดการขายก่อนพร้อมส่งมอบไม่ได้');
+  perform crm.set_delivery_step(dl, 'READY_TO_DELIVER', current_date + 3);
+  perform t_assert((select stage = 'READY_TO_DELIVER' from crm.leads where id = l) and (select details->>'delivery_date' is not null from crm.deals where id = dl), 'ส่งมอบ: พร้อมส่งมอบ + บันทึกวันนัด');
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'DELIVERED', current_date, 'AB')$q$, dl), 'vin_required', 'ส่งมอบ: ต้องมีเลขตัวถัง');
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'DELIVERED', current_date + 1, 'VIN12345')$q$, dl), 'date_future', 'ส่งมอบ: วันส่งมอบอนาคตไม่ได้');
+  perform crm.set_delivery_step(dl, 'DELIVERED', current_date, 'lsvin12345', 'ลูกค้ารับรถเรียบร้อย');
+  perform t_assert((select stage = 'WON' from crm.leads where id = l) and (select details->>'vin' = 'LSVIN12345' from crm.deals where id = dl), 'ส่งมอบ: ปิดการขาย + เก็บเลขตัวถัง');
+  perform t_assert(not exists (select 1 from crm.tasks where lead_id = l and status = 'OPEN'), 'ส่งมอบ: ปิดการขายแล้วไม่มีงานติดตาม');
+  perform t_reset();
+
+  -- เลขตัวถังซ้ำกับลูกค้าอื่น + ลูกค้าเงินสดข้ามสินเชื่อได้
+  r := crm.ingest_message('dv2', 'fbDv2', 'จองครับ', 'คุณดีวีสอง', '0899990002', 'Bingo');
+  l2 := (r->>'lead_id')::uuid; select user_id into ou2 from crm.sales_team where id = (r->'owner'->>'id')::uuid;
+  perform t_as(ou2); dl2 := crm.mark_booked(l2, 'RES-DV-2', 5000, '{"model":"Bingo","purchase_type":"CASH"}', null); perform t_reset();
+  perform t_as(mgr); perform crm.verify_deal(dl2); perform t_reset();
+  perform t_as(ou2);
+  perform crm.set_delivery_step(dl2, 'READY_TO_DELIVER', current_date + 1);
+  perform t_assert((select stage = 'READY_TO_DELIVER' from crm.leads where id = l2), 'ส่งมอบ: ลูกค้าเงินสดข้ามสินเชื่อได้');
+  perform t_raises(format($q$select crm.set_delivery_step(%L, 'DELIVERED', current_date, 'LSVIN12345')$q$, dl2), 'duplicate_vin', 'ส่งมอบ: เลขตัวถังซ้ำถูกปฏิเสธ');
+  perform t_reset();
+end $$;
