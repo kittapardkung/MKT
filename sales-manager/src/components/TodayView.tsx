@@ -15,7 +15,7 @@ export default function TodayView({ items, onOpen, showOwner }: { items: TodayIt
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">วันนี้ต้องติดต่อใครก่อน</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">วันนี้ต้องติดต่อใครก่อน</h1>
         <p className="mt-0.5 text-sm text-muted">
           {items.length === 0 ? "ไม่มีงานค้างสำหรับวันนี้" : `${items.length} งาน · เลยกำหนดแล้ว ${overdue} งาน${veryOld ? ` (ค้างเกิน 7 วัน ${veryOld} งาน)` : ""} — เรียงตามความเร่งด่วน`}
         </p>
@@ -23,7 +23,7 @@ export default function TodayView({ items, onOpen, showOwner }: { items: TodayIt
       <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
         {items.length === 0 && <div className="lg:col-span-2"><Empty>เยี่ยมมาก! ไม่มีงานติดตามค้างวันนี้</Empty></div>}
         {shown.map((i, idx) => (
-          <article key={i.task_id} className={`card p-4 ${i.overdue_minutes > 0 ? "border-l-4 border-l-danger" : ""}`}>
+          <article key={i.task_id} className={`card p-3 sm:p-4 ${i.overdue_minutes > 0 ? "border-l-4 border-l-danger" : ""}`}>
             <div className="flex items-start gap-3">
               <Avatar name={i.customer_name ?? i.lead_code} />
               <div className="min-w-0 flex-1">

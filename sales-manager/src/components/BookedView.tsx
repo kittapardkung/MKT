@@ -21,7 +21,7 @@ export default function BookedView({ bookings, canVerify, onOpen, onVerify }: { 
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">ลูกค้าจองแล้ว</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">ลูกค้าจองแล้ว</h1>
         <p className="mt-0.5 text-sm text-muted">ลูกค้าที่เซลล์กด “จองแล้ว” พร้อมรถ รุ่น และเงื่อนไขการซื้อ — ผู้จัดการตรวจสอบหลักฐานแล้วสถานะจึงเป็น “จองแล้ว”</p>
       </div>
       <div className="grid grid-cols-3 gap-3">

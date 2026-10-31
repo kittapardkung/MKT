@@ -125,7 +125,7 @@ export default function LeadsView({ leads, onOpen, showOwner, q, setQ, onStar }:
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{showOwner ? "ลีดทั้งหมด" : "ลีดของฉัน"}</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{showOwner ? "ลีดทั้งหมด" : "ลีดของฉัน"}</h1>
         <p className="mt-0.5 text-sm text-muted">{rows.length} จาก {leads.length} ราย · เรียงจากใหม่ล่าสุดไปเก่า (คลิกหัวคอลัมน์เพื่อเปลี่ยนการเรียง)</p>
       </div>
 

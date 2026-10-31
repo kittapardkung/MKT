@@ -48,7 +48,7 @@ export default function DeliveryView({ bookings, onOpen, onStep }: { bookings: B
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">สถานะส่งมอบ</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">สถานะส่งมอบ</h1>
         <p className="mt-0.5 text-sm text-muted">ติดตามลูกค้าที่จองแล้วจนส่งมอบรถ: สินเชื่ออนุมัติ → พร้อมส่งมอบ (ลงวันนัดรับรถ) → ปิดการขาย (เลขตัวถัง) — ลูกค้าที่ส่งมอบแล้วเก็บไว้เป็นประวัติ</p>
       </div>
       <div className="card flex items-center gap-2 px-3"><Search size={16} className="text-muted" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาชื่อ เลขตัวถัง ใบจอง รุ่น…" className="min-h-11 flex-1 bg-transparent text-sm outline-none" /></div>

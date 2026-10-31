@@ -59,7 +59,7 @@ export default function DashboardView({ leads, today, summary, perf, leadership,
   return (
     <section className="space-y-4 lg:space-y-5">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{leadership ? "ภาพรวมการขาย" : "ผลงานของฉัน"}</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{leadership ? "ภาพรวมการขาย" : "ผลงานของฉัน"}</h1>
         <p className="mt-0.5 text-sm text-muted">ติดตามประสิทธิภาพการขายและลีดแบบเรียลไทม์</p>
       </div>
 

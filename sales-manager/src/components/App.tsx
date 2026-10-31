@@ -109,7 +109,7 @@ export default function App() {
   const stamp = updatedAt ? updatedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }) : "";
 
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="min-h-screen overflow-x-hidden lg:flex">
       <aside className="hidden w-64 shrink-0 flex-col bg-side p-4 text-white lg:sticky lg:top-0 lg:flex lg:h-screen">
         <div className="flex items-center gap-3 px-2 py-3"><Logo /><div><div className="text-lg font-bold leading-tight">Sale Lead</div><div className="text-xs text-white/60">WULING CHONBURI</div></div></div>
         <nav className="mt-4 space-y-1" aria-label="เมนูหลัก">
@@ -131,7 +131,7 @@ export default function App() {
 
       <div className="min-w-0 flex-1 pb-24 lg:pb-8">
         {api.mode === "demo" && <div className="bg-warn-soft px-4 py-2 text-center text-xs text-warn">โหมดสาธิต — ข้อมูลตัวอย่าง ไม่ใช่ข้อมูลลูกค้าจริง · ปุ่มออกจากระบบ = สลับมุมมองเซลล์/ผู้จัดการ</div>}
-        <header className="flex items-center gap-3 px-4 py-3 lg:px-8 lg:py-5">
+        <header className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 lg:px-8 lg:py-5">
           <div className="flex items-center gap-2 lg:hidden"><Logo /><span className="font-bold">Sale Lead</span></div>
           <label className="card focus-within:ring-2 focus-within:ring-accent hidden min-h-11 max-w-md flex-1 items-center gap-2 px-4 lg:flex">
             <Search size={16} className="text-muted" />
@@ -158,7 +158,7 @@ export default function App() {
             </div>
           </div>
         </header>
-        <main className="px-4 lg:px-8">
+        <main className="px-3 sm:px-4 lg:px-8">
           {error && <div role="alert" className="mb-3 rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดข้อมูลไม่สำเร็จ: {error}</div>}
           {tab === "dash" && <DashboardView leads={leads} today={today} summary={summary} perf={perf} leadership={leadership} range={range} onOpen={setOpenId} onGo={go} />}
           {tab === "today" && <TodayView items={today} onOpen={setOpenId} showOwner={leadership} />}

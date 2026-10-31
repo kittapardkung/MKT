@@ -16,7 +16,7 @@ export default function NewLeadsView({ leads, onOpen, showOwner, onStar }: { lea
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">LEAD ใหม่</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">LEAD ใหม่</h1>
         <p className="mt-0.5 text-sm text-muted">ลีดที่เข้ามาใหม่และ <b>ยังไม่มีการติดต่อจากเซลล์</b> — รีบติดต่อและอัปเดตข้อมูลให้เร็วที่สุด · {current.length} ราย{old ? ` (มีลีดเก่าที่ไม่ได้ติดต่ออีก ${old} ราย พักไว้ ดูได้ที่ “ลีดทั้งหมด”)` : ""}</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
