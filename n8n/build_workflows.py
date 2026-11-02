@@ -151,16 +151,13 @@ const r = $json;
 const cfg = $('Config').first().json;
 if (!r || !r.notify || !r.owner) return [];
 const chat = r.owner.telegram_chat_id;
-const head = r.notify === 'NEW_LEAD' ? '🆕 ได้ลีดใหม่ !!' : '💬 ลูกค้าทักกลับ';
-const text = [
-  head, '',
-  '👤 ชื่อลูกค้า: ' + (r.customer_name || '-'),
-  '💬 ข้อความ:', '', r.message || '', '',
-  '📞 เบอร์: ' + (r.phone || '-'),
-  '🎯 สินค้าที่สนใจ: ' + (r.interested_model || '-'),
-  '', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name,
-  '🆔 Lead ID: ' + r.lead_code,
-  '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'].join('\n');
+const ST = { NEW: 'ใหม่', CONTACTED: 'ติดต่อแล้ว', FOLLOW_UP: 'ติดตาม', APPOINTMENT: 'นัดหมาย', TEST_DRIVE: 'ทดลองขับ', QUOTATION: 'เสนอราคา', NEGOTIATION: 'ต่อรอง', BOOKING: 'จองแล้ว', FINANCE_PENDING: 'รอผลสินเชื่อ', FINANCE_APPROVED: 'สินเชื่ออนุมัติ', READY_TO_DELIVER: 'พร้อมส่งมอบ', WON: 'ปิดการขาย', LOST: 'เสียโอกาส' };
+const known = ['👤 ชื่อลูกค้า: ' + (r.customer_name || '-'), '📞 เบอร์: ' + (r.phone || '-'), '🎯 สินค้าที่สนใจ: ' + (r.interested_model || '-')];
+const tail = ['', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name, '🆔 Lead ID: ' + r.lead_code, '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'];
+const lines = r.notify === 'NEW_LEAD'
+  ? ['🆕 ได้ลีดใหม่ !!', '', ...known, '💬 ข้อความลูกค้า:', r.message || '', ...tail]
+  : ['💬 ลูกค้าเดิมทักกลับ', '', '💬 ข้อความล่าสุด:', r.message || '', '', '— ข้อมูลเดิมในระบบ —', ...known, '📌 สถานะลีด: ' + (ST[r.stage] || r.stage || '-'), ...tail];
+const text = lines.join('\n');
 const out = [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];
 // เดิมเจ้าของได้รับสำเนาลีดใหม่ทุกใบ (WULING_CHONBURI_LEAD) — คงไว้เฉพาะลีดใหม่
 if (r.notify === 'NEW_LEAD' && chat && String(chat) !== String(cfg.adminChatId)) out.push({ json: { chatId: String(cfg.adminChatId), text: '📋 สำเนาให้ผู้จัดการ\n\n' + text, missingChat: false } });
@@ -169,6 +166,11 @@ notify = w1.add("Build notification", "n8n-nodes-base.code", {"jsCode": NOTIFY_J
 w1.link(ing, notify, 0)
 send = tg_send(w1, "Telegram: แจ้งเซลล์", "={{ $json.chatId }}", "={{ $json.text }}", [540, 400])
 w1.link(notify, send)
+for n in w1.nodes:
+    if n["name"] == "Telegram: แจ้งเซลล์": n["onError"] = "continueErrorOutput"
+sendfail = tg_send(w1, "Telegram: ส่งการ์ดไม่สำเร็จ (แจ้งแอดมิน)", "={{ $('Config').first().json.adminChatId }}",
+  "=⚠️ ส่งการ์ดให้เซลล์ไม่สำเร็จ (เซลล์อาจยังไม่ได้กด Start บอท) — โปรดแจ้งเซลล์ด้วยตัวเอง\n\n{{ $('Build notification').item.json.text }}", [760, 520])
+w1.link(send, sendfail, 1)
 err = tg_send(w1, "Telegram: แจ้งแอดมิน (ingest error)", "={{ $('Config').first().json.adminChatId }}",
   "=⚠️ บันทึกลีดเข้า Supabase ไม่สำเร็จ\nข้อความ FB id: {{ $('Prepare ingest').item.json.p_message_id }}\nเหตุผล: {{ JSON.stringify($json.error || $json).slice(0, 300) }}", [320, 600])
 w1.link(ing, err, 1)
