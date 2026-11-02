@@ -71,8 +71,7 @@ w1.link(wh, cfg, 1)   # POST (ข้อความจริง) — ต้อ�
 VERIFY_JS = r"""// ตรวจ Facebook webhook: (GET) verify token / (POST) ลายเซ็น X-Hub-Signature-256 แล้วแตกเป็นข้อความทีละรายการ
 const crypto = require('crypto');
 const c = $('Config').first().json;
-const req = $('Webhook').first().json;
-const method = (req.headers && (req.headers[':method'] || '')) || '';
+const req = $input.first().json;   // ข้อมูลจาก Webhook ที่ผ่าน Config (ใช้ได้ทั้งทาง GET และ POST)
 const q = req.query || {};
 if (q['hub.mode']) {
   if (q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === c.fbVerifyToken) return [{ json: { kind: 'verify_ok', challenge: String(q['hub.challenge'] || '') } }];
@@ -84,7 +83,7 @@ try { raw = await this.helpers.getBinaryDataBuffer(0, 'data'); } catch (e) { ret
 const sigHeader = String((req.headers || {})['x-hub-signature-256'] || '');
 const expected = 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).update(raw).digest('hex');
 const a = Buffer.from(sigHeader), b = Buffer.from(expected);
-if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return [{ json: { kind: 'bad_sig' } }];
+if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return [{ json: { kind: 'bad_sig', reason: sigHeader ? 'signature mismatch (เช็ก fbAppSecret ของแอปที่ส่ง webhook)' : 'no signature header', raw_bytes: raw.length, secret_len: String(c.fbAppSecret || '').length } }];
 
 const body = req.body || {};
 const out = [];
