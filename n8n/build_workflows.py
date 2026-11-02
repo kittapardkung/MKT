@@ -52,7 +52,7 @@ def rest_get(w, name, path_expr, pos):
     return w.add(name, "n8n-nodes-base.httpRequest", p, pos, 4.2, SUPA_CRED, alwaysOutputData=True)
 
 def tg_send(w, name, chat_expr, text_expr, pos, reply_expr=None):
-    add = {"parse_mode": "None", "appendAttribution": False}
+    add = {"appendAttribution": False}
     if reply_expr: add["reply_to_message_id"] = reply_expr
     return w.add(name, "n8n-nodes-base.telegram", {"chatId": chat_expr, "text": text_expr, "additionalFields": add}, pos, 1.2, TG_CRED)
 
