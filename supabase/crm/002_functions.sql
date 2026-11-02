@@ -224,7 +224,7 @@ create or replace function crm.ingest_message(
 ) returns jsonb
 language plpgsql security definer set search_path = crm, pg_temp as $$
 declare
-  v_key text; v_phone text; l crm.leads; v_action text; v_notify text; v_owner crm.sales_team; v_new_owner uuid;
+  v_key text; v_phone text; l crm.leads; v_action text; v_notify text; v_owner crm.sales_team; v_new_owner uuid; v_last_msg timestamptz;
 begin
   if p_message_id is null or btrim(p_message_id) = '' then raise exception 'message_id required'; end if;
   v_key := 'fb:' || p_message_id;
@@ -264,6 +264,8 @@ begin
     end if;
   end if;
 
+  -- ข้อความล่าสุดของลูกค้า (ก่อนข้อความนี้) ใช้ลดการเด้งเตือน: ลูกค้าเดิมทักต่อเนื่องไม่เด้งซ้ำ
+  select max(occurred_at) into v_last_msg from crm.lead_events where lead_id = l.id and type = 'CUSTOMER_MESSAGE';
   insert into crm.lead_events(lead_id, type, channel, body, idempotency_key, occurred_at)
   values (l.id, 'CUSTOMER_MESSAGE', 'FACEBOOK', left(p_text, 2000), v_key, p_occurred_at);
 
@@ -282,7 +284,8 @@ begin
     v_new_owner := crm.assign_lead(l.id);
     if v_new_owner is not null then v_notify := 'NEW_LEAD'; end if;
     select * into l from crm.leads where id = l.id;
-  elsif l.owner_id is not null and v_action = 'appended' then
+  elsif l.owner_id is not null and v_action = 'appended'
+        and (v_last_msg is null or v_last_msg < now() - interval '12 hours') then   -- เด้งเฉพาะลูกค้าเดิมที่กลับมาหลังเงียบเกิน 12 ชม.
     v_notify := 'CUSTOMER_REPLIED';
   end if;
 
