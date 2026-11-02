@@ -12,12 +12,14 @@ import path from 'node:path';
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
 const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : d; };
-if (!file) { console.error('usage: node import-legacy.mjs <file.xlsx> [--out dir] [--include-mes-only] [--dormant-days N]'); process.exit(1); }
+if (!file) { console.error('usage: node import-legacy.mjs <file.xlsx> [--out dir] [--include-mes-only] [--dormant-days N] [--dump-json f] [--exclude-json f]'); process.exit(1); }
 const OUT = opt('out', './out');
 const INCLUDE_MES_ONLY = args.includes('--include-mes-only');
 const DORMANT_DAYS = Number(opt('dormant-days', '14'));
 const NOW = new Date(opt('now', new Date().toISOString()));
 const CHUNK_BYTES = 200_000;
+// --dump-json <file>: เก็บรายการลีด/กิจกรรมของรอบนี้ไว้เทียบ;  --exclude-json <file>: นำเข้าเฉพาะที่ไม่อยู่ในรอบก่อนหน้า (ลีด/กิจกรรมใหม่เท่านั้น)
+const DUMP_JSON = opt('dump-json', ''); const EXCLUDE_JSON = opt('exclude-json', '');
 
 const PROFILE_KEYS = ['Customer_Email','Customer_Line_ID','Customer_Address','Customer_Province','Customer_District','Customer_Postal_Code',
   'Occupation','Interested_Brand','Variant','Preferred_Color','Preferred_Variant','Purchase_Type','Budget','Vehicle_Price','Down_Payment',
@@ -205,6 +207,16 @@ if (INCLUDE_MES_ONLY) {
       stage: 'NEW', temperature: null, lost_reason: null, profile: {}, legacy: { source_sheet: 'SHEET_1_MES' }, dormant: true });
     for (const m of ms_) { const body = clean(m.Customer_Message); if (body) events.push({ lead_code: code, type: 'CUSTOMER_MESSAGE', channel: 'FACEBOOK', body: body.slice(0, 2000), occurred_at: stamp(m.Created_Date, m.Created_Time), key: `legacy-mes:${clean(m.Lead_ID)}`, evidence: { source: 'legacy_sheet_1_mes' } }); }
   }
+}
+if (DUMP_JSON) fs.writeFileSync(DUMP_JSON, JSON.stringify({ leads: leads.map((l) => l.lead_code), events: events.map((e) => e.key) }));
+if (EXCLUDE_JSON) {
+  const prev = JSON.parse(fs.readFileSync(EXCLUDE_JSON, 'utf8')); const pl = new Set(prev.leads), pe = new Set(prev.events);
+  const newLeads = leads.filter((l) => !pl.has(l.lead_code)); const newEvents = events.filter((e) => !pe.has(e.key));
+  const keepCodes = new Set([...newLeads.map((l) => l.lead_code), ...newEvents.map((e) => e.lead_code)]);
+  leads.splice(0, leads.length, ...newLeads); events.splice(0, events.length, ...newEvents);
+  for (let i = dq.length - 1; i >= 0; i--) if (!newLeads.some((l) => l.lead_code === dq[i].lead_code)) dq.splice(i, 1);
+  report.notes.push(`delta mode: ลีดใหม่ ${newLeads.length}, กิจกรรมใหม่ ${newEvents.length} (เทียบกับ ${EXCLUDE_JSON})`);
+  void keepCodes;
 }
 report.counts.leads_total = leads.length; report.counts.events = events.length;
 report.counts.dormant = leads.filter((l) => l.dormant).length;

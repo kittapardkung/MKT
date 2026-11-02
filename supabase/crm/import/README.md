@@ -29,3 +29,13 @@ psql "$DATABASE_URL" -f out/99_verify.sql
 - ลีดที่ไม่มีความเคลื่อนไหวเกิน N วัน (ค่าเริ่มต้น 14 วัน และไม่มีนัดติดตามที่ยังไม่ถึงกำหนด) = `dormant` (ไม่สร้างงานค้าง/แจ้งเตือน จนกว่าลูกค้าจะทักใหม่)
 - ประวัติสถานะสร้างจาก ACTIVITY_LOG เป็น STAGE_CHANGE; ข้อความเซลล์เป็น SALES_REPLY; ข้อความลูกค้าเป็น CUSTOMER_MESSAGE
 - `alerts_enabled` = false ตามค่าเริ่มต้น — sweep_sla จะไม่แจ้งเตือนจนกว่าจะตั้งเป็น true ตอน cut-over
+
+## นำเข้าเฉพาะลีด/กิจกรรมใหม่ (delta) ระหว่างที่ workflow เดิมยังเขียนลงชีต
+```bash
+# รอบก่อน: เก็บรายการที่นำเข้าแล้วไว้เทียบ
+node import-legacy.mjs old.xlsx --out ./out_old --dump-json ./imported.json
+# รอบนี้: สร้าง SQL เฉพาะที่ยังไม่เคยนำเข้า (ไม่แตะสถานะ/เจ้าของ/ข้อมูลที่แก้ในเว็บ)
+node import-legacy.mjs new.xlsx --out ./out_delta --exclude-json ./imported.json
+cat out_delta/10_*.sql out_delta/20_*.sql out_delta/30_*.sql   # วางรันใน SQL Editor
+```
+หมายเหตุ: ลีดเดิมที่เซลล์แก้ในชีตหลังนำเข้าจะ **ไม่** ถูกซิงก์ (เว็บเป็นแหล่งจริงแล้ว)
