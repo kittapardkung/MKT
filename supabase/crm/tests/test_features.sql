@@ -178,3 +178,34 @@ begin
   perform t_raises(format($q$select crm.set_delivery_step(%L, 'DELIVERED', current_date, 'LSVIN12345')$q$, dl2), 'duplicate_vin', 'ส่งมอบ: เลขตัวถังซ้ำถูกปฏิเสธ');
   perform t_reset();
 end $$;
+
+-- เบอร์ใหม่ของลูกค้าเดิม (เก็บเป็นเบอร์อื่น) + โหมดเจ้าของส่งเบอร์เข้าเพจ (intake)
+do $$
+declare r jsonb; l uuid; n0 int; ou uuid; l2 uuid; r2 jsonb;
+begin
+  r := crm.ingest_message('alt1', 'fbAlt', 'สนใจครับ', 'คุณอัลท์', '0891110001', 'Darion');
+  l := (r->>'lead_id')::uuid; select user_id into ou from crm.sales_team where id = (r->'owner'->>'id')::uuid;
+  r := crm.ingest_message('alt2', 'fbAlt', 'เบอร์ใหม่ 0891110002', null, '0891110002', null);
+  perform t_assert(r->>'action' = 'appended' and (r->>'lead_id')::uuid = l and r->>'notify' = 'PHONE_RESENT', 'เบอร์ใหม่ลูกค้าเดิม: ลีดเดิม แจ้งเจ้าของเดิม');
+  perform t_assert((select phone_norm = '0891110001' and profile->>'Alt_Phones' = '0891110002' from crm.leads where id = l), 'เบอร์ใหม่ลูกค้าเดิม: ไม่ทับเบอร์หลัก เก็บเป็นเบอร์อื่น');
+  r := crm.ingest_message('alt3', 'fbAlt', 'เบอร์เดิมอีกรอบ 0891110002', null, '0891110002', null);
+  perform t_assert((select profile->>'Alt_Phones' = '0891110002' from crm.leads where id = l), 'เบอร์ใหม่ลูกค้าเดิม: เบอร์อื่นไม่ซ้ำในรายการ');
+  perform t_as(ou);
+  perform crm.update_lead_info(l, 'คุณอัลท์', '0891110002', 'Darion', '{}');
+  perform t_reset();
+  perform t_assert((select phone_norm = '0891110002' and profile->>'Alt_Phones' = '0891110001' from crm.leads where id = l), 'ใช้เบอร์อื่นเป็นเบอร์หลัก: เบอร์เดิมย้ายไปเป็นเบอร์อื่น');
+
+  -- intake: เจ้าของส่งเบอร์เข้าเพจเพื่อกระจายลีด
+  insert into crm.settings(key, value) values ('intake_fb_ids', 'fbOwnerX') on conflict (key) do update set value = excluded.value;
+  select count(*) into n0 from crm.leads;
+  r := crm.ingest_message('in1', 'fbOwnerX', 'คุณเอ 0892220001 สนใจ Porta', 'คุณเอ', '0892220001', 'Porta');
+  perform t_assert(r->>'action' = 'created' and r->>'notify' = 'NEW_LEAD', 'intake: เบอร์ใหม่ = ลีดใหม่ + กระจายเซลล์');
+  perform t_assert((select fb_user_id is null and source like 'Call Center%' from crm.leads where id = (r->>'lead_id')::uuid), 'intake: ไม่ผูก FB ID เจ้าของ และบันทึกแหล่งที่มา');
+  r2 := crm.ingest_message('in2', 'fbOwnerX', 'คุณบี 0892220002', 'คุณบี', '0892220002', null);
+  perform t_assert(r2->>'action' = 'created' and (r2->>'lead_id') <> (r->>'lead_id'), 'intake: เบอร์ใหม่อีกเบอร์ = ลีดใหม่อีกใบ (ไม่รวมเป็นลีดเดียวกัน)');
+  perform t_assert(crm.ingest_message('in3', 'fbOwnerX', 'สวัสดี')->>'action' = 'ignored', 'intake: ข้อความไม่มีเบอร์ ไม่สร้างลีด');
+  r := crm.ingest_message('in4', 'fbOwnerX', 'คุณเอ 0892220001 อีกครั้ง', null, '0892220001', null);
+  perform t_assert(r->>'action' = 'appended' and r->>'notify' = 'PHONE_RESENT', 'intake: เบอร์ซ้ำ = ลีดเดิม แจ้งเจ้าของเดิม ไม่สร้างซ้ำ');
+  perform t_assert((select count(*) from crm.leads) = n0 + 2, 'intake: สร้างลีดใหม่เฉพาะเบอร์ใหม่ 2 ใบ');
+  delete from crm.settings where key = 'intake_fb_ids';
+end $$;

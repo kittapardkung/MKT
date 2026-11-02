@@ -423,25 +423,33 @@ create or replace function crm.ingest_message(
 language plpgsql security definer set search_path = crm, pg_temp as $$
 declare
   v_key text; v_phone text; l crm.leads; v_action text; v_notify text; v_owner crm.sales_team; v_new_owner uuid;
+  v_intake boolean; v_alt_added boolean := false;
 begin
   if p_message_id is null or btrim(p_message_id) = '' then raise exception 'message_id required'; end if;
   v_key := 'fb:' || p_message_id;
-  perform pg_advisory_xact_lock(hashtextextended(coalesce(nullif(p_fb_user_id, ''), p_message_id), 0));
+  v_phone := crm.normalize_phone(p_phone_raw);
+  -- Facebook ID ของเจ้าของ/call center ที่ใช้ "ส่งเบอร์เข้าเพจ" เพื่อให้ระบบกระจายลีด (ตั้งใน settings.intake_fb_ids คั่นด้วยจุลภาค)
+  --   → 1 เบอร์ใหม่ = 1 ลีดใหม่ (จับคู่ด้วยเบอร์เท่านั้น ไม่ผูก FB ID) ; ไม่มีเบอร์ = ไม่สร้างลีด
+  v_intake := coalesce(nullif(btrim(p_fb_user_id), '') = any(string_to_array(replace(coalesce(crm.setting('intake_fb_ids'), ''), ' ', ''), ',')), false);
+  if v_intake then p_fb_user_id := null; end if;
+  perform pg_advisory_xact_lock(hashtextextended(case when v_intake then coalesce(v_phone, p_message_id) else coalesce(nullif(p_fb_user_id, ''), p_message_id) end, 0));
   if exists (select 1 from crm.lead_events where idempotency_key = v_key) then
     return jsonb_build_object('action', 'duplicate');
   end if;
-
-  v_phone := crm.normalize_phone(p_phone_raw);
+  if v_intake and v_phone is null then
+    insert into crm.ingest_log(message_id, result, error) values (v_key, 'ignored', 'intake: ข้อความไม่มีเบอร์โทร') on conflict do nothing;
+    return jsonb_build_object('action', 'ignored', 'reason', 'intake_no_phone');
+  end if;
   select * into l from crm.leads
    where (v_phone is not null and phone_norm = v_phone)
       or (nullif(p_fb_user_id, '') is not null and fb_user_id = p_fb_user_id)
    order by (phone_norm = v_phone) desc nulls last limit 1;
 
   if not found then
-    insert into crm.leads(lead_code, fb_user_id, phone_norm, phone_raw, customer_name, interested_model, created_at)
+    insert into crm.leads(lead_code, fb_user_id, phone_norm, phone_raw, customer_name, interested_model, created_at, source)
     values (to_char(p_occurred_at at time zone crm.setting('tz'), 'YYYYMMDD') || '-' || lpad((nextval('crm.lead_code_seq') % 1000000)::text, 6, '0'),
             nullif(p_fb_user_id, ''), v_phone, nullif(btrim(p_phone_raw), ''), nullif(btrim(p_customer_name), ''),
-            nullif(btrim(p_model), ''), p_occurred_at)
+            nullif(btrim(p_model), ''), p_occurred_at, case when v_intake then 'Call Center / เจ้าของส่งเข้า' else 'Facebook Messenger' end)
     returning * into l;
     v_action := 'created';
   else
@@ -455,6 +463,14 @@ begin
                     and not exists (select 1 from crm.leads o where o.fb_user_id = p_fb_user_id) then p_fb_user_id end)
     where id = l.id returning * into l;
     v_action := 'appended';
+    -- ลูกค้าเดิมส่งเบอร์ใหม่ที่ต่างจากเบอร์ในระบบ: เก็บไว้เป็น "เบอร์อื่น" ไม่ทับเบอร์หลัก (ให้เจ้าของลีดยืนยันเองในเว็บ)
+    if v_phone is not null and l.phone_norm is not null and v_phone <> l.phone_norm
+       and position(v_phone in coalesce(l.profile->>'Alt_Phones', '')) = 0 then
+      update crm.leads set profile = profile || jsonb_build_object('Alt_Phones',
+        case when coalesce(profile->>'Alt_Phones', '') = '' then v_phone else (profile->>'Alt_Phones') || ', ' || v_phone end)
+       where id = l.id returning * into l;
+      v_alt_added := true;
+    end if;
     if nullif(p_fb_user_id, '') is not null and l.fb_user_id is distinct from p_fb_user_id then
       insert into crm.data_quality_issues(entity, entity_id, code, detail)
       values ('lead', l.id::text, 'IDENTITY_CONFLICT', 'เบอร์ตรงกับลีดนี้ แต่ Facebook ID ผูกกับอีกลีด')
@@ -488,7 +504,7 @@ begin
   return jsonb_build_object(
     'action', v_action, 'notify', v_notify,
     'lead_id', l.id, 'lead_code', l.lead_code, 'stage', l.stage,
-    'customer_name', l.customer_name, 'phone', l.phone_norm, 'message_phone', v_phone, 'interested_model', l.interested_model,
+    'customer_name', l.customer_name, 'phone', l.phone_norm, 'message_phone', v_phone, 'alt_phone_added', v_alt_added, 'interested_model', l.interested_model,
     'message', left(p_text, 500), 'created_at', l.created_at,
     'owner', case when v_owner.id is null then null else jsonb_build_object(
         'id', v_owner.id, 'code', v_owner.code, 'name', v_owner.display_name, 'telegram_chat_id', v_owner.telegram_chat_id) end);
@@ -682,7 +698,7 @@ end $$;
 -- แก้ไขข้อมูลลูกค้า (ชื่อ/เบอร์/รุ่นที่สนใจ/Customer Card) — เจ้าของลีดหรือผู้จัดการ ทุกสถานะรวมถึง LOST
 create or replace function crm.update_lead_info(p_lead uuid, p_name text, p_phone text, p_model text, p_profile jsonb default '{}') returns void
 language plpgsql security definer set search_path = crm, pg_temp as $$
-declare a crm.sales_team; l crm.leads; v_norm text; v_dup text; k text; v text; v_prof jsonb; v_changed text[] := '{}';
+declare a crm.sales_team; l crm.leads; v_norm text; v_dup text; k text; v text; v_prof jsonb; v_changed text[] := '{}'; v_alts text[];
 begin
   a := crm._actor_for(p_lead);
   select * into l from crm.leads where id = p_lead for update;
@@ -693,6 +709,10 @@ begin
     select lead_code into v_dup from crm.leads where phone_norm = v_norm and id <> p_lead limit 1;
     if v_dup is not null then raise exception 'phone_duplicate: เบอร์นี้มีอยู่แล้วในลีด %', v_dup; end if;
     update crm.leads set phone_raw = btrim(p_phone), phone_norm = v_norm where id = p_lead;
+    -- เบอร์หลักเดิมย้ายไปเก็บเป็น "เบอร์อื่น" (ไม่ทิ้งข้อมูล) และเอาเบอร์ใหม่ออกจากรายการเบอร์อื่น
+    v_alts := array(select x from unnest(string_to_array(coalesce(v_prof->>'Alt_Phones', ''), ', ')) x where x <> '' and x <> v_norm);
+    if l.phone_norm is not null and not (l.phone_norm = any(v_alts)) then v_alts := v_alts || l.phone_norm; end if;
+    if cardinality(v_alts) > 0 then v_prof := v_prof || jsonb_build_object('Alt_Phones', array_to_string(v_alts, ', ')); else v_prof := v_prof - 'Alt_Phones'; end if;
     v_changed := v_changed || 'phone'::text;
   end if;
   if p_name is not null and btrim(p_name) is distinct from coalesce(l.customer_name, '') then

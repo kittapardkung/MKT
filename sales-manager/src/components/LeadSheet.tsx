@@ -36,6 +36,7 @@ export default function LeadSheet({ lead, onClose, onChanged, isManager, onGoDel
   const closed = lead.stage === "WON" && !isManager;
   const postBooking = DELIVERY_STAGES.includes(lead.stage) || lead.stage === "BOOKING" || lead.stage === "FINANCE_PENDING";
   const lost = lead.stage === "LOST";
+  const altPhones = (lead.profile?.Alt_Phones ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const cantReach = lost && /ติดต่อไม่ได้|ไม่รับสาย|ไม่ได้รับสาย/.test(lead.lost_reason ?? "");
   const [editing, setEditing] = useState(false);
   const [info, setInfo] = useState(() => ({ name: lead.customer_name ?? "", phone: lead.phone ?? "", model: lead.interested_model ?? "",
@@ -78,6 +79,20 @@ export default function LeadSheet({ lead, onClose, onChanged, isManager, onGoDel
 
         <div className="card mt-3 p-3 text-sm">
           <div>รุ่นที่สนใจ: {lead.interested_model ?? "—"} · เบอร์: {maskPhone(lead.phone)} · ผู้รับผิดชอบ: {lead.responsible_sales ?? "—"}</div>
+          {altPhones.length > 0 && (
+            <div className="mt-2 rounded-xl bg-warn-soft p-2 text-xs text-warn">
+              <b>เบอร์อื่นที่ลูกค้าส่งมา</b> (ยังไม่ได้แทนเบอร์หลัก — ยืนยันกับลูกค้าก่อน)
+              <div className="mt-1 flex flex-wrap gap-2">
+                {altPhones.map((p) => (
+                  <span key={p} className="inline-flex items-center gap-2 rounded-full bg-surface px-2 py-1 text-ink">
+                    <a href={`tel:${p}`} className="font-semibold no-underline">{p}</a>
+                    <button type="button" disabled={busy} onClick={() => run(() => api.updateLeadInfo(lead.lead_id, { name: lead.customer_name ?? "", phone: p, model: lead.interested_model ?? "", profile: {} }), "ใช้เบอร์นี้เป็นเบอร์หลักแล้ว (เบอร์เดิมย้ายไปเป็นเบอร์อื่น)")}
+                      className="focus-ring !min-h-8 rounded-full border border-line px-2 text-[11px] font-semibold">ใช้เป็นเบอร์หลัก</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-1 text-muted">ติดต่อล่าสุด {fmtDateTime(lead.last_contact_at)} · นัดถัดไป {fmtDateTime(lead.next_follow_up_at)}</div>
           {lead.last_customer_message && <div className="mt-2 rounded-xl bg-bg p-2 text-xs text-muted">ลูกค้าพิมพ์ล่าสุด: “{lead.last_customer_message}”</div>}
           <div className="mt-2"><b>Next Best Action:</b> {lead.next_best_action}</div>
