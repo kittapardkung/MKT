@@ -81,9 +81,13 @@ if (q['hub.mode']) {
 let raw;
 try { raw = await this.helpers.getBinaryDataBuffer(0, 'data'); } catch (e) { return [{ json: { kind: 'bad_sig', reason: 'no raw body' } }]; }
 const sigHeader = String((req.headers || {})['x-hub-signature-256'] || '');
-const expected = 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).update(raw).digest('hex');
-const a = Buffer.from(sigHeader), b = Buffer.from(expected);
-if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return [{ json: { kind: 'bad_sig', reason: sigHeader ? 'signature mismatch (เช็ก fbAppSecret ของแอปที่ส่ง webhook)' : 'no signature header', raw_bytes: raw.length, secret_len: String(c.fbAppSecret || '').length } }];
+// Meta คำนวณลายเซ็นจาก payload ที่ "escape ภาษาไทย/ยูนิโค้ดเป็น \uXXXX (ตัวพิมพ์เล็ก)" แต่ส่ง body จริงเป็น UTF-8 ดิบ → ตรวจทั้งสองแบบ
+const esc = (t) => t.replace(/[\u0080-￿]/g, (ch) => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4));
+const sign = (buf) => 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).update(buf).digest('hex');
+const a = Buffer.from(sigHeader);
+const same = (exp) => { const b = Buffer.from(exp); return a.length === b.length && crypto.timingSafeEqual(a, b); };
+const ok = same(sign(raw)) || same(sign(Buffer.from(esc(raw.toString('utf8')), 'utf8')));
+if (!ok) return [{ json: { kind: 'bad_sig', reason: sigHeader ? 'signature mismatch (เช็ก fbAppSecret ของแอปที่ส่ง webhook)' : 'no signature header', raw_bytes: raw.length, secret_len: String(c.fbAppSecret || '').length } }];
 
 const body = req.body || {};
 const out = [];
