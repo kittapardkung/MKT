@@ -28,7 +28,7 @@
    - (01) `fbVerifyToken`, `fbAppSecret` (App Secret ของ Meta app), `adminChatId`
 3. เลือก credentials ในโหนด HTTP Request / Telegram / OpenAI ที่ขึ้นสีแดง
 4. รัน `set_telegram_ids.sql` (ใส่ id จริง) และให้เซลล์แต่ละคนกด **Start** บอทก่อน (ไม่งั้นบอทส่งหาไม่ได้)
-5. **สลับของจริง:** ปิด workflow เดิม (Google Sheets) → เปิด 01 (path เดิม `63db852b-…` เมตาไม่ต้องแก้ URL แต่ต้องใช้ verify token ตรงกับที่ตั้งไว้) → เปิด 02
+5. **สลับของจริง:** ปิด workflow เดิม (Google Sheets) → เปิด 01 (path เดิม `63db852b-…` Facebook ยิงมาที่ path นี้อยู่แล้ว ไม่ต้องแก้ URL ใน Meta (verify token ใช้เฉพาะตอน Meta ขอยืนยัน URL ใหม่)) → เปิด 02
 6. ตรวจ: ส่งข้อความทดสอบเข้าเพจที่มีเบอร์ → ได้ลีดใน Supabase + การ์ดใน Telegram → Reply การ์ด "โทรแล้ว นัดพรุ่งนี้ 10 โมง" → ได้ข้อความสรุป
 7. เมื่อสลับเรียบร้อยแล้วเท่านั้น: `update crm.settings set value = 'true' where key = 'alerts_enabled';` (ค่าเริ่มต้นปิดอยู่ กันแจ้งเตือนลีดเก่าท่วม)
 

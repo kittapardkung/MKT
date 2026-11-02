@@ -63,7 +63,7 @@ w1 = WF("WULING Sale Lead - 01 Lead Intake (Facebook → Supabase → Telegram)"
 cfg = cfg_node(w1, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "fbVerifyToken": "REPLACE_VERIFY_TOKEN",
                     "fbAppSecret": "REPLACE_FB_APP_SECRET", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID"})
 wh = w1.add("Webhook", "n8n-nodes-base.webhook",
-  {"multipleMethods": True, "httpMethod": ["GET", "POST"], "path": "63db852b-a5d5-4c37-bf12-b659b9131b3d", "responseMode": "responseNode", "options": {"rawBody": True}},
+  {"multipleMethods": True, "httpMethod": ["GET", "POST"], "path": "dfa1cf27-1f97-42d6-bc6d-1c26945ca8b8", "responseMode": "responseNode", "options": {"rawBody": True}},
   [-1400, 300], 2.1, webhookId=uid())
 w1.link(wh, cfg)
 
