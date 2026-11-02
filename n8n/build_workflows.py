@@ -161,7 +161,10 @@ const text = [
   '', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name,
   '🆔 Lead ID: ' + r.lead_code,
   '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'].join('\n');
-return [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];"""
+const out = [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];
+// เดิมเจ้าของได้รับสำเนาลีดใหม่ทุกใบ (WULING_CHONBURI_LEAD) — คงไว้เฉพาะลีดใหม่
+if (r.notify === 'NEW_LEAD' && chat && String(chat) !== String(cfg.adminChatId)) out.push({ json: { chatId: String(cfg.adminChatId), text: '📋 สำเนาให้ผู้จัดการ\n\n' + text, missingChat: false } });
+return out;"""
 notify = w1.add("Build notification", "n8n-nodes-base.code", {"jsCode": NOTIFY_JS}, [320, 400], 2)
 w1.link(ing, notify, 0)
 send = tg_send(w1, "Telegram: แจ้งเซลล์", "={{ $json.chatId }}", "={{ $json.text }}", [540, 400])
