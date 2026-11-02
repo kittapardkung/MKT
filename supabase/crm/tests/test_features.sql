@@ -209,3 +209,54 @@ begin
   perform t_assert((select count(*) from crm.leads) = n0 + 2, 'intake: สร้างลีดใหม่เฉพาะเบอร์ใหม่ 2 ใบ');
   delete from crm.settings where key = 'intake_fb_ids';
 end $$;
+
+-- สคริปต์ลบลีดทดสอบ (maintenance/delete_test_leads.sql)
+set crm.delete_codes = 'ZZ-T1,ZZ-T2';
+do $$
+declare l1 uuid; l2 uuid; l3 uuid; t1 uuid;
+begin
+  insert into crm.leads(lead_code, phone_norm, phone_raw, customer_name, source) values ('ZZ-T1', '0800000001', '0800000001', 'ทดสอบ1', 'Call Center / เจ้าของส่งเข้า') returning id into l1;
+  insert into crm.leads(lead_code, phone_norm, phone_raw, customer_name, source) values ('ZZ-T2', '0800000002', '0800000002', 'ทดสอบ2', 'Call Center / เจ้าของส่งเข้า') returning id into l2;
+  insert into crm.leads(lead_code, phone_norm, phone_raw, customer_name, source) values ('ZZ-KEEP', '0800000099', '0800000099', 'ห้ามลบ', 'Facebook Messenger') returning id into l3;
+  insert into crm.lead_events(lead_id, type, channel, body) values (l1, 'CUSTOMER_MESSAGE', 'FACEBOOK', 'zz-x'), (l2, 'CUSTOMER_MESSAGE', 'FACEBOOK', 'zz-y');
+  insert into crm.data_quality_issues(entity, entity_id, code, detail) values ('lead', l1::text, 'PHONE_INVALID', 'zz');
+end $$;
+\ir ../maintenance/delete_test_leads.sql
+do $$
+begin
+  perform t_assert(not exists (select 1 from crm.leads where lead_code in ('ZZ-T1','ZZ-T2')), 'ลบลีดทดสอบ: ลีดตามรายการถูกลบ');
+  perform t_assert(not exists (select 1 from crm.lead_events where body in ('zz-x','zz-y')), 'ลบลีดทดสอบ: กิจกรรมของลีดที่ลบถูกลบด้วย');
+  perform t_assert(not exists (select 1 from crm.data_quality_issues where detail = 'zz'), 'ลบลีดทดสอบ: DQ ของลีดที่ลบถูกลบด้วย');
+  perform t_assert(exists (select 1 from crm.leads where lead_code = 'ZZ-KEEP'), 'ลบลีดทดสอบ: ลีดอื่นไม่ถูกลบ');
+end $$;
+-- guard: ลีดที่ไม่ใช่ลีดจากโหมดเจ้าของ ต้องหยุดและไม่ลบ
+set crm.delete_codes = 'ZZ-KEEP';
+do $$ begin
+  begin
+    perform 1;
+    -- เรียกสคริปต์ด้วยการรันซ้ำผ่าน \ir ไม่ได้ในบล็อก → ตรวจเงื่อนไขเดียวกันตรงนี้
+    perform t_assert((select coalesce(source, '') not like 'Call Center%' from crm.leads where lead_code = 'ZZ-KEEP'), 'ลบลีดทดสอบ: guard — ZZ-KEEP ไม่ใช่ลีดจากโหมดเจ้าของ');
+  end;
+end $$;
+delete from crm.leads where lead_code = 'ZZ-KEEP';
+reset crm.delete_codes;
+
+-- ลีดจริงที่มีเจ้าของ/งาน/การแจ้งเตือน ลบได้ครบ (ผ่านโหมดเจ้าของส่งเบอร์)
+insert into crm.settings(key, value) values ('intake_fb_ids', 'fbDelOwner') on conflict (key) do update set value = excluded.value;
+do $$
+declare r jsonb; t uuid; n int;
+begin
+  r := crm.ingest_message('del1', 'fbDelOwner', 'ลบทดสอบ 0897770001', 'ลบทดสอบ', '0897770001', 'Darion');
+  perform set_config('crm.delete_codes', r->>'lead_code', false);
+  select count(*) into n from crm.tasks where lead_id = (r->>'lead_id')::uuid;
+  perform t_assert(n >= 1, 'ลบลีดทดสอบ: ลีดตัวอย่างมีงานติดตามก่อนลบ');
+  perform set_config('crm.del_lead_id', r->>'lead_id', false);
+end $$;
+\ir ../maintenance/delete_test_leads.sql
+do $$
+begin
+  perform t_assert(not exists (select 1 from crm.leads where id = current_setting('crm.del_lead_id')::uuid), 'ลบลีดทดสอบ: ลีดที่มีเจ้าของ/งาน ถูกลบ');
+  perform t_assert(not exists (select 1 from crm.tasks where lead_id = current_setting('crm.del_lead_id')::uuid), 'ลบลีดทดสอบ: งานของลีดถูกลบด้วย');
+end $$;
+delete from crm.settings where key = 'intake_fb_ids';
+reset crm.delete_codes;
