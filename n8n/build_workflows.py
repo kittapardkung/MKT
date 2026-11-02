@@ -121,7 +121,11 @@ agent = w1.add("Extract Customer Data", "@n8n/n8n-nodes-langchain.agent", {
   "promptType": "define", "text": "={{ $json.text }}", "hasOutputParser": True,
   "options": {"systemMessage": "You are a data extraction assistant for a CRM at a Thai EV car dealership.\nExtract from the customer's Facebook Messenger message: customerName, phoneNumber (any format, digits only is fine), interestedModel (car model they mention), and leave a field as an empty string when it is not present.\nNever invent values. Return exactly the JSON schema requested."}},
   [-500, 460], 2.2, onError="continueRegularOutput")
-w1.link(sw, agent, 1)
+# ตรวจ mid ซ้ำ (Meta ส่งซ้ำ): ข้อความที่เคยเห็นแล้วจะไม่ถูกส่งต่อไป AI/Supabase — ทาง Respond 200 แยกอยู่ จึงยังตอบ 200 ให้ Meta เสมอ
+dedupe = w1.add("Remove Duplicates (mid)", "n8n-nodes-base.removeDuplicates",
+  {"operation": "removeItemsSeenInPreviousExecutions", "dedupeValue": "={{ $json.message_id }}", "options": {}}, [-500, 460], 2)
+w1.link(sw, dedupe, 1)
+w1.link(dedupe, agent, 0)
 llm = w1.add("OpenAI Chat Model", "@n8n/n8n-nodes-langchain.lmChatOpenAi", {"model": {"__rl": True, "value": "gpt-4.1-mini", "mode": "list", "cachedResultName": "gpt-4.1-mini"}, "options": {"temperature": 0}}, [-560, 680], 1.3, OAI_CRED)
 w1.link(llm, agent, 0, 0, "ai_languageModel")
 parser = w1.add("Structured Output Parser", "@n8n/n8n-nodes-langchain.outputParserStructured", {"schemaType": "manual", "inputSchema": json.dumps({
