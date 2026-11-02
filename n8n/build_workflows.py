@@ -160,7 +160,7 @@ const known = ['👤 ชื่อลูกค้า: ' + (r.customer_name || '-'
 const tail = ['', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name, '🆔 Lead ID: ' + r.lead_code, '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'];
 const lines = r.notify === 'NEW_LEAD'
   ? ['🆕 ได้ลีดใหม่ !!', '', ...known, '💬 ข้อความลูกค้า:', r.message || '', ...tail]
-  : ['💬 ลูกค้าเดิมทักกลับ', '', '💬 ข้อความล่าสุด:', r.message || '', '', '— ข้อมูลเดิมในระบบ —', ...known, '📌 สถานะลีด: ' + (ST[r.stage] || r.stage || '-'), ...tail];
+  : ['📞 ลูกค้าเดิมส่งเบอร์มาอีกครั้ง', '(ลีดเดิม ไม่ได้สร้างลีดใหม่)', '', '💬 ข้อความ:', r.message || '', '', '📞 เบอร์ที่ลูกค้าส่งมา: ' + (r.message_phone || '-') + (r.message_phone && r.phone && r.message_phone !== r.phone ? '  (ต่างจากเบอร์ในระบบ ' + r.phone + ')' : ''), '— ข้อมูลเดิมในระบบ —', known[0], known[2], '📌 สถานะลีด: ' + (ST[r.stage] || r.stage || '-'), ...tail];
 const text = lines.join('\n');
 const out = [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];
 // เดิมเจ้าของได้รับสำเนาลีดใหม่ทุกใบ (WULING_CHONBURI_LEAD) — คงไว้เฉพาะลีดใหม่

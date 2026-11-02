@@ -63,10 +63,11 @@ begin
 
   r := crm.ingest_message('m5', 'fb999', 'ผมเบอร์เดิม', null, '+66 81 445 2574', null);
   perform t_assert(r->>'action' = 'appended' and (r->>'lead_id')::uuid = l1, 'dedupe: เบอร์เดียวกัน คนละ FB ID ไม่สร้างลีดซ้ำ');
-  perform t_assert((r->>'notify') is null, 'ingest: ลูกค้าเดิมทักต่อเนื่อง (ไม่ถึง 12 ชม.) ไม่เด้งซ้ำ');
-  update crm.lead_events set occurred_at = occurred_at - interval '13 hours' where lead_id = l1 and type = 'CUSTOMER_MESSAGE';
-  r := crm.ingest_message('m5b', 'fb999', 'กลับมาแล้วครับ', null, '+66 81 445 2574', null);
-  perform t_assert(r->>'notify' = 'CUSTOMER_REPLIED', 'ingest: ลูกค้าเดิมกลับมาหลังเงียบเกิน 12 ชม. แจ้งเจ้าของ');
+  perform t_assert(r->>'notify' = 'PHONE_RESENT' and r->'owner'->>'code' = 'SA0001', 'ingest: ลูกค้าเดิมส่งเบอร์ซ้ำ แจ้งเซลล์เจ้าของเดิม ไม่สร้างลีดใหม่');
+  perform t_assert((select count(*) from crm.leads) = 3, 'ingest: เบอร์ซ้ำ ไม่สร้างลีดซ้ำใน DB');
+  r := crm.ingest_message('m5b', 'fb100', 'ขอบคุณครับ', null, null, null);
+  perform t_assert(r->>'action' = 'appended' and (r->>'notify') is null, 'ingest: ลูกค้าเดิมทักแชทธรรมดา (ไม่มีเบอร์) ไม่เด้ง');
+  perform t_assert((crm.ingest_message('m5', 'fb999', 'ผมเบอร์เดิม', null, '+66 81 445 2574', null))->>'action' = 'duplicate', 'ingest: Meta ส่งซ้ำ (mid เดิม) ไม่เด้ง ไม่บันทึกซ้ำ');
   perform t_assert((select count(*) from crm.lead_events where lead_id = l1 and type = 'CUSTOMER_MESSAGE') = 4, 'timeline: เก็บทุกข้อความเป็น event');
 
   r := crm.ingest_message('m6', 'fb400', 'เบอร์ 08968660966', null, '08968660966', null);
