@@ -6,25 +6,25 @@
         "assignments": {
           "assignments": [
             {
-              "id": "cb16691d-3f02-41de-b81b-cf1472efd174",
+              "id": "06712eee-36d4-4e06-85ad-55915f2e7c65",
               "name": "supabaseUrl",
               "value": "https://REPLACE_PROJECT_REF.supabase.co",
               "type": "string"
             },
             {
-              "id": "6bd7c7bd-1ab0-433e-b436-46df265cae91",
+              "id": "4cb3e667-7e69-48ed-b9ae-7e5288576497",
               "name": "fbVerifyToken",
               "value": "REPLACE_VERIFY_TOKEN",
               "type": "string"
             },
             {
-              "id": "ce1226db-90e4-4c8b-aceb-30aa08657b85",
+              "id": "c99bc0ab-4406-44fe-9c47-ddf47c68c41a",
               "name": "fbAppSecret",
               "value": "REPLACE_FB_APP_SECRET",
               "type": "string"
             },
             {
-              "id": "423d72f4-b3ac-4e09-ad6c-a049fe2c427e",
+              "id": "6b796c3d-a1cd-4c05-adc0-9444d6b292c9",
               "name": "adminChatId",
               "value": "REPLACE_ADMIN_TELEGRAM_CHAT_ID",
               "type": "string"
@@ -34,7 +34,7 @@
         "includeOtherFields": true,
         "options": {}
       },
-      "id": "26e63df1-5fe5-45c8-911b-c0a73f8f0634",
+      "id": "444e1da9-88df-4aaf-9a65-043b4e97f522",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -56,7 +56,7 @@
           "rawBody": true
         }
       },
-      "id": "b39fe08d-ddc8-4ddc-8a5e-d2396911c420",
+      "id": "3e38e194-7de2-4c3b-ac45-c290b4e297d5",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
@@ -64,13 +64,13 @@
         -1400,
         300
       ],
-      "webhookId": "09cf0ec6-8cf1-45ae-a05d-deae4a2877cf"
+      "webhookId": "a547a28c-3e30-436e-b6e6-430dc480a1b2"
     },
     {
       "parameters": {
         "jsCode": "// ตรวจ Facebook webhook: (GET) verify token / (POST) ลายเซ็น X-Hub-Signature-256 แล้วแตกเป็นข้อความทีละรายการ\nconst crypto = require('crypto');\nconst c = $('Config').first().json;\nconst req = $('Webhook').first().json;\nconst method = (req.headers && (req.headers[':method'] || '')) || '';\nconst q = req.query || {};\nif (q['hub.mode']) {\n  if (q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === c.fbVerifyToken) return [{ json: { kind: 'verify_ok', challenge: String(q['hub.challenge'] || '') } }];\n  return [{ json: { kind: 'verify_bad' } }];\n}\n// POST: ตรวจลายเซ็นจาก raw body\nlet raw;\ntry { raw = await this.helpers.getBinaryDataBuffer(0, 'data'); } catch (e) { return [{ json: { kind: 'bad_sig', reason: 'no raw body' } }]; }\nconst sigHeader = String((req.headers || {})['x-hub-signature-256'] || '');\nconst expected = 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).update(raw).digest('hex');\nconst a = Buffer.from(sigHeader), b = Buffer.from(expected);\nif (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return [{ json: { kind: 'bad_sig' } }];\n\nconst body = req.body || {};\nconst out = [];\nfor (const entry of (body.entry || [])) {\n  for (const m of (entry.messaging || [])) {\n    const msg = m.message;\n    if (!msg || msg.is_echo || !msg.text || !msg.mid) continue;      // ข้าม echo / ไฟล์ / read receipt\n    out.push({ json: { kind: 'event', message_id: msg.mid, userid: String(m.sender && m.sender.id || ''), text: String(msg.text), timestamp: m.timestamp || Date.now() } });\n  }\n}\nif (out.length === 0) return [{ json: { kind: 'event_ignored' } }];\nreturn out;"
       },
-      "id": "b5d0a15c-9a8e-41e0-9b0e-97b2eb1f1cdb",
+      "id": "2376e75a-5171-4aba-9100-30a048170046",
       "name": "Verify & Parse",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -94,7 +94,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "94fb1439-899d-4fbd-b7cf-ae9bc50ac38d",
+                    "id": "232b0c07-de1a-484c-8c0c-6b4f46818f0f",
                     "leftValue": "={{ $json.kind }}",
                     "rightValue": "verify_ok",
                     "operator": {
@@ -118,7 +118,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "38de96eb-522f-4d09-bbcc-0d1d6f8a3233",
+                    "id": "a49496ec-13d3-4c5d-b006-6b69d840608b",
                     "leftValue": "={{ $json.kind }}",
                     "rightValue": "event",
                     "operator": {
@@ -142,7 +142,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "e8d51300-8d33-4684-89ea-0b93531d35e7",
+                    "id": "68988529-6a7c-4427-9586-b795e5684429",
                     "leftValue": "={{ $json.kind }}",
                     "rightValue": "event_ignored",
                     "operator": {
@@ -163,7 +163,7 @@
           "renameFallbackOutput": "rejected"
         }
       },
-      "id": "42a38664-f44f-4ea5-9020-bede2bbe72eb",
+      "id": "2c2b46fc-711e-48be-b202-e107d05512cd",
       "name": "Route",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
@@ -180,7 +180,7 @@
           "responseCode": 200
         }
       },
-      "id": "425336c4-d039-47d9-9553-bf0af8b82e4c",
+      "id": "f35bd056-3637-4780-9ae7-a5d889be1a9a",
       "name": "Respond challenge",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -193,7 +193,7 @@
       "parameters": {
         "maxItems": 1
       },
-      "id": "16db772d-5d41-4767-bbb8-0e0dab5d70dd",
+      "id": "9ec8ef54-b540-477b-861c-d0899f48e2e5",
       "name": "First only",
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
@@ -210,7 +210,7 @@
           "responseCode": 200
         }
       },
-      "id": "94a46247-c1f5-4410-886b-3bbf96b83e71",
+      "id": "2f83b49b-09bb-4716-a2be-4828e281f7cd",
       "name": "Respond 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -227,7 +227,7 @@
           "responseCode": 200
         }
       },
-      "id": "9e08ed67-869f-4daf-82e5-834a8e304684",
+      "id": "4db086bf-cab7-4f62-9b0b-f9bcbfa3ddef",
       "name": "Respond 200 (ignored)",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -244,7 +244,7 @@
           "responseCode": 403
         }
       },
-      "id": "de62b56a-0d27-49c4-be93-3fbe64553906",
+      "id": "c592c8c3-5fb2-4795-bae6-cf234459bd17",
       "name": "Respond 403",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -262,7 +262,7 @@
           "systemMessage": "You are a data extraction assistant for a CRM at a Thai EV car dealership.\nExtract from the customer's Facebook Messenger message: customerName, phoneNumber (any format, digits only is fine), interestedModel (car model they mention), and leave a field as an empty string when it is not present.\nNever invent values. Return exactly the JSON schema requested."
         }
       },
-      "id": "39a0c298-dee4-42b5-a493-644b82632534",
+      "id": "76578cf0-e712-4d76-a988-a28188cce6ae",
       "name": "Extract Customer Data",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
@@ -284,7 +284,7 @@
           "temperature": 0
         }
       },
-      "id": "b00bf008-3eee-4fe4-8878-e83cbf86ee7d",
+      "id": "8089cfca-8fbb-4772-90a0-8f983810320d",
       "name": "OpenAI Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
@@ -304,7 +304,7 @@
         "schemaType": "manual",
         "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"customerName\": {\n      \"type\": \"string\"\n    },\n    \"phoneNumber\": {\n      \"type\": \"string\"\n    },\n    \"interestedModel\": {\n      \"type\": \"string\"\n    }\n  }\n}"
       },
-      "id": "76f5310d-6fef-4228-a2d1-1f5f60c1611c",
+      "id": "ba4bb699-659d-4dfc-a43f-24e6fe409921",
       "name": "Structured Output Parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
@@ -318,7 +318,7 @@
         "mode": "runOnceForEachItem",
         "jsCode": "// เตรียม payload ให้ฟังก์ชัน crm.ingest_message (normalize เบอร์ทำใน DB; AI ไม่ได้ตัดสินใจอะไร ได้แค่สกัดข้อความ)\nconst src = $('Route').item.json;\nconst ai = ($input.item.json && $input.item.json.output) || {};\nlet phone = String(ai.phoneNumber || '').trim();\nif (!phone) { const m = String(src.text).replace(/[\\s-]/g, '').match(/(?:\\+?66|0)\\d{8,9}/); phone = m ? m[0] : ''; }\nconst ts = Number(src.timestamp);\nreturn { json: {\n  p_message_id: src.message_id, p_fb_user_id: src.userid, p_text: src.text,\n  p_customer_name: String(ai.customerName || '').trim() || null,\n  p_phone_raw: phone || null,\n  p_model: String(ai.interestedModel || '').trim() || null,\n  p_occurred_at: isFinite(ts) ? new Date(ts).toISOString() : new Date().toISOString() } };"
       },
-      "id": "5d36ee84-9ef9-46cc-8515-4d88ef782b5c",
+      "id": "3903f51d-04ec-4c37-8034-38652ed63ad7",
       "name": "Prepare ingest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -357,7 +357,7 @@
           "timeout": 20000
         }
       },
-      "id": "821b4407-f04b-4d56-aefa-419ead4e8c83",
+      "id": "45b328ff-2ed6-4ce1-a17d-b726fcb484d1",
       "name": "Supabase ingest_message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -380,7 +380,7 @@
       "parameters": {
         "jsCode": "// สร้างข้อความ Telegram ตามผลจาก ingest_message (ต้องมี Lead ID ในข้อความ เพื่อให้เซลล์กด Reply ได้)\nconst r = $json;\nconst cfg = $('Config').first().json;\nif (!r || !r.notify || !r.owner) return [];\nconst chat = r.owner.telegram_chat_id;\nconst head = r.notify === 'NEW_LEAD' ? '🆕 ได้ลีดใหม่ !!' : '💬 ลูกค้าทักกลับ';\nconst text = [\n  head, '',\n  '👤 ชื่อลูกค้า: ' + (r.customer_name || '-'),\n  '💬 ข้อความ:', '', r.message || '', '',\n  '📞 เบอร์: ' + (r.phone || '-'),\n  '🎯 สินค้าที่สนใจ: ' + (r.interested_model || '-'),\n  '', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name,\n  '🆔 Lead ID: ' + r.lead_code,\n  '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'].join('\\n');\nconst out = [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];\n// เดิมเจ้าของได้รับสำเนาลีดใหม่ทุกใบ (WULING_CHONBURI_LEAD) — คงไว้เฉพาะลีดใหม่\nif (r.notify === 'NEW_LEAD' && chat && String(chat) !== String(cfg.adminChatId)) out.push({ json: { chatId: String(cfg.adminChatId), text: '📋 สำเนาให้ผู้จัดการ\\n\\n' + text, missingChat: false } });\nreturn out;"
       },
-      "id": "1b26fe76-d8ca-4463-a0a7-680dec937546",
+      "id": "ad059741-b828-4b8f-9ab2-f12853622cfc",
       "name": "Build notification",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -398,7 +398,7 @@
           "appendAttribution": false
         }
       },
-      "id": "8c640166-7468-487c-b883-fc5da6c721cf",
+      "id": "6339b026-896b-4eb8-b929-b09ccf6941ca",
       "name": "Telegram: แจ้งเซลล์",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -422,7 +422,7 @@
           "appendAttribution": false
         }
       },
-      "id": "fcd3e1af-1b2a-4ffa-bed7-67810832738f",
+      "id": "c31879dd-c3da-4f5d-92dc-32b17e50d0a1",
       "name": "Telegram: แจ้งแอดมิน (ingest error)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -441,6 +441,13 @@
   "connections": {
     "Webhook": {
       "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Config",

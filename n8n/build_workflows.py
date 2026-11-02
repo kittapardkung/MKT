@@ -65,7 +65,8 @@ cfg = cfg_node(w1, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "f
 wh = w1.add("Webhook", "n8n-nodes-base.webhook",
   {"multipleMethods": True, "httpMethod": ["GET", "POST"], "path": "dfa1cf27-1f97-42d6-bc6d-1c26945ca8b8", "responseMode": "responseNode", "options": {"rawBody": True}},
   [-1400, 300], 2.1, webhookId=uid())
-w1.link(wh, cfg)
+w1.link(wh, cfg, 0)   # GET (verify)
+w1.link(wh, cfg, 1)   # POST (ข้อความจริง) — ต้องต่อทั้งสองทาง
 
 VERIFY_JS = r"""// ตรวจ Facebook webhook: (GET) verify token / (POST) ลายเซ็น X-Hub-Signature-256 แล้วแตกเป็นข้อความทีละรายการ
 const crypto = require('crypto');
