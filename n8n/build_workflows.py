@@ -200,7 +200,7 @@ ifs = w2.add("Known sender?", "n8n-nodes-base.if", {"conditions": {"options": {"
   "conditions": [{"id": uid(), "leftValue": "={{ $json.code }}", "rightValue": "", "operator": {"type": "string", "operation": "notEmpty", "singleValue": True}}], "combinator": "and"}, "options": {}}, [-740, 300], 2.2)
 w2.link(chk, ifs)   # false branch: เงียบ (ไม่ส่งข้อความของคนแปลกหน้าไปให้ AI)
 
-ctx = rest_get(w2, "Get lead context", "leads?lead_code=eq.{{ $('Parse reply').item.json.lead_code }}&select=stage,temperature,profile&limit=1", [-520, 240])
+ctx = rest_get(w2, "Get lead context", "leads?lead_code=eq.{{ $('Parse reply').first().json.lead_code }}&select=stage,temperature,profile&limit=1", [-520, 240])
 w2.link(ifs, ctx, 0)
 
 PROMPT_JS = r"""// ส่งให้ AI เฉพาะ: ข้อความเซลล์ + Customer Card (ไม่มีชื่อ/เบอร์ลูกค้า) — PDPA data minimization
@@ -276,8 +276,8 @@ res = w2.add("Build reply", "n8n-nodes-base.code", {"jsCode": RESULT_JS}, [640, 
 w2.link(rec, res, 0)
 send2 = tg_send(w2, "Telegram: ตอบเซลล์", "={{ $json.chatId }}", "={{ $json.text }}", [860, 200], "={{ $json.replyTo }}")
 w2.link(res, send2)
-err2 = tg_send(w2, "Telegram: แจ้งเซลล์ (error)", "={{ $('Parse reply').item.json.chat_id }}",
-  "=⚠️ ระบบบันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้งหรือบันทึกในเว็บแอป\n🆔 {{ $('Parse reply').item.json.lead_code }}", [640, 400])
+err2 = tg_send(w2, "Telegram: แจ้งเซลล์ (error)", "={{ $('Parse reply').first().json.chat_id }}",
+  "=⚠️ ระบบบันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้งหรือบันทึกในเว็บแอป\n🆔 {{ $('Parse reply').first().json.lead_code }}", [640, 400])
 w2.link(rec, err2, 1)
 w2.save("02_sales_reply.json")
 print("ok")
