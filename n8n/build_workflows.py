@@ -87,15 +87,16 @@ const sign = (buf) => 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).upd
 const a = Buffer.from(sigHeader);
 const same = (exp) => { const b = Buffer.from(exp); return a.length === b.length && crypto.timingSafeEqual(a, b); };
 const ok = same(sign(raw)) || same(sign(Buffer.from(esc(raw.toString('utf8')), 'utf8')));
-if (!ok) return [{ json: { kind: 'bad_sig', reason: sigHeader ? 'signature mismatch (เช็ก fbAppSecret ของแอปที่ส่ง webhook)' : 'no signature header', raw_bytes: raw.length, secret_len: String(c.fbAppSecret || '').length } }];
+// ไม่บล็อกข้อความเมื่อลายเซ็นไม่ผ่าน (เจ้าของสั่งให้ถอดด่านนี้ เพื่อไม่ให้ลีดจริงหาย) — เก็บผลไว้ใน sig_ok เพื่อตรวจย้อนหลัง
 
 const body = req.body || {};
 const out = [];
 for (const entry of (body.entry || [])) {
+  if (String(entry.id) !== '1025952777273131') continue;   // รับเฉพาะเหตุการณ์ของเพจ Wuling Chonburi
   for (const m of (entry.messaging || [])) {
     const msg = m.message;
     if (!msg || msg.is_echo || !msg.text || !msg.mid) continue;      // ข้าม echo / ไฟล์ / read receipt
-    out.push({ json: { kind: 'event', message_id: msg.mid, userid: String(m.sender && m.sender.id || ''), text: String(msg.text), timestamp: m.timestamp || Date.now() } });
+    out.push({ json: { kind: 'event', sig_ok: ok, message_id: msg.mid, userid: String(m.sender && m.sender.id || ''), text: String(msg.text), timestamp: m.timestamp || Date.now() } });
   }
 }
 if (out.length === 0) return [{ json: { kind: 'event_ignored' } }];
