@@ -60,66 +60,28 @@ def tg_send(w, name, chat_expr, text_expr, pos, reply_expr=None):
 # 1) Lead intake: Facebook Messenger webhook -> Supabase ingest_message -> Telegram แจ้งเซลล์เจ้าของลีด
 # =====================================================================================
 w1 = WF("WULING Sale Lead - 01 Lead Intake (Facebook → Supabase → Telegram)")
-cfg = cfg_node(w1, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "fbVerifyToken": "REPLACE_VERIFY_TOKEN",
-                    "fbAppSecret": "REPLACE_FB_APP_SECRET", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID"})
+cfg = cfg_node(w1, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID"})
+# ตอบ Meta ทันที (200) ทุกคำขอ: ไม่มีโหนด Respond, ไม่มี 403/500, Meta จึงไม่ส่งซ้ำ — ไม่ตรวจลายเซ็น (เจ้าของสั่งถอดออก)
 wh = w1.add("Webhook", "n8n-nodes-base.webhook",
-  {"multipleMethods": True, "httpMethod": ["GET", "POST"], "path": "dfa1cf27-1f97-42d6-bc6d-1c26945ca8b8", "responseMode": "responseNode", "options": {"rawBody": True}},
+  {"multipleMethods": True, "httpMethod": ["GET", "POST"], "path": "dfa1cf27-1f97-42d6-bc6d-1c26945ca8b8", "responseMode": "onReceived", "options": {}},
   [-1400, 300], 2.1, webhookId=uid())
-w1.link(wh, cfg, 0)   # GET (verify)
-w1.link(wh, cfg, 1)   # POST (ข้อความจริง) — ต้องต่อทั้งสองทาง
+w1.link(wh, cfg, 0); w1.link(wh, cfg, 1)
 
-VERIFY_JS = r"""// ตรวจ Facebook webhook: (GET) verify token / (POST) ลายเซ็น X-Hub-Signature-256 แล้วแตกเป็นข้อความทีละรายการ
-const crypto = require('crypto');
-const c = $('Config').first().json;
-const req = $input.first().json;   // ข้อมูลจาก Webhook ที่ผ่าน Config (ใช้ได้ทั้งทาง GET และ POST)
-const q = req.query || {};
-if (q['hub.mode']) {
-  if (q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === c.fbVerifyToken) return [{ json: { kind: 'verify_ok', challenge: String(q['hub.challenge'] || '') } }];
-  return [{ json: { kind: 'verify_bad' } }];
-}
-// POST: ตรวจลายเซ็นจาก raw body
-let raw;
-try { raw = await this.helpers.getBinaryDataBuffer(0, 'data'); } catch (e) { return [{ json: { kind: 'bad_sig', reason: 'no raw body' } }]; }
-const sigHeader = String((req.headers || {})['x-hub-signature-256'] || '');
-// Meta คำนวณลายเซ็นจาก payload ที่ "escape ภาษาไทย/ยูนิโค้ดเป็น \uXXXX (ตัวพิมพ์เล็ก)" แต่ส่ง body จริงเป็น UTF-8 ดิบ → ตรวจทั้งสองแบบ
-const esc = (t) => t.replace(/[\u0080-￿]/g, (ch) => '\\u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4));
-const sign = (buf) => 'sha256=' + crypto.createHmac('sha256', c.fbAppSecret).update(buf).digest('hex');
-const a = Buffer.from(sigHeader);
-const same = (exp) => { const b = Buffer.from(exp); return a.length === b.length && crypto.timingSafeEqual(a, b); };
-const ok = same(sign(raw)) || same(sign(Buffer.from(esc(raw.toString('utf8')), 'utf8')));
-// ไม่บล็อกข้อความเมื่อลายเซ็นไม่ผ่าน (เจ้าของสั่งให้ถอดด่านนี้ เพื่อไม่ให้ลีดจริงหาย) — เก็บผลไว้ใน sig_ok เพื่อตรวจย้อนหลัง
-
+PARSE_JS = r"""// แตกข้อความจาก Facebook ทีละรายการ (ไม่ตรวจลายเซ็น) — รับเฉพาะเพจ Wuling Chonburi, ข้าม echo/ไฟล์/read receipt
+const req = $input.first().json;
 const body = req.body || {};
 const out = [];
 for (const entry of (body.entry || [])) {
-  if (String(entry.id) !== '1025952777273131') continue;   // รับเฉพาะเหตุการณ์ของเพจ Wuling Chonburi
+  if (String(entry.id) !== '1025952777273131') continue;
   for (const m of (entry.messaging || [])) {
     const msg = m.message;
-    if (!msg || msg.is_echo || !msg.text || !msg.mid) continue;      // ข้าม echo / ไฟล์ / read receipt
-    out.push({ json: { kind: 'event', sig_ok: ok, message_id: msg.mid, userid: String(m.sender && m.sender.id || ''), text: String(msg.text), timestamp: m.timestamp || Date.now() } });
+    if (!msg || msg.is_echo || !msg.text || !msg.mid) continue;
+    out.push({ json: { message_id: msg.mid, userid: String((m.sender && m.sender.id) || ''), text: String(msg.text), timestamp: m.timestamp || Date.now() } });
   }
 }
-if (out.length === 0) return [{ json: { kind: 'event_ignored' } }];
 return out;"""
-vp = w1.add("Verify & Parse", "n8n-nodes-base.code", {"jsCode": VERIFY_JS}, [-1180, 300], 2, onError="continueRegularOutput")
-w1.link(cfg, vp)
-
-sw = w1.add("Route", "n8n-nodes-base.switch", {"rules": {"values": [
-    {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2}, "conditions": [{"id": uid(), "leftValue": "={{ $json.kind }}", "rightValue": "verify_ok", "operator": {"type": "string", "operation": "equals"}}], "combinator": "and"}, "renameOutput": True, "outputKey": "verify_ok"},
-    {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2}, "conditions": [{"id": uid(), "leftValue": "={{ $json.kind }}", "rightValue": "event", "operator": {"type": "string", "operation": "equals"}}], "combinator": "and"}, "renameOutput": True, "outputKey": "event"},
-    {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2}, "conditions": [{"id": uid(), "leftValue": "={{ $json.kind }}", "rightValue": "event_ignored", "operator": {"type": "string", "operation": "equals"}}], "combinator": "and"}, "renameOutput": True, "outputKey": "event_ignored"},
-  ]}, "options": {"fallbackOutput": "extra", "renameFallbackOutput": "rejected"}}, [-960, 300], 3.2)
-w1.link(vp, sw)
-
-r_chal = w1.add("Respond challenge", "n8n-nodes-base.respondToWebhook", {"respondWith": "text", "responseBody": "={{ $json.challenge }}", "options": {"responseCode": 200}}, [-720, 60], 1.1)
-w1.link(sw, r_chal, 0)
-lim = w1.add("First only", "n8n-nodes-base.limit", {"maxItems": 1}, [-720, 240], 1)
-r_ok = w1.add("Respond 200", "n8n-nodes-base.respondToWebhook", {"respondWith": "text", "responseBody": "EVENT_RECEIVED", "options": {"responseCode": 200}}, [-500, 240], 1.1)
-w1.link(sw, lim, 1); w1.link(lim, r_ok)
-r_ign = w1.add("Respond 200 (ignored)", "n8n-nodes-base.respondToWebhook", {"respondWith": "text", "responseBody": "IGNORED", "options": {"responseCode": 200}}, [-720, 420], 1.1)
-w1.link(sw, r_ign, 2)
-r_rej = w1.add("Respond 403", "n8n-nodes-base.respondToWebhook", {"respondWith": "text", "responseBody": "FORBIDDEN", "options": {"responseCode": 403}}, [-720, 600], 1.1)
-w1.link(sw, r_rej, 3)
+parse = w1.add("Parse events", "n8n-nodes-base.code", {"jsCode": PARSE_JS}, [-1180, 300], 2)
+w1.link(cfg, parse)
 
 # ---- สกัดชื่อ/เบอร์/รุ่นด้วย AI (ถ้า AI ล้ม ยังบันทึกข้อความด้วยเบอร์จาก regex) ----
 agent = w1.add("Extract Customer Data", "@n8n/n8n-nodes-langchain.agent", {
@@ -129,7 +91,7 @@ agent = w1.add("Extract Customer Data", "@n8n/n8n-nodes-langchain.agent", {
 # ตรวจ mid ซ้ำ (Meta ส่งซ้ำ): ข้อความที่เคยเห็นแล้วจะไม่ถูกส่งต่อไป AI/Supabase — ทาง Respond 200 แยกอยู่ จึงยังตอบ 200 ให้ Meta เสมอ
 dedupe = w1.add("Remove Duplicates (mid)", "n8n-nodes-base.removeDuplicates",
   {"operation": "removeItemsSeenInPreviousExecutions", "dedupeValue": "={{ $json.message_id }}", "options": {}}, [-500, 460], 2)
-w1.link(sw, dedupe, 1)
+w1.link(parse, dedupe)
 w1.link(dedupe, agent, 0)
 llm = w1.add("OpenAI Chat Model", "@n8n/n8n-nodes-langchain.lmChatOpenAi", {"model": {"__rl": True, "value": "gpt-4.1-mini", "mode": "list", "cachedResultName": "gpt-4.1-mini"}, "options": {"temperature": 0}}, [-560, 680], 1.3, OAI_CRED)
 w1.link(llm, agent, 0, 0, "ai_languageModel")
@@ -138,7 +100,7 @@ parser = w1.add("Structured Output Parser", "@n8n/n8n-nodes-langchain.outputPars
 w1.link(parser, agent, 0, 0, "ai_outputParser")
 
 PREP_JS = r"""// เตรียม payload ให้ฟังก์ชัน crm.ingest_message (normalize เบอร์ทำใน DB; AI ไม่ได้ตัดสินใจอะไร ได้แค่สกัดข้อความ)
-const src = $('Route').item.json;
+const src = $('Remove Duplicates (mid)').item.json;
 const ai = ($input.item.json && $input.item.json.output) || {};
 let phone = String(ai.phoneNumber || '').trim();
 if (!phone) { const m = String(src.text).replace(/[\s-]/g, '').match(/(?:\+?66|0)\d{8,9}/); phone = m ? m[0] : ''; }
