@@ -114,7 +114,10 @@ return { json: {
 prep = w1.add("Prepare ingest", "n8n-nodes-base.code", {"mode": "runOnceForEachItem", "jsCode": PREP_JS}, [-120, 460], 2)
 w1.link(agent, prep)
 ing = rpc(w1, "Supabase ingest_message", "ingest_message", "={{ JSON.stringify($json) }}", [100, 460])
-w1.link(prep, ing)
+havetel = w1.add("HAVE TEL Y/N?", "n8n-nodes-base.if", {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+  "conditions": [{"id": uid(), "leftValue": "={{ $json.p_phone_raw }}", "rightValue": "", "operator": {"type": "string", "operation": "notEmpty", "singleValue": True}}], "combinator": "and"}, "options": {}}, [-10, 460], 2.2)
+w1.link(prep, havetel)
+w1.link(havetel, ing, 0)   # YES (มีเบอร์: จากที่ AI สกัด หรือจากข้อความด้วย regex) → บันทึก ; NO = ทิ้ง ไม่สร้างลีด ไม่แจ้งเซลล์
 
 # สำเร็จ -> แจ้งเซลล์ / ผิดพลาด -> แจ้งแอดมิน
 NOTIFY_JS = r"""// สร้างข้อความ Telegram ตามผลจาก ingest_message (ต้องมี Lead ID ในข้อความ เพื่อให้เซลล์กด Reply ได้)
