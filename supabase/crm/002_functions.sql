@@ -141,7 +141,7 @@ $$;
 create or replace function crm.refresh_task(p_lead uuid) returns void
 language plpgsql security definer set search_path = crm, pg_temp as $$
 declare
-  l crm.leads; r crm.sla_rules; v_kind text; v_due timestamptz; v_base timestamptz; v_prio int; v_open crm.tasks;
+  l crm.leads; r crm.sla_rules; v_next timestamptz; v_kind text; v_due timestamptz; v_base timestamptz; v_prio int; v_open crm.tasks;
 begin
   select * into l from crm.leads where id = p_lead;
   if not found then return; end if;
@@ -151,17 +151,19 @@ begin
     return;
   end if;
 
+  -- วันนัดเดิมที่ "ติดต่อไปแล้วหลังวันนัดนั้น" ถือว่าใช้ไปแล้ว (stale) — ไม่ใช้สร้างงานใหม่ ไม่งั้นงานเลยกำหนดทันทีหลังเซลล์รายงานผล
+  v_next := case when l.next_follow_up_at is not null and (l.last_contact_at is null or l.next_follow_up_at > l.last_contact_at) then l.next_follow_up_at end;
   select * into r from crm.sla_rules where scope = crm.sla_scope(l.stage, l.first_contact_at, l.temperature);
   if l.first_contact_at is null then
     v_kind := 'FIRST_CONTACT';
-    v_due  := coalesce(l.next_follow_up_at,
+    v_due  := coalesce(v_next,
                 case when r.business_hours_only then crm.add_work_minutes(coalesce(l.assigned_at, l.created_at), r.minutes)
                      else coalesce(l.assigned_at, l.created_at) + make_interval(mins => r.minutes) end);
     v_prio := 100;
   else
     v_kind := 'FOLLOW_UP';
     v_base := coalesce(l.last_contact_at, l.first_contact_at);
-    v_due  := coalesce(l.next_follow_up_at,
+    v_due  := coalesce(v_next,
                 case when r.business_hours_only then crm.add_work_minutes(v_base, r.minutes)
                      else v_base + make_interval(mins => r.minutes) end);
     v_prio := case coalesce(l.temperature, crm.setting('default_temperature')) when 'HOT' then 90 when 'WARM' then 60 else 30 end;
@@ -188,6 +190,8 @@ language plpgsql as $$ begin perform crm.refresh_task(new.id); return null; end 
 -- ล้างงานติดตามที่ค้างของลีดที่จองแล้ว (แก้สถานะงานเท่านั้น ไม่ลบข้อมูล)
 update crm.tasks k set status = 'CANCELLED' from crm.leads l
  where l.id = k.lead_id and k.status = 'OPEN' and l.stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST');
+-- คำนวณงานติดตามใหม่ให้ลีดที่ยังมีงานเปิดอยู่ (เคลียร์งานค้างจากวันนัดเก่าที่ติดต่อไปแล้ว) — ไม่แตะข้อมูลลีด
+select crm.refresh_task(lead_id) from (select distinct lead_id from crm.tasks where status = 'OPEN') x;
 drop trigger if exists lead_task on crm.leads;
 create trigger lead_task after insert or update of owner_id, stage, temperature, next_follow_up_at, first_contact_at, last_contact_at, dormant
   on crm.leads for each row execute function crm.lead_task_trg();

@@ -260,3 +260,18 @@ begin
 end $$;
 delete from crm.settings where key = 'intake_fb_ids';
 reset crm.delete_codes;
+
+-- งานในหน้าวันนี้ต้องหายหลังเซลล์รายงานผล แม้ไม่ได้ระบุวันนัดใหม่ (Telegram reply)
+do $$
+declare r jsonb; l uuid; ev jsonb; n int; own uuid; tg text := 'tg-stale-' || gen_random_uuid()::text;
+begin
+  r := crm.ingest_message('stale1', 'fbStale', 'สนใจ', 'คุณสเตล', '0877770088', 'Darion');
+  l := (r->>'lead_id')::uuid; own := (r->'owner'->>'id')::uuid;
+  update crm.sales_team set telegram_user_id = tg where id = own;
+  update crm.leads set next_follow_up_at = now() - interval '3 days', first_contact_at = now() - interval '4 days', last_contact_at = now() - interval '4 days', stage = 'FOLLOW_UP' where id = l;
+  perform crm.refresh_task(l);
+  perform t_assert((select count(*) from crm.v_my_today where lead_id = l) = 1, 'วันนี้: ลีดเลยกำหนดขึ้นในหน้าวันนี้');
+  ev := crm.record_sales_reply(880001, (select lead_code from crm.leads where id = l), tg, 'โทรแล้ว คุยได้', '{"contact_outcome":"CONNECTED"}'::jsonb);
+  perform t_assert((select count(*) from crm.v_my_today where lead_id = l) = 0, 'วันนี้: รายงานผลทาง Telegram แล้วงานหายจากหน้าวันนี้');
+  perform t_assert(not exists (select 1 from crm.v_lead_control_center c where c.lead_id = l and 'OVERDUE_FOLLOWUP' = any(c.flags)), 'วันนี้: ไม่ติดธงเลยกำหนดติดตามหลังติดต่อแล้ว');
+end $$;

@@ -57,8 +57,8 @@ cross join lateral (
     case when not l.dormant and l.owner_id is not null and l.accepted_at is null and l.stage = 'NEW'
               and l.assigned_at < now() - make_interval(mins => sla.new_minutes) then 'NOT_ACCEPTED' end,
     case when not l.dormant and l.first_contact_at is null and t.kind = 'FIRST_CONTACT' and t.due_at < now() then 'FIRST_CONTACT_OVERDUE' end,
-    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and l.next_follow_up_at is null then 'NO_NEXT_FOLLOWUP' end,
-    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.next_follow_up_at < now() then 'OVERDUE_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.owner_id is not null and l.first_contact_at is not null and (l.next_follow_up_at is null or l.next_follow_up_at <= l.last_contact_at) then 'NO_NEXT_FOLLOWUP' end,
+    case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.next_follow_up_at < now() and (l.last_contact_at is null or l.next_follow_up_at > l.last_contact_at) then 'OVERDUE_FOLLOWUP' end,
     case when not l.dormant and l.stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and l.owner_id is not null
               and coalesce(ev.last_event, l.updated_at) < now() - interval '7 days' then 'STALE' end,
     case when l.stage = 'LOST' and ev.last_msg is not null and ev.last_msg > coalesce(ev.last_lost, l.created_at) then 'LOST_WITH_SIGNAL' end,
@@ -138,7 +138,7 @@ select
   count(*) as total_leads,
   count(*) filter (where stage not in ('WON','LOST')) as active_leads,
   count(*) filter (where owner_id is null and phone_norm is not null and stage not in ('WON','LOST')) as unassigned_leads,
-  count(*) filter (where stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and not dormant and next_follow_up_at < now()) as overdue_followups,
+  count(*) filter (where stage not in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON','LOST') and not dormant and next_follow_up_at < now() and (last_contact_at is null or next_follow_up_at > last_contact_at)) as overdue_followups,
   count(*) filter (where stage = 'WON') as won,
   count(*) filter (where stage = 'LOST') as lost,
   count(*) filter (where stage in ('BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as booking_or_won,
