@@ -52,7 +52,7 @@ def rest_get(w, name, path_expr, pos):
     return w.add(name, "n8n-nodes-base.httpRequest", p, pos, 4.2, SUPA_CRED, alwaysOutputData=True)
 
 def tg_send(w, name, chat_expr, text_expr, pos, reply_expr=None):
-    add = {"appendAttribution": False}
+    add = {"appendAttribution": False, "parse_mode": "HTML"}
     if reply_expr: add["reply_to_message_id"] = reply_expr
     return w.add(name, "n8n-nodes-base.telegram", {"chatId": chat_expr, "text": text_expr, "additionalFields": add}, pos, 1.2, TG_CRED)
 
@@ -125,12 +125,13 @@ const r = $json;
 const cfg = $('Config').first().json;
 if (!r || !r.notify || !r.owner) return [];
 const chat = r.owner.telegram_chat_id;
+const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');   // Telegram ใช้โหมด HTML — ชื่อ/ข้อความลูกค้ามี _ * < > ได้
 const ST = { NEW: 'ใหม่', CONTACTED: 'ติดต่อแล้ว', FOLLOW_UP: 'ติดตาม', APPOINTMENT: 'นัดหมาย', TEST_DRIVE: 'ทดลองขับ', QUOTATION: 'เสนอราคา', NEGOTIATION: 'ต่อรอง', BOOKING: 'จองแล้ว', FINANCE_PENDING: 'รอผลสินเชื่อ', FINANCE_APPROVED: 'สินเชื่ออนุมัติ', READY_TO_DELIVER: 'พร้อมส่งมอบ', WON: 'ปิดการขาย', LOST: 'เสียโอกาส' };
-const known = ['👤 ชื่อลูกค้า: ' + (r.customer_name || '-'), '📞 เบอร์: ' + (r.phone || '-'), '🎯 สินค้าที่สนใจ: ' + (r.interested_model || '-')];
-const tail = ['', '👨‍💼 เซลล์ผู้ดูแล: ' + r.owner.code + ' - ' + r.owner.name, '🆔 Lead ID: ' + r.lead_code, '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'];
+const known = ['👤 ชื่อลูกค้า: ' + esc(r.customer_name || '-'), '📞 เบอร์: ' + esc(r.phone || '-'), '🎯 สินค้าที่สนใจ: ' + esc(r.interested_model || '-')];
+const tail = ['', '👨‍💼 เซลล์ผู้ดูแล: ' + esc(r.owner.code) + ' - ' + esc(r.owner.name), '🆔 Lead ID: ' + esc(r.lead_code), '', '💡 กด Reply ข้อความนี้ เพื่อบันทึกผลการติดต่อ'];
 const lines = r.notify === 'NEW_LEAD'
-  ? ['🆕 ได้ลีดใหม่ !!', '', ...known, '💬 ข้อความลูกค้า:', r.message || '', ...tail]
-  : ['📞 ลูกค้าเดิมส่งเบอร์มาอีกครั้ง', '(ลีดเดิม ไม่ได้สร้างลีดใหม่)', '', '💬 ข้อความ:', r.message || '', '', '📞 เบอร์ที่ลูกค้าส่งมา: ' + (r.message_phone || '-') + (r.message_phone && r.phone && r.message_phone !== r.phone ? '  (ต่างจากเบอร์ในระบบ ' + r.phone + ')' : ''), '— ข้อมูลเดิมในระบบ —', known[0], known[2], '📌 สถานะลีด: ' + (ST[r.stage] || r.stage || '-'), ...tail];
+  ? ['🆕 ได้ลีดใหม่ !!', '', ...known, '💬 ข้อความลูกค้า:', esc(r.message), ...tail]
+  : ['📞 ลูกค้าเดิมส่งเบอร์มาอีกครั้ง', '(ลีดเดิม ไม่ได้สร้างลีดใหม่)', '', '💬 ข้อความ:', esc(r.message), '', '📞 เบอร์ที่ลูกค้าส่งมา: ' + esc(r.message_phone || '-') + (r.message_phone && r.phone && r.message_phone !== r.phone ? '  (ต่างจากเบอร์ในระบบ ' + esc(r.phone) + ')' : ''), '— ข้อมูลเดิมในระบบ —', known[0], known[2], '📌 สถานะลีด: ' + (ST[r.stage] || r.stage || '-'), ...tail];
 const text = lines.join('\n');
 const out = [{ json: { chatId: String(chat || cfg.adminChatId), text, missingChat: !chat } }];
 // เดิมเจ้าของได้รับสำเนาลีดใหม่ทุกใบ (WULING_CHONBURI_LEAD) — คงไว้เฉพาะลีดใหม่
@@ -146,7 +147,7 @@ sendfail = tg_send(w1, "Telegram: ส่งการ์ดไม่สำเร�
   "=⚠️ ส่งการ์ดให้เซลล์ไม่สำเร็จ (เซลล์อาจยังไม่ได้กด Start บอท) — โปรดแจ้งเซลล์ด้วยตัวเอง\n\n{{ $('Build notification').item.json.text }}", [760, 520])
 w1.link(send, sendfail, 1)
 err = tg_send(w1, "Telegram: แจ้งแอดมิน (ingest error)", "={{ $('Config').first().json.adminChatId }}",
-  "=⚠️ บันทึกลีดเข้า Supabase ไม่สำเร็จ\nข้อความ FB id: {{ $('Prepare ingest').item.json.p_message_id }}\nเหตุผล: {{ JSON.stringify($json.error || $json).slice(0, 300) }}", [320, 600])
+  "=⚠️ บันทึกลีดเข้า Supabase ไม่สำเร็จ\nข้อความ FB id: {{ $('Prepare ingest').item.json.p_message_id }}\nเหตุผล: {{ JSON.stringify($json.error || $json).slice(0, 300).replace(/[<>&]/g, ' ') }}", [320, 600])
 w1.link(ing, err, 1)
 w1.save("01_lead_intake.json")
 
@@ -232,17 +233,18 @@ RESULT_JS = r"""// แปลผลจากฐานข้อมูลเป็�
 const r = $json;
 const p = $('Parse reply').first().json;
 const ai = $('Merge AI output').first().json.p_ai || {};
+const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const TH = { accepted: 'รับลีด', contact: 'บันทึกการติดต่อสำเร็จ', profile: 'อัปเดต Customer Card', next_follow_up: 'นัดติดตามครั้งถัดไป', temperature: 'อุณหภูมิลีด', stage: 'เปลี่ยนสถานะ' };
 let text = '';
 if (r.status === 'ok') {
   const applied = (r.applied || []).map(x => '• ' + (TH[x] || x));
-  const review = (r.needs_review || []).map(x => '• ' + (x.startsWith('stage:') ? 'สถานะ ' + x.slice(6) + ' — ต้องให้ผู้จัดการตรวจ/แนบหลักฐานในระบบ' : x === 'next_follow_up' ? 'วันนัดไม่สมเหตุสมผล (ไม่ได้ใช้)' : x));
-  text = '✅ บันทึกเรียบร้อย\n🆔 ' + r.lead_code + '\n' + (ai.summary ? '📝 ' + ai.summary + '\n' : '') +
+  const review = (r.needs_review || []).map(x => '• ' + (x.startsWith('stage:') ? 'สถานะ ' + esc(x.slice(6)) + ' — ต้องให้ผู้จัดการตรวจ/แนบหลักฐานในระบบ' : x === 'next_follow_up' ? 'วันนัดไม่สมเหตุสมผล (ไม่ได้ใช้)' : x));
+  text = '✅ บันทึกเรียบร้อย\n🆔 ' + esc(r.lead_code) + '\n' + (ai.summary ? '📝 ' + esc(ai.summary) + '\n' : '') +
     (applied.length ? '\nระบบอัปเดต:\n' + applied.join('\n') : '\nบันทึกข้อความเป็นหลักฐานแล้ว') +
     (review.length ? '\n\n⚠️ รอมนุษย์ตรวจสอบ:\n' + review.join('\n') : '') +
     (!ai.next_follow_up ? '\n\n📅 อย่าลืมตั้งวันนัดติดตามครั้งถัดไปในระบบ' : '');
 } else if (r.status === 'forbidden') text = '⛔ คุณไม่ใช่เจ้าของลีดนี้ จึงบันทึกไม่ได้';
-else if (r.status === 'lead_not_found') text = '❓ ไม่พบลีด ' + p.lead_code + ' ในระบบ';
+else if (r.status === 'lead_not_found') text = '❓ ไม่พบลีด ' + esc(p.lead_code) + ' ในระบบ';
 else if (r.status === 'closed_lead_noted') text = 'ℹ️ ลีดนี้ปิดการขายแล้ว บันทึกข้อความเป็นหมายเหตุเท่านั้น';
 else return [];   // duplicate
 return [{ json: { chatId: p.chat_id, text, replyTo: p.message_id } }];"""
