@@ -103,7 +103,7 @@ PREP_JS = r"""// เตรียม payload ให้ฟังก์ชัน cr
 const src = $('Remove Duplicates (mid)').item.json;
 const ai = ($input.item.json && $input.item.json.output) || {};
 let phone = String(ai.phoneNumber || '').trim();
-if (!phone) { const m = String(src.text).replace(/[\s-]/g, '').match(/(?:\+?66|0)\d{8,9}/); phone = m ? m[0] : ''; }
+if (!phone) { const m = String(src.text).replace(/[\s-]/g, '').match(/(?:\+?66)?0\d{8,9}|\+66\d{9}|66\d{9}/); phone = m ? m[0] : ''; }
 const ts = Number(src.timestamp);
 return { json: {
   p_message_id: src.message_id, p_fb_user_id: src.userid, p_text: src.text,

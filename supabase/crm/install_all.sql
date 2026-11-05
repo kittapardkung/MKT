@@ -210,6 +210,7 @@ begin
   if p_raw is null then return null; end if;
   d := regexp_replace(p_raw, '\D', '', 'g');
   if d like '66%' and length(d) in (11, 10) then d := '0' || substr(d, 3); end if;
+  if d like '660%' and length(d) = 12 then d := substr(d, 3); end if;   -- พิมพ์ +66 แล้วมี 0 นำหน้าซ้อน เช่น +66 0937290211
   if length(d) = 9 and d ~ '^[2-9]' then d := '0' || d; end if;   -- ACTIVITY_LOG เดิมตัด 0 นำหน้า
   if d ~ '^0([689][0-9]{8}|[2-7][0-9]{7})$' then return d; end if;
   return null;

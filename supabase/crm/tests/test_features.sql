@@ -275,3 +275,13 @@ begin
   perform t_assert((select count(*) from crm.v_my_today where lead_id = l) = 0, 'วันนี้: รายงานผลทาง Telegram แล้วงานหายจากหน้าวันนี้');
   perform t_assert(not exists (select 1 from crm.v_lead_control_center c where c.lead_id = l and 'OVERDUE_FOLLOWUP' = any(c.flags)), 'วันนี้: ไม่ติดธงเลยกำหนดติดตามหลังติดต่อแล้ว');
 end $$;
+
+-- normalize_phone: +66 ตามด้วย 0 นำหน้า (ลูกค้าพิมพ์แบบนี้บ่อย)
+do $$
+begin
+  perform t_assert(crm.normalize_phone('+66 0937290211') = '0937290211', 'เบอร์: +66 0937290211 → 0937290211');
+  perform t_assert(crm.normalize_phone('660937290211') = '0937290211', 'เบอร์: 660937290211 → 0937290211');
+  perform t_assert(crm.normalize_phone('+66 93 729 0211') = '0937290211', 'เบอร์: +66 93 729 0211 → 0937290211');
+  perform t_assert(crm.normalize_phone('093-729-0211') = '0937290211', 'เบอร์: 093-729-0211 → 0937290211');
+  perform t_assert(crm.normalize_phone('+66 0123') is null, 'เบอร์: ผิดรูปแบบยังถูกปฏิเสธ');
+end $$;
