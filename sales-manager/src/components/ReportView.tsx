@@ -80,6 +80,8 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
   const [live, setLive] = useState<WeeklyReport | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true); setErr(null);
@@ -89,6 +91,16 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
     } catch (e) { setErr(friendlyError(e instanceof Error ? e.message : String(e))); }
     finally { setBusy(false); }
   }, [days]);
+  const analyze = async () => {
+    setAiBusy(true); setAiMsg(null); setErr(null);
+    try {
+      const { snapshot, cached } = await api.analyzeReport(days);
+      setSnaps((cur) => [snapshot, ...cur.filter((x) => x.id !== snapshot.id)]);
+      setSel(snapshot.id);
+      if (cached) setAiMsg("เพิ่งสร้างไปไม่ถึง 10 นาที จึงแสดงบทวิเคราะห์เดิม");
+    } catch (e) { setErr(friendlyError(e instanceof Error ? e.message : String(e))); }
+    finally { setAiBusy(false); }
+  };
   useEffect(() => {
     let alive = true;
     Promise.all([api.reportSnapshots(), api.weeklyReport(days)])
@@ -135,10 +147,12 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
               </select>
             </label>
           )}
-          <button onClick={() => void load()} className="btn-dark min-h-11 px-4 text-sm" disabled={busy}>{busy ? "กำลังโหลด…" : "รีเฟรช"}</button>
+          <button onClick={() => void load()} className="card focus-ring min-h-11 px-4 text-sm" disabled={busy}>{busy ? "กำลังโหลด…" : "รีเฟรช"}</button>
+          <button onClick={() => void analyze()} className="btn-dark min-h-11 px-4 text-sm disabled:opacity-60" disabled={aiBusy}>{aiBusy ? "AI กำลังวิเคราะห์… (ราว 30 วินาที)" : "สร้างบทวิเคราะห์ AI"}</button>
         </div>
       </div>
 
+      {aiMsg && <div className="rounded-xl bg-warn-soft p-3 text-sm text-warn">{aiMsg}</div>}
       {err && <div role="alert" className="rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดรายงานไม่สำเร็จ: {err}</div>}
       {!report && !err && !busy && <Empty>ยังไม่มีข้อมูลรายงาน</Empty>}
 
@@ -152,6 +166,7 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
           <Stat label="จอง" value={sum("bookings_reported")} />
         </div>
 
+        {!aiSrc?.overview_text && <p className="text-xs text-muted">ยังไม่มีบทวิเคราะห์ AI — กด “สร้างบทวิเคราะห์ AI” (ใช้เวลาประมาณ 30 วินาที ไม่ส่งชื่อ/เบอร์ลูกค้าให้ AI)</p>}
         {aiSrc?.overview_text && (
           <div className="card p-4">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">ภาพรวมจาก AI · รายงาน {stamp(aiSrc.generated_at)}</div>

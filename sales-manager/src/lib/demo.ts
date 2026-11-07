@@ -198,6 +198,7 @@ export function createDemoApi(): Api {
       l.events.push({ id: l.events.length + 1, type: "NOTE", channel: null, outcome: null, body: "แก้ไขข้อมูลลูกค้า", occurred_at: iso(0), actor: sales[role] });
     },
     async setStar(id, on, note) { const l = leads.find((x) => x.lead_id === id); if (!l) return; l.starred = on; l.star_note = on ? (note ?? l.star_note) : null; },
+    async analyzeReport(): Promise<{ snapshot: import("./types").ReportSnapshot; cached: boolean }> { throw new Error("โหมดสาธิตไม่รองรับการสร้างบทวิเคราะห์ AI"); },
     async weeklyReport() { return role === "sales" ? null : demoReport(); },
     async reportSnapshots() { return role === "sales" ? [] : [{ id: 1, period_days: 7, generated_at: iso(0), report: demoReport(), overview_text: "ตัวอย่าง: ทีมได้รับลีดเพิ่มขึ้น แต่เวลาติดต่อครั้งแรกยังสูงกว่าเป้า", person_texts: { SA0001: "ตัวอย่างบทวิเคราะห์ (ข้อมูลสาธิต)", SA0002: "ตัวอย่างบทวิเคราะห์ (ข้อมูลสาธิต)" } }]; },
     async funnel() {

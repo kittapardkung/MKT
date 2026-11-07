@@ -92,6 +92,7 @@ export interface ReportSnapshot { id: number; period_days: number; generated_at:
 export interface Api {
   weeklyReport(days: number): Promise<WeeklyReport | null>;
   reportSnapshots(): Promise<ReportSnapshot[]>;
+  analyzeReport(days: number): Promise<{ snapshot: ReportSnapshot; cached: boolean }>;
   mode: "demo" | "live";
   me(): Promise<Me | null>;
   signIn?(email: string, password: string): Promise<string | null>;

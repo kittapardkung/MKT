@@ -1373,3 +1373,17 @@ begin
 end $$;
 revoke all on function crm.get_weekly_report(int) from public, anon;
 grant execute on function crm.get_weekly_report(int) to authenticated, service_role;
+
+-- บันทึกบทวิเคราะห์ AI จากแอป (เรียกด้วยสิทธิ์ผู้ใช้ที่ล็อกอิน ไม่ใช้ service key) — เฉพาะ leadership
+create or replace function crm.save_report_snapshot(p_days int, p_report jsonb, p_overview text, p_person_texts jsonb) returns bigint
+language plpgsql security definer set search_path = crm, pg_temp as $$
+declare v_id bigint;
+begin
+  if not coalesce(crm.is_leadership(), false) then raise exception 'forbidden'; end if;
+  insert into crm.report_snapshots(period_days, report, overview_text, person_texts)
+  values (greatest(1, least(coalesce(p_days, 7), 90)), p_report, left(p_overview, 6000), coalesce(p_person_texts, '{}'::jsonb))
+  returning id into v_id;
+  return v_id;
+end $$;
+revoke all on function crm.save_report_snapshot(int, jsonb, text, jsonb) from public, anon;
+grant execute on function crm.save_report_snapshot(int, jsonb, text, jsonb) to authenticated, service_role;

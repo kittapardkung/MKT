@@ -80,6 +80,15 @@ export function createLiveApi(url: string, key: string): Api {
       const { data, error } = await sb.from("report_snapshots").select("*").order("generated_at", { ascending: false }).limit(12);
       fail(error); return (data ?? []) as ReportSnapshot[];
     },
+    async analyzeReport(days) {
+      const { data: s } = await sb.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) throw new Error("ต้องเข้าสู่ระบบก่อน");
+      const res = await fetch("/api/report-analysis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ days }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `error ${res.status}`);
+      return body as { snapshot: ReportSnapshot; cached: boolean };
+    },
     async funnel() {
       const { data, error } = await sb.from("v_funnel").select("*");
       fail(error); return (data ?? []) as Funnel[];

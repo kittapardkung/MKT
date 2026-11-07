@@ -327,3 +327,15 @@ do $$ declare n int; r jsonb; denied boolean := false; begin
   perform t_assert(r ? 'sales_quality', 'get_weekly_report: ผู้บริหารเรียกได้');
   perform t_reset();
 end $$;
+
+-- save_report_snapshot: leadership เท่านั้น
+do $$ declare denied boolean := false; v bigint; begin
+  perform t_as('10000000-0000-0000-0000-0000000000a1');
+  begin perform crm.save_report_snapshot(7, '{}'::jsonb, 'x', '{}'::jsonb); exception when others then denied := (sqlerrm = 'forbidden'); end;
+  perform t_assert(denied, 'save_report_snapshot: เซลล์ถูกปฏิเสธ');
+  perform t_reset();
+  perform t_as('10000000-0000-0000-0000-0000000000b1');
+  v := crm.save_report_snapshot(7, '{}'::jsonb, 'บทวิเคราะห์', '{"SA0001":"ok"}'::jsonb);
+  perform t_assert(v is not null, 'save_report_snapshot: ผู้จัดการบันทึกได้');
+  perform t_reset();
+end $$;

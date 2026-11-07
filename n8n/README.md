@@ -39,3 +39,4 @@
 ## หมายเหตุ
 - ถ้าหลัง Import โหนด AI Agent ในไฟล์ 01/02 ขึ้น "model is not supported in version 2.2" ให้ลบแล้วเพิ่มโหนด AI Agent ใหม่ (รุ่นล่าสุด) ต่อ Chat Model และ Output Parser เดิม
 - รายงานสรุปฝ่ายขายอยู่ในแอป เมนู "รายงาน" (อ่านจาก `crm.get_weekly_report`) ไม่มี workflow รายงานใน n8n และไม่ส่งรายงานทาง Telegram — ต้องรัน `supabase/crm/006_weekly_report.sql` และ `007_report_snapshots.sql` (หรือ `install_all.sql`) ครั้งเดียว
+- บทวิเคราะห์ AI ในหน้ารายงานสร้างจากปุ่ม "สร้างบทวิเคราะห์ AI" (เส้นทาง `/api/report-analysis` ฝั่งเซิร์ฟเวอร์ของแอป เรียก Claude) ต้องตั้ง `ANTHROPIC_API_KEY` ใน Vercel → Settings → Environment Variables (ห้ามใส่ในโค้ด/แชท); ส่ง AI เฉพาะตัวเลขสรุป ไม่มีชื่อ/เบอร์ลูกค้า; กันกดซ้ำภายใน 10 นาที
