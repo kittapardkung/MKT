@@ -262,7 +262,7 @@ w2.save("02_sales_reply.json")
 # 3) Weekly report: ทุกวันจันทร์ 08:30 (เวลาไทย) -> crm.weekly_report -> OpenAI เขียนรายงาน -> Telegram เจ้าของ
 # =====================================================================================
 w3 = WF("WULING Sale Lead - 03 Weekly Report (Supabase → AI → Telegram)")
-cfg3 = cfg_node(w3, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID", "days": "7", "appUrl": "https://wuling-sales-manager.vercel.app"})
+cfg3 = cfg_node(w3, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID", "days": "7"})
 sch = w3.add("ทุกวันจันทร์ 08:30", "n8n-nodes-base.scheduleTrigger", {"rule": {"interval": [{"field": "cronExpression", "expression": "30 8 * * 1"}]}}, [-1400, 200], 1.2)
 man = w3.add("รันเอง (ทดสอบ)", "n8n-nodes-base.manualTrigger", {}, [-1400, 400], 1)
 w3.link(sch, cfg3); w3.link(man, cfg3)
@@ -419,9 +419,6 @@ save = w3.add("บันทึกรายงานลงแอป", "n8n-nodes-
   "sendBody": True, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}", "options": {"timeout": 20000}},
   [0, -100], 4.2, SUPA_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=1500)
 w3.link(asm, save)
-ping = tg_send(w3, "Telegram: แจ้งว่ารายงานพร้อมในแอป", "={{ $('Config').first().json.adminChatId }}",
-  "=📊 รายงานฝ่ายขายประจำสัปดาห์พร้อมแล้ว เปิดดูในแอป Sale Lead เมนู \"รายงาน\"\n{{ $('Config').first().json.appUrl }}", [220, -100])
-w3.link(save, ping, 0)
 w3.link(save, err3, 1); w3.link(pai, err3, 1)
 
 w3.save("03_weekly_report.json")
