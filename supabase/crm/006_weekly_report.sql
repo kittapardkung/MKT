@@ -36,6 +36,33 @@ begin
         (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant) as active_leads
       from crm.sales_team s where s.role = 'sales' and s.active) t),
 
+    -- เชิงคุณภาพรายคน: ใช้เฉพาะตัวเลข/หมวดที่นับได้ ไม่ส่งข้อความอิสระ (โน้ต/เหตุผลเสียโอกาส) เพื่อไม่ให้ชื่อ/เบอร์หลุดไปถึง AI
+    'sales_quality', (select coalesce(jsonb_agg(to_jsonb(t) order by t.code), '[]') from (
+      select s.code,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at <= interval '1 hour') as first_contact_within_1h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '1 hour' and l.first_contact_at - l.assigned_at <= interval '4 hours') as first_contact_1_to_4h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '4 hours' and l.first_contact_at - l.assigned_at <= interval '24 hours') as first_contact_4_to_24h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '24 hours') as first_contact_over_24h,
+        (select coalesce(jsonb_object_agg(o.outcome, o.n), '{}'::jsonb) from (
+           select e.outcome, count(*) as n from crm.lead_events e
+           where e.actor_id = s.id and e.type in ('CONTACT_SUCCESS','CONTACT_ATTEMPT') and e.occurred_at > w0 and e.outcome is not null group by e.outcome) o) as contact_outcomes,
+        (select count(distinct (e.occurred_at at time zone 'Asia/Bangkok')::date) from crm.lead_events e
+           where e.actor_id = s.id and e.type in ('CONTACT_SUCCESS','CONTACT_ATTEMPT','SALES_REPLY') and e.occurred_at > w0) as active_days,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'NOTE' and e.occurred_at > w0) as notes_logged,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'SALES_REPLY' and e.occurred_at > w0) as telegram_replies,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as assigned_now_advanced,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'STAGE_CHANGE' and e.occurred_at > w0) as stage_changes,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'HOT') as active_hot,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'WARM') as active_warm,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'COLD') as active_cold,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature is null) as active_temp_unset,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.next_follow_up_at is not null) as active_with_next_followup,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant) as active_total,
+        (select coalesce(jsonb_agg(jsonb_build_object('model', m.model, 'n', m.n) order by m.n desc), '[]'::jsonb) from (
+           select coalesce(nullif(btrim(l.interested_model), ''), 'ไม่ระบุ') as model, count(*) as n from crm.leads l
+           where l.owner_id = s.id and l.assigned_at > w0 group by 1 order by 2 desc limit 4) m) as models_requested
+      from crm.sales_team s where s.role = 'sales' and s.active) t),
+
     'leads_by_source', (select coalesce(jsonb_agg(to_jsonb(t) order by t.this_period desc), '[]') from (
       select source, count(*) filter (where created_at > w0) as this_period,
              count(*) filter (where created_at > w1 and created_at <= w0) as previous_period

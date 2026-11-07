@@ -341,5 +341,99 @@ w3.link(split, send3)
 err3 = tg_send(w3, "Telegram: รายงานสร้างไม่สำเร็จ", "={{ $('Config').first().json.adminChatId }}",
   "=รายงานรายสัปดาห์สร้างไม่สำเร็จ ดูรายละเอียดที่ n8n แท็บ Executions ของ workflow 03 (ดึงข้อมูลจาก Supabase หรือเรียก OpenAI ไม่ได้) รันซ้ำได้ด้วยปุ่มรันเอง", [-440, 520])
 w3.link(rep, err3, 1); w3.link(ai, err3, 1)
+
+# ---- รายงานแยกรายคน (เชิงปริมาณ + เชิงคุณภาพ) ส่งถึงเจ้าของ ทีละคน ----
+SYS_PERSON = """คุณคือโค้ชฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนรายงานผลงานรายบุคคลให้เจ้าของ
+ได้รับ JSON ของเซลล์ 1 คน (quant = ตัวเลขปริมาณ, quality = ตัวเลขพฤติกรรมการทำงาน, team = ค่าเฉลี่ยทีมไว้เทียบ) ไม่มีชื่อ/เบอร์ลูกค้า
+
+กติกา
+1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ข้อมูลไม่พอให้บอกว่าขาดอะไร
+2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด เปลี่ยนเจ้าของลีด) และห้ามตัดสินคนจากตัวเลขเดียว ให้เสนอเป็นข้อเสนอให้ผู้จัดการพิจารณา
+3. ตัวเลขบันทึกในระบบไม่ใช่จำนวนสายจริง บันทึกน้อยให้เขียนว่า "ยังไม่ได้บันทึก" ไม่ใช่ "ไม่ทำงาน"
+4. งานค้างลีดเก่าก่อน 3 พ.ย. 2026 ไม่นำมาประเมินวินัย
+5. ห้ามใส่ชื่อ/เบอร์ลูกค้า อ้างลีดด้วย lead_code เท่านั้น
+6. ไม่ใช้อีโมจิ ไม่ใช้ markdown ภาษาไทย ประโยคสั้น น้ำเสียงให้เกียรติ ใช้สำหรับพัฒนาคน
+7. ยาวไม่เกิน 1,400 ตัวอักษร
+
+รูปแบบ (ตามนี้เท่านั้น)
+เชิงปริมาณ: 2-3 ข้อ (ปริมาณงานเทียบทีมและเทียบช่วงก่อนหน้า)
+เชิงคุณภาพ: 3 ข้อ จากข้อมูลพฤติกรรม เช่น ความเร็วตอบสนอง สัดส่วนติดต่อสำเร็จต่อไม่รับสาย ความต่อเนื่องในการทำงานรายวัน การตั้งนัดติดตามต่อ การไล่ระดับความร้อนของลีด การเลื่อนสถานะ
+จุดเด่น: 1-2 ข้อ
+จุดที่ควรพัฒนา: 1-2 ข้อ
+ข้อเสนอการโค้ช: 3 ข้อ สิ่งที่ผู้จัดการควรคุยหรือช่วย (ไม่ใช่คำสั่ง)
+ลีดที่ควรติดตามก่อน: lead_code ไม่เกิน 5 รายการจาก risk_leads (ถ้าไม่มีให้เขียน ไม่มี)
+ข้อมูลที่ขาด: ไม่เกิน 2 ข้อ (ถ้าไม่มีให้เขียน ไม่มี)"""
+PERSON_JS = r"""// สร้างรายงานรายคน: ตัวเลขสรุปคำนวณเองในโค้ด + prompt ให้ AI วิเคราะห์เชิงคุณภาพ (ไม่มีชื่อ/เบอร์ลูกค้า)
+const rep = $input.first().json;
+const cfg = $('Config').first().json;
+const sys = __SYS__;
+const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const num = (v) => Number(v) || 0;
+const pct = (a, b) => b ? Math.round(a * 100 / b) + '%' : '-';
+const S = rep.sales || [], Q = rep.sales_quality || [], risk = rep.risk_leads || [];
+const avg = (k) => S.length ? S.reduce((a, x) => a + num(x[k]), 0) / S.length : 0;
+const team = { leads_assigned: avg('leads_assigned'), contacted: avg('contacted'), not_contacted: avg('not_contacted'), contact_logs: avg('contact_logs'), overdue_tasks_new: avg('overdue_tasks_new') };
+const hrs = S.map(x => x.avg_hours_to_first_contact).filter(x => x !== null && x !== undefined).map(Number);
+team.avg_hours_to_first_contact = hrs.length ? +(hrs.reduce((a, b) => a + b, 0) / hrs.length).toFixed(1) : null;
+const days = rep.period_days || 7;
+const out = [];
+for (const x of S) {
+  const q = Q.find(y => y.code === x.code) || {};
+  const o = q.contact_outcomes || {};
+  const ok = num(o.CONNECTED) + num(o.REPLIED), noans = num(o.NO_ANSWER), msg = num(o.MESSAGE_SENT), wrong = num(o.WRONG_NUMBER);
+  const att = ok + noans + msg + wrong;
+  const fc = num(q.first_contact_within_1h) + num(q.first_contact_1_to_4h) + num(q.first_contact_4_to_24h) + num(q.first_contact_over_24h);
+  const mine = risk.filter(r => r.sales === x.code).slice(0, 5);
+  const lines = [
+    '<b>👤 ' + esc(x.code) + ' ' + esc(x.name || '') + '</b> (' + days + ' วัน)', '',
+    '<b>เชิงปริมาณ</b>',
+    '• ลีดใหม่ ' + num(x.leads_assigned) + ' (ช่วงก่อน ' + num(x.leads_assigned_prev) + ', เฉลี่ยทีม ' + team.leads_assigned.toFixed(0) + ')',
+    '• ติดต่อแล้ว ' + num(x.contacted) + ' · ยังไม่ติดต่อ ' + num(x.not_contacted) + ' · HOT ' + num(x.hot_leads_assigned),
+    '• บันทึกผลติดต่อ ' + num(x.contact_logs) + ' ครั้ง (ช่วงก่อน ' + num(x.contact_logs_prev) + ')',
+    '• งานเลยกำหนด ลีดใหม่ ' + num(x.overdue_tasks_new) + ' · ลีดเก่า ' + num(x.overdue_tasks_legacy),
+    '• จอง ' + num(x.bookings_reported) + ' · เสียโอกาสในช่วง ' + num(x.lost_in_period) + ' · ลีดที่กำลังดูแล ' + num(x.active_leads),
+    '• ติดต่อครั้งแรกเฉลี่ย ' + (x.avg_hours_to_first_contact === null || x.avg_hours_to_first_contact === undefined ? '-' : x.avg_hours_to_first_contact + ' ชม.') + ' (ทีม ' + (team.avg_hours_to_first_contact === null ? '-' : team.avg_hours_to_first_contact + ' ชม.') + ')',
+    '', '<b>เชิงคุณภาพ (จากพฤติกรรมในระบบ)</b>',
+    '• ติดต่อครั้งแรกใน 1 ชม. ' + num(q.first_contact_within_1h) + ' · 1-4 ชม. ' + num(q.first_contact_1_to_4h) + ' · 4-24 ชม. ' + num(q.first_contact_4_to_24h) + ' · เกิน 24 ชม. ' + num(q.first_contact_over_24h),
+    '• ผลการติดต่อ: สำเร็จ ' + ok + ' · ไม่รับสาย ' + noans + ' · ส่งข้อความ ' + msg + ' · เบอร์ผิด ' + wrong + ' (สำเร็จ ' + pct(ok, att) + ')',
+    '• ทำงานต่อเนื่อง ' + num(q.active_days) + '/' + days + ' วัน · ตอบแจ้งเตือนผ่าน Telegram ' + num(q.telegram_replies) + ' ครั้ง',
+    '• ลีดที่ตั้งนัดติดตามต่อ ' + num(q.active_with_next_followup) + '/' + num(q.active_total) + ' (' + pct(num(q.active_with_next_followup), num(q.active_total)) + ')',
+    '• ลีดใหม่ที่เลื่อนไปถึงนัด/เสนอราคาขึ้นไป ' + num(q.assigned_now_advanced) + '/' + num(x.leads_assigned) + ' · เปลี่ยนสถานะ ' + num(q.stage_changes) + ' ครั้ง',
+    '• ลีดที่ดูแล: HOT ' + num(q.active_hot) + ' · WARM ' + num(q.active_warm) + ' · COLD ' + num(q.active_cold) + ' · ยังไม่ประเมิน ' + num(q.active_temp_unset)
+  ];
+  const models = (q.models_requested || []).map(m => esc(m.model) + ' ' + m.n).join(', ');
+  if (models) lines.push('• รุ่นที่ลูกค้าสนใจ: ' + models);
+  const user = 'ช่วงรายงาน ' + days + ' วัน สร้างเมื่อ ' + rep.generated_at + '\n\nข้อมูลเซลล์ (JSON):\n' + JSON.stringify({ quant: x, quality: q, team, risk_leads: mine, note: rep.note });
+  out.push({ json: { code: x.code, chatId: String(cfg.adminChatId), digest: lines.join('\n'), body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } });
+}
+return out;""".replace("__SYS__", json.dumps(SYS_PERSON, ensure_ascii=False))
+pbuild = w3.add("สร้างรายงานรายคน", "n8n-nodes-base.code", {"jsCode": PERSON_JS}, [-660, -100], 2)
+w3.link(rep, pbuild, 0)
+pai = w3.add("OpenAI วิเคราะห์รายคน", "n8n-nodes-base.httpRequest", {"method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+  "authentication": "predefinedCredentialType", "nodeCredentialType": "openAiApi", "sendBody": True, "specifyBody": "json", "jsonBody": "={{ $json.body }}", "options": {"timeout": 120000}},
+  [-440, -100], 4.2, OAI_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000)
+w3.link(pbuild, pai)
+PSPLIT_JS = r"""// รวมตัวเลขรายคน + บทวิเคราะห์ AI เป็นข้อความเดียวต่อคน (แบ่งถ้าเกิน 3800 ตัวอักษร)
+const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const items = $('สร้างรายงานรายคน').all();
+const res = $input.all();
+const outs = [];
+res.forEach((r, i) => {
+  const pi = r.pairedItem && r.pairedItem.item !== undefined ? r.pairedItem.item : i;
+  const src = items[pi] ? items[pi].json : {};
+  const content = String(r.json.choices && r.json.choices[0] && r.json.choices[0].message && r.json.choices[0].message.content || '').trim();
+  const text = src.digest + '\n\n<b>🧠 วิเคราะห์และข้อเสนอโค้ช</b>\n' + esc(content || 'AI ไม่ส่งบทวิเคราะห์กลับมา (ดูตัวเลขด้านบนได้ตามปกติ)');
+  const parts = []; let cur = '';
+  for (const l of text.split('\n')) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
+  if (cur) parts.push(cur);
+  parts.forEach(p => outs.push({ json: { chatId: src.chatId, text: p } }));
+});
+return outs;"""
+psplit = w3.add("จัดข้อความรายคน", "n8n-nodes-base.code", {"jsCode": PSPLIT_JS}, [-220, -100], 2)
+w3.link(pai, psplit, 0)
+psend = tg_send(w3, "Telegram: ส่งรายงานรายคน", "={{ $json.chatId }}", "={{ $json.text }}", [0, -100])
+w3.link(psplit, psend)
+w3.link(pai, err3, 1)
+
 w3.save("03_weekly_report.json")
 print("ok")

@@ -304,3 +304,9 @@ do $$ declare r jsonb; begin
   r := crm.weekly_report(7);
   perform t_assert((r->'sales'->0) ? 'overdue_tasks_new' and (r->'sales'->0) ? 'overdue_tasks_legacy', 'รายงาน: แยกงานเลยกำหนดลีดใหม่/ลีดเก่า');
 end $$;
+
+do $$ declare r jsonb; begin
+  r := crm.weekly_report(7);
+  perform t_assert(r ? 'sales_quality' and jsonb_array_length(r->'sales_quality') = jsonb_array_length(r->'sales'), 'รายงาน: มีเชิงคุณภาพรายคนครบทุกเซลล์');
+  perform t_assert(position('0812340099' in r::text) = 0 and position('นามสมมติ' in r::text) = 0, 'รายงานคุณภาพ: ไม่มีชื่อ/เบอร์');
+end $$;
