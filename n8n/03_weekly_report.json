@@ -6,19 +6,19 @@
         "assignments": {
           "assignments": [
             {
-              "id": "d26b3387-2216-4e16-b5ce-eb99508ebe31",
+              "id": "17a473fc-ed1e-44ee-963c-6761837a0769",
               "name": "supabaseUrl",
               "value": "https://REPLACE_PROJECT_REF.supabase.co",
               "type": "string"
             },
             {
-              "id": "c534b586-fcdb-4b80-8311-f056748a671e",
+              "id": "82177c34-6d1c-4f9a-b40f-d65f1fc59b7c",
               "name": "adminChatId",
               "value": "REPLACE_ADMIN_TELEGRAM_CHAT_ID",
               "type": "string"
             },
             {
-              "id": "f8988e92-c815-427b-8e2e-b22db08fe73b",
+              "id": "aca1893e-3d71-461a-b163-5577e96b358d",
               "name": "days",
               "value": "7",
               "type": "string"
@@ -28,7 +28,7 @@
         "includeOtherFields": true,
         "options": {}
       },
-      "id": "36727aea-9fe9-4e8f-9e27-b545870d4801",
+      "id": "7bd6fcb0-ba35-48f1-949a-03fd52e46a92",
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -48,7 +48,7 @@
           ]
         }
       },
-      "id": "32f7f14f-5c1c-4f35-aca3-9c7a8b8c2c49",
+      "id": "099d0282-0753-4358-ba90-7c3421b64e39",
       "name": "ทุกวันจันทร์ 08:30",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -59,7 +59,7 @@
     },
     {
       "parameters": {},
-      "id": "e27fda09-ba38-43ed-9350-eda852681d01",
+      "id": "fb3af2da-1f64-4600-9790-8e7c85909230",
       "name": "รันเอง (ทดสอบ)",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
@@ -98,7 +98,7 @@
           "timeout": 20000
         }
       },
-      "id": "5433ac1e-d7b4-4b8e-93ad-1a3edc206f26",
+      "id": "365d6e1d-7c84-4a2d-8e80-bc6cd62eee7c",
       "name": "Supabase weekly_report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -119,9 +119,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// ประกอบ prompt + ข้อมูล JSON ส่ง OpenAI (ข้อมูลไม่มีชื่อ/เบอร์ลูกค้า)\nconst rep = $input.first().json;\nconst sys = \"คุณคือนักวิเคราะห์ฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนรายงานรายสัปดาห์ให้เจ้าของ\\nข้อมูลที่ได้รับเป็น JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อหรือเบอร์ลูกค้า) เวลาในข้อมูลเป็น UTC เวลาไทย = UTC+7\\n\\nกติกา\\n1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ถ้าข้อมูลไม่พอให้เขียนว่า \\\"ข้อมูลไม่พอ\\\" และบอกว่าขาดอะไร\\n2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด การเปลี่ยนเจ้าของลีด การอนุมัติ) ให้เสนอเป็น \\\"ข้อเสนอให้ผู้จัดการพิจารณา\\\" เท่านั้น\\n3. ห้ามใส่ชื่อหรือเบอร์โทรลูกค้า อ้างลีดด้วย lead_code เท่านั้น\\n4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว ให้เทียบโดยดูจำนวนลีดที่ได้รับ สัดส่วนลีด HOT และช่วงเวลาที่ลีดเข้าประกอบ\\n5. จอง สินเชื่อ ส่งมอบ ปิดการขาย นับเฉพาะรายการที่ verified = true ที่ยังไม่ยืนยันให้เรียก \\\"รอตรวจสอบ\\\"\\n6. ตัวเลขบันทึกผลติดต่อของเซลล์คือที่บันทึกในระบบ ไม่ใช่จำนวนสายที่โทรจริง ถ้าต่ำให้เขียนว่า \\\"ยังไม่ได้บันทึก\\\" ไม่ใช่ \\\"ไม่ทำงาน\\\"\\n7. ข้อมูลก่อน 3 พ.ย. 2026 มาจาก Google Sheet เดิม ไม่มีประวัติเปลี่ยนสถานะละเอียด ให้ระบุข้อจำกัดนี้เมื่อเทียบกับช่วงก่อนหน้าที่คาบเกี่ยววันนี้\\n8. ไม่ใช้อีโมจิ ไม่ใช้ markdown (ห้าม ** # ``` และตาราง) ใช้ข้อความธรรมดา ขึ้นหัวข้อด้วยเลขและจุด และขีด - นำหน้ารายการ ภาษาไทย ประโยคสั้น ตัวเลขมีหน่วย\\n9. ยาวไม่เกิน 3,500 ตัวอักษร\\n\\nโครงรายงาน (หัวข้อไหนไม่มีข้อมูลให้เขียนว่า \\\"ไม่มีข้อมูลในสัปดาห์นี้\\\")\\n1. สรุปผู้บริหาร (ไม่เกิน 5 บรรทัด)\\n2. ภาพรวมลีดเทียบช่วงก่อนหน้า (ลีดใหม่ แหล่งที่มา การกระจายเซลล์ ลีดไม่มีผู้ดูแล)\\n3. ความเร็วและวินัยการติดต่อ (เวลาติดต่อครั้งแรก ลีดยังไม่ได้ติดต่อ งานเลยกำหนด)\\n4. ผลงานเซลล์รายคน (ตัวเลขสำคัญ จุดเด่น จุดที่ควรพัฒนา ข้อเสนอการโค้ช)\\n5. ท่อขายและการเปลี่ยนสถานะ\\n6. การจอง สินเชื่อ และส่งมอบ\\n7. ลีดเสี่ยงที่ต้องดูแลพิเศษ (lead_code พร้อมเหตุผล)\\n8. คุณภาพข้อมูลและสุขภาพระบบ (รายการข้อมูลผิดปกติ ข้อความที่ระบบไม่รับ)\\n9. ข้อเสนอและเรื่องที่ผู้จัดการต้องตัดสินใจ (3 เรื่องสำคัญที่สุด)\\n10. ข้อมูลที่ขาดหรือน่าสงสัย\";\nconst days = rep.period_days || 7;\nconst user = 'ช่วงรายงาน: ' + days + ' วันล่าสุด (สร้างเมื่อ ' + rep.generated_at + ')\\n\\nข้อมูล JSON:\\n' + JSON.stringify(rep);\nreturn [{ json: { body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];"
+        "jsCode": "// ประกอบ prompt + ข้อมูล JSON ส่ง OpenAI (ข้อมูลไม่มีชื่อ/เบอร์ลูกค้า)\nconst rep = $input.first().json;\nconst sys = \"คุณคือที่ปรึกษาฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนบทวิเคราะห์สั้นให้เจ้าของ\\nได้รับ JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อ/เบอร์ลูกค้า) ตารางตัวเลขและสถานะไฟระบบสร้างให้แล้ว หน้าที่ของคุณคือบอกว่า \\\"ตัวเลขนี้หมายความว่าอะไร และต้องทำอะไร\\\" เท่านั้น ห้ามเล่าตัวเลขซ้ำยาวๆ\\n\\nกติกา\\n1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ข้อมูลไม่พอให้บอกว่าขาดอะไร\\n2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด เปลี่ยนเจ้าของลีด อนุมัติ) ให้เสนอเป็น \\\"ข้อเสนอให้ผู้จัดการพิจารณา\\\"\\n3. ห้ามใส่ชื่อ/เบอร์ลูกค้า อ้างลีดด้วย lead_code เท่านั้น\\n4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว\\n5. จอง/สินเชื่อ/ส่งมอบ/ปิดการขาย นับเฉพาะ verified = true\\n6. ตัวเลขบันทึกผลติดต่อคือที่บันทึกในระบบ ไม่ใช่จำนวนสายจริง\\n7. งานค้างลีดเก่า (ก่อน 3 พ.ย. 2026) แยกจากงานค้างลีดใหม่ ให้ประเมินวินัยจากลีดใหม่เป็นหลัก\\n8. ไม่ใช้อีโมจิ ไม่ใช้ markdown ภาษาไทย ประโยคสั้น\\n9. ยาวไม่เกิน 1,200 ตัวอักษร\\n\\nรูปแบบ (ตามนี้เท่านั้น)\\nสิ่งที่เห็น: 3 ข้อ ข้อละ 1 ประโยค\\nต้องตัดสินใจสัปดาห์นี้: 3 ข้อ เรียงตามความสำคัญ แต่ละข้อบอกว่าใครควรทำอะไร\\nข้อมูลที่ขาด/น่าสงสัย: ไม่เกิน 2 ข้อ (ถ้าไม่มีให้เขียน ไม่มี)\";\nconst days = rep.period_days || 7;\nconst esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst pad = (v, n) => String(v).padEnd(n);\nconst num = (v) => Number(v) || 0;\nconst light = (ok, warn) => ok ? '🟢' : (warn ? '🟡' : '🔴');\nconst S = rep.sales || [];\nconst sum = (k) => S.reduce((a, x) => a + num(x[k]), 0);\nconst newLeads = sum('leads_assigned'), prevLeads = sum('leads_assigned_prev');\nconst notCont = sum('not_contacted'), ovNew = sum('overdue_tasks_new'), ovOld = sum('overdue_tasks_legacy');\nconst hrs = S.map(x => x.avg_hours_to_first_contact).filter(x => x !== null && x !== undefined).map(Number);\nconst avgH = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;\nconst book = sum('bookings_reported'), bookV = sum('bookings_verified_total');\nconst unassigned = num(rep.unassigned_leads);\nconst table = S.map(x => '<b>' + esc(x.code) + '</b>  ใหม่ ' + num(x.leads_assigned) + ' · ติดต่อแล้ว ' + num(x.contacted) + ' · ค้าง ' + num(x.not_contacted) + ' · เลยกำหนด ' + num(x.overdue_tasks_new) + ' · เร็ว ' + (x.avg_hours_to_first_contact === null ? '-' : x.avg_hours_to_first_contact + ' ชม.')).join('\\n');\nconst trend = prevLeads ? (newLeads >= prevLeads ? '▲' : '▼') + ' ' + Math.abs(Math.round((newLeads - prevLeads) * 100 / prevLeads)) + '% จากช่วงก่อน' : 'ไม่มีช่วงก่อนเทียบ';\nconst digest = '<b>📊 รายงานฝ่ายขาย WULING Chonburi</b>\\n' + days + ' วันล่าสุด\\n\\n' +\n  light(newLeads > 0, false) + ' ลีดใหม่ <b>' + newLeads + '</b> (' + trend + ')\\n' +\n  light(avgH !== null && avgH <= 4, avgH !== null && avgH <= 8) + ' ติดต่อครั้งแรกเฉลี่ย <b>' + (avgH === null ? '-' : avgH.toFixed(1) + ' ชม.') + '</b> (เป้า ≤ 4 ชม.)\\n' +\n  light(notCont === 0, notCont <= 3) + ' ยังไม่ได้ติดต่อ <b>' + notCont + '</b> ลีด\\n' +\n  light(ovNew === 0, ovNew <= 5) + ' งานเลยกำหนด (ลีดใหม่) <b>' + ovNew + '</b>\\n' +\n  light(unassigned === 0, false) + ' ลีดไม่มีผู้ดูแล <b>' + unassigned + '</b>\\n' +\n  '📌 จอง <b>' + book + '</b> (ยืนยันแล้วสะสม ' + bookV + ')\\n\\n' +\n  '<b>รายคน</b>\\n' + table + '\\n\\n' +\n  '<i>งานค้างลีดเก่าก่อน 3 พ.ย. แยกนับ: ' + ovOld + ' งาน (ไม่รวมในไฟด้านบน)</i>';\nconst user = 'ช่วงรายงาน: ' + days + ' วันล่าสุด (สร้างเมื่อ ' + rep.generated_at + ')\\n\\nข้อมูล JSON:\\n' + JSON.stringify(rep);\nreturn [{ json: { digest, body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];"
       },
-      "id": "2eea569c-3ff2-465f-be8c-60a74d1f8031",
+      "id": "a5bfd8cf-d28f-4531-bfd4-94b0df92b3a6",
       "name": "Build prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -143,7 +143,7 @@
           "timeout": 120000
         }
       },
-      "id": "542ae4b5-0149-4155-b0ff-a2a3441f29ee",
+      "id": "4d407e3b-f73f-4fb3-a92a-5db64e0b9d6b",
       "name": "OpenAI เขียนรายงาน",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -164,9 +164,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// แบ่งข้อความตามขีดจำกัด Telegram (4096) และ escape สำหรับโหมด HTML\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();\nif (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');\nconst esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);\nconst text = 'รายงานรายสัปดาห์ฝ่ายขาย WULING Chonburi (สร้างเมื่อ ' + d + ')\\n\\n' + content;\nconst lines = text.split('\\n').map(esc), parts = []; let cur = '';\nfor (const l of lines) { if ((cur + '\\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\\n' + l : l; } }\nif (cur) parts.push(cur);\nreturn parts.map((p, i) => ({ json: { chatId: String(cfg.adminChatId), text: p + (parts.length > 1 ? '\\n\\n(' + (i + 1) + '/' + parts.length + ')' : '') } }));"
+        "jsCode": "// แบ่งข้อความตามขีดจำกัด Telegram (4096) และ escape สำหรับโหมด HTML\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();\nif (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');\nconst esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst digest = $('Build prompt').first().json.digest;\nconst text = '<b>🧠 วิเคราะห์และข้อเสนอ</b>\\n' + esc(content);\nconst parts = []; let cur = '';\nfor (const l of text.split('\\n')) { if ((cur + '\\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\\n' + l : l; } }\nif (cur) parts.push(cur);\nreturn [digest].concat(parts).map(p => ({ json: { chatId: String(cfg.adminChatId), text: p } }));"
       },
-      "id": "0b2de4d9-80ad-40bd-ad28-eab2a0303820",
+      "id": "ff7ef646-a128-4cab-aca2-ee87140dcb87",
       "name": "แบ่งข้อความ",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -184,7 +184,7 @@
           "parse_mode": "HTML"
         }
       },
-      "id": "b0f5475d-5d36-411d-88c7-7e5a98bd89ab",
+      "id": "0a33f2fa-5503-4073-b76e-88207dc2966e",
       "name": "Telegram: ส่งรายงานถึงเจ้าของ",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -208,7 +208,7 @@
           "parse_mode": "HTML"
         }
       },
-      "id": "4794f763-0408-4d26-b35b-e4751026308e",
+      "id": "8b5d59e0-bf19-40e3-8fe5-e10d1a41801f",
       "name": "Telegram: รายงานสร้างไม่สำเร็จ",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,

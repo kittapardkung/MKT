@@ -269,37 +269,53 @@ w3.link(sch, cfg3); w3.link(man, cfg3)
 rep = rpc(w3, "Supabase weekly_report", "weekly_report", "={{ JSON.stringify({ p_days: Number($('Config').first().json.days) || 7 }) }}", [-880, 300])
 w3.link(cfg3, rep)
 
-SYS_REPORT = """คุณคือนักวิเคราะห์ฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนรายงานรายสัปดาห์ให้เจ้าของ
-ข้อมูลที่ได้รับเป็น JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อหรือเบอร์ลูกค้า) เวลาในข้อมูลเป็น UTC เวลาไทย = UTC+7
+SYS_REPORT = """คุณคือที่ปรึกษาฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนบทวิเคราะห์สั้นให้เจ้าของ
+ได้รับ JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อ/เบอร์ลูกค้า) ตารางตัวเลขและสถานะไฟระบบสร้างให้แล้ว หน้าที่ของคุณคือบอกว่า "ตัวเลขนี้หมายความว่าอะไร และต้องทำอะไร" เท่านั้น ห้ามเล่าตัวเลขซ้ำยาวๆ
 
 กติกา
-1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ถ้าข้อมูลไม่พอให้เขียนว่า "ข้อมูลไม่พอ" และบอกว่าขาดอะไร
-2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด การเปลี่ยนเจ้าของลีด การอนุมัติ) ให้เสนอเป็น "ข้อเสนอให้ผู้จัดการพิจารณา" เท่านั้น
-3. ห้ามใส่ชื่อหรือเบอร์โทรลูกค้า อ้างลีดด้วย lead_code เท่านั้น
-4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว ให้เทียบโดยดูจำนวนลีดที่ได้รับ สัดส่วนลีด HOT และช่วงเวลาที่ลีดเข้าประกอบ
-5. จอง สินเชื่อ ส่งมอบ ปิดการขาย นับเฉพาะรายการที่ verified = true ที่ยังไม่ยืนยันให้เรียก "รอตรวจสอบ"
-6. ตัวเลขบันทึกผลติดต่อของเซลล์คือที่บันทึกในระบบ ไม่ใช่จำนวนสายที่โทรจริง ถ้าต่ำให้เขียนว่า "ยังไม่ได้บันทึก" ไม่ใช่ "ไม่ทำงาน"
-7. ข้อมูลก่อน 3 พ.ย. 2026 มาจาก Google Sheet เดิม ไม่มีประวัติเปลี่ยนสถานะละเอียด ให้ระบุข้อจำกัดนี้เมื่อเทียบกับช่วงก่อนหน้าที่คาบเกี่ยววันนี้
-8. ไม่ใช้อีโมจิ ไม่ใช้ markdown (ห้าม ** # ``` และตาราง) ใช้ข้อความธรรมดา ขึ้นหัวข้อด้วยเลขและจุด และขีด - นำหน้ารายการ ภาษาไทย ประโยคสั้น ตัวเลขมีหน่วย
-9. ยาวไม่เกิน 3,500 ตัวอักษร
+1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ข้อมูลไม่พอให้บอกว่าขาดอะไร
+2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด เปลี่ยนเจ้าของลีด อนุมัติ) ให้เสนอเป็น "ข้อเสนอให้ผู้จัดการพิจารณา"
+3. ห้ามใส่ชื่อ/เบอร์ลูกค้า อ้างลีดด้วย lead_code เท่านั้น
+4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว
+5. จอง/สินเชื่อ/ส่งมอบ/ปิดการขาย นับเฉพาะ verified = true
+6. ตัวเลขบันทึกผลติดต่อคือที่บันทึกในระบบ ไม่ใช่จำนวนสายจริง
+7. งานค้างลีดเก่า (ก่อน 3 พ.ย. 2026) แยกจากงานค้างลีดใหม่ ให้ประเมินวินัยจากลีดใหม่เป็นหลัก
+8. ไม่ใช้อีโมจิ ไม่ใช้ markdown ภาษาไทย ประโยคสั้น
+9. ยาวไม่เกิน 1,200 ตัวอักษร
 
-โครงรายงาน (หัวข้อไหนไม่มีข้อมูลให้เขียนว่า "ไม่มีข้อมูลในสัปดาห์นี้")
-1. สรุปผู้บริหาร (ไม่เกิน 5 บรรทัด)
-2. ภาพรวมลีดเทียบช่วงก่อนหน้า (ลีดใหม่ แหล่งที่มา การกระจายเซลล์ ลีดไม่มีผู้ดูแล)
-3. ความเร็วและวินัยการติดต่อ (เวลาติดต่อครั้งแรก ลีดยังไม่ได้ติดต่อ งานเลยกำหนด)
-4. ผลงานเซลล์รายคน (ตัวเลขสำคัญ จุดเด่น จุดที่ควรพัฒนา ข้อเสนอการโค้ช)
-5. ท่อขายและการเปลี่ยนสถานะ
-6. การจอง สินเชื่อ และส่งมอบ
-7. ลีดเสี่ยงที่ต้องดูแลพิเศษ (lead_code พร้อมเหตุผล)
-8. คุณภาพข้อมูลและสุขภาพระบบ (รายการข้อมูลผิดปกติ ข้อความที่ระบบไม่รับ)
-9. ข้อเสนอและเรื่องที่ผู้จัดการต้องตัดสินใจ (3 เรื่องสำคัญที่สุด)
-10. ข้อมูลที่ขาดหรือน่าสงสัย"""
+รูปแบบ (ตามนี้เท่านั้น)
+สิ่งที่เห็น: 3 ข้อ ข้อละ 1 ประโยค
+ต้องตัดสินใจสัปดาห์นี้: 3 ข้อ เรียงตามความสำคัญ แต่ละข้อบอกว่าใครควรทำอะไร
+ข้อมูลที่ขาด/น่าสงสัย: ไม่เกิน 2 ข้อ (ถ้าไม่มีให้เขียน ไม่มี)"""
 BUILD_JS = r"""// ประกอบ prompt + ข้อมูล JSON ส่ง OpenAI (ข้อมูลไม่มีชื่อ/เบอร์ลูกค้า)
 const rep = $input.first().json;
-const sys = %s;
+const sys = __SYS__;
 const days = rep.period_days || 7;
+const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const pad = (v, n) => String(v).padEnd(n);
+const num = (v) => Number(v) || 0;
+const light = (ok, warn) => ok ? '🟢' : (warn ? '🟡' : '🔴');
+const S = rep.sales || [];
+const sum = (k) => S.reduce((a, x) => a + num(x[k]), 0);
+const newLeads = sum('leads_assigned'), prevLeads = sum('leads_assigned_prev');
+const notCont = sum('not_contacted'), ovNew = sum('overdue_tasks_new'), ovOld = sum('overdue_tasks_legacy');
+const hrs = S.map(x => x.avg_hours_to_first_contact).filter(x => x !== null && x !== undefined).map(Number);
+const avgH = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;
+const book = sum('bookings_reported'), bookV = sum('bookings_verified_total');
+const unassigned = num(rep.unassigned_leads);
+const table = S.map(x => '<b>' + esc(x.code) + '</b>  ใหม่ ' + num(x.leads_assigned) + ' · ติดต่อแล้ว ' + num(x.contacted) + ' · ค้าง ' + num(x.not_contacted) + ' · เลยกำหนด ' + num(x.overdue_tasks_new) + ' · เร็ว ' + (x.avg_hours_to_first_contact === null ? '-' : x.avg_hours_to_first_contact + ' ชม.')).join('\n');
+const trend = prevLeads ? (newLeads >= prevLeads ? '▲' : '▼') + ' ' + Math.abs(Math.round((newLeads - prevLeads) * 100 / prevLeads)) + '% จากช่วงก่อน' : 'ไม่มีช่วงก่อนเทียบ';
+const digest = '<b>📊 รายงานฝ่ายขาย WULING Chonburi</b>\n' + days + ' วันล่าสุด\n\n' +
+  light(newLeads > 0, false) + ' ลีดใหม่ <b>' + newLeads + '</b> (' + trend + ')\n' +
+  light(avgH !== null && avgH <= 4, avgH !== null && avgH <= 8) + ' ติดต่อครั้งแรกเฉลี่ย <b>' + (avgH === null ? '-' : avgH.toFixed(1) + ' ชม.') + '</b> (เป้า ≤ 4 ชม.)\n' +
+  light(notCont === 0, notCont <= 3) + ' ยังไม่ได้ติดต่อ <b>' + notCont + '</b> ลีด\n' +
+  light(ovNew === 0, ovNew <= 5) + ' งานเลยกำหนด (ลีดใหม่) <b>' + ovNew + '</b>\n' +
+  light(unassigned === 0, false) + ' ลีดไม่มีผู้ดูแล <b>' + unassigned + '</b>\n' +
+  '📌 จอง <b>' + book + '</b> (ยืนยันแล้วสะสม ' + bookV + ')\n\n' +
+  '<b>รายคน</b>\n' + table + '\n\n' +
+  '<i>งานค้างลีดเก่าก่อน 3 พ.ย. แยกนับ: ' + ovOld + ' งาน (ไม่รวมในไฟด้านบน)</i>';
 const user = 'ช่วงรายงาน: ' + days + ' วันล่าสุด (สร้างเมื่อ ' + rep.generated_at + ')\n\nข้อมูล JSON:\n' + JSON.stringify(rep);
-return [{ json: { body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];""" % json.dumps(SYS_REPORT, ensure_ascii=False)
+return [{ json: { digest, body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];""".replace("__SYS__", json.dumps(SYS_REPORT, ensure_ascii=False))
 build = w3.add("Build prompt", "n8n-nodes-base.code", {"jsCode": BUILD_JS}, [-660, 300], 2)
 w3.link(rep, build, 0)
 ai = w3.add("OpenAI เขียนรายงาน", "n8n-nodes-base.httpRequest", {"method": "POST", "url": "https://api.openai.com/v1/chat/completions",
@@ -312,12 +328,12 @@ const res = $input.first().json;
 const content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();
 if (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-const text = 'รายงานรายสัปดาห์ฝ่ายขาย WULING Chonburi (สร้างเมื่อ ' + d + ')\n\n' + content;
-const lines = text.split('\n').map(esc), parts = []; let cur = '';
-for (const l of lines) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
+const digest = $('Build prompt').first().json.digest;
+const text = '<b>🧠 วิเคราะห์และข้อเสนอ</b>\n' + esc(content);
+const parts = []; let cur = '';
+for (const l of text.split('\n')) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
 if (cur) parts.push(cur);
-return parts.map((p, i) => ({ json: { chatId: String(cfg.adminChatId), text: p + (parts.length > 1 ? '\n\n(' + (i + 1) + '/' + parts.length + ')' : '') } }));"""
+return [digest].concat(parts).map(p => ({ json: { chatId: String(cfg.adminChatId), text: p } }));"""
 split = w3.add("แบ่งข้อความ", "n8n-nodes-base.code", {"jsCode": SPLIT_JS}, [-220, 300], 2)
 w3.link(ai, split, 0)
 send3 = tg_send(w3, "Telegram: ส่งรายงานถึงเจ้าของ", "={{ $json.chatId }}", "={{ $json.text }}", [0, 300])

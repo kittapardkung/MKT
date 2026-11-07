@@ -27,6 +27,8 @@ begin
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN') as open_tasks,
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now()) as overdue_tasks,
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() - interval '7 days') as overdue_over_7d,
+        (select count(*) from crm.tasks k join crm.leads l on l.id = k.lead_id where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() and l.created_at >= timestamptz '2026-11-03 00:00+07') as overdue_tasks_new,
+        (select count(*) from crm.tasks k join crm.leads l on l.id = k.lead_id where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() and l.created_at < timestamptz '2026-11-03 00:00+07') as overdue_tasks_legacy,
         (select count(*) from crm.deals x join crm.leads l on l.id = x.lead_id where l.owner_id = s.id and x.kind = 'BOOKING' and x.created_at > w0) as bookings_reported,
         (select count(*) from crm.deals x join crm.leads l on l.id = x.lead_id where l.owner_id = s.id and x.kind = 'BOOKING' and x.verified_at is not null) as bookings_verified_total,
         (select count(*) from crm.leads l where l.owner_id = s.id and l.stage = 'WON') as won_total,

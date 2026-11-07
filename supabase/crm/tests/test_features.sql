@@ -299,3 +299,8 @@ begin
   r2 := crm.weekly_report(500);
   perform t_assert((r2->>'period_days')::int = 90, 'รายงาน: จำกัดช่วงสูงสุด 90 วัน');
 end $$;
+
+do $$ declare r jsonb; begin
+  r := crm.weekly_report(7);
+  perform t_assert((r->'sales'->0) ? 'overdue_tasks_new' and (r->'sales'->0) ? 'overdue_tasks_legacy', 'รายงาน: แยกงานเลยกำหนดลีดใหม่/ลีดเก่า');
+end $$;
