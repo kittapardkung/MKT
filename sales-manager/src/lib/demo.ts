@@ -198,8 +198,17 @@ export function createDemoApi(): Api {
       l.events.push({ id: l.events.length + 1, type: "NOTE", channel: null, outcome: null, body: "แก้ไขข้อมูลลูกค้า", occurred_at: iso(0), actor: sales[role] });
     },
     async setStar(id, on, note) { const l = leads.find((x) => x.lead_id === id); if (!l) return; l.starred = on; l.star_note = on ? (note ?? l.star_note) : null; },
+    async weeklyReport() { return role === "sales" ? null : demoReport(); },
+    async reportSnapshots() { return role === "sales" ? [] : [{ id: 1, period_days: 7, generated_at: iso(0), report: demoReport(), overview_text: "ตัวอย่าง: ทีมได้รับลีดเพิ่มขึ้น แต่เวลาติดต่อครั้งแรกยังสูงกว่าเป้า", person_texts: { SA0001: "ตัวอย่างบทวิเคราะห์ (ข้อมูลสาธิต)", SA0002: "ตัวอย่างบทวิเคราะห์ (ข้อมูลสาธิต)" } }]; },
     async funnel() {
       return role === "sales" ? [] : ([["NEW", 14], ["CONTACTED", 38], ["FOLLOW_UP", 41], ["APPOINTMENT", 9], ["TEST_DRIVE", 21], ["QUOTATION", 8], ["NEGOTIATION", 6], ["BOOKING", 3], ["FINANCE_PENDING", 1], ["FINANCE_APPROVED", 2], ["READY_TO_DELIVER", 1], ["WON", 6], ["LOST", 218]] as Array<[Stage, number]>).map(([stage, leads]) => ({ stage, leads }));
     },
   };
+}
+
+
+function demoReport(): import("./types").WeeklyReport {
+  const q = (code: string, ok: number, no: number) => ({ code, first_contact_within_1h: 2, first_contact_1_to_4h: 3, first_contact_4_to_24h: 6, first_contact_over_24h: 4, contact_outcomes: { CONNECTED: ok, NO_ANSWER: no }, active_days: 4, notes_logged: 3, telegram_replies: 3, assigned_now_advanced: 3, stage_changes: 7, active_hot: 4, active_warm: 20, active_cold: 30, active_temp_unset: 6, active_with_next_followup: 40, active_total: 60, models_requested: [{ model: "Binguo", n: 10 }] });
+  const s = (code: string, name: string) => ({ code, name, leads_assigned: 22, leads_assigned_prev: 12, hot_leads_assigned: 3, contacted: 15, not_contacted: 4, avg_hours_to_first_contact: 11.6, contact_logs: 20, contact_logs_prev: 10, overdue_tasks_new: 6, overdue_tasks_legacy: 80, bookings_reported: 0, lost_in_period: 2, active_leads: 60 });
+  return { generated_at: new Date().toISOString(), period_days: 7, unassigned_leads: 1, sales: [s("SA0001", "วิ"), s("SA0002", "โอ๋")], sales_quality: [q("SA0001", 5, 9), q("SA0002", 6, 7)], risk_leads: [{ lead_code: "DEMO-000001", sales: "SA0001", stage: "NEW", temperature: "HOT", reason: "HOT_OVERDUE" }], leads_by_source: [] };
 }

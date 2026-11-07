@@ -310,3 +310,20 @@ do $$ declare r jsonb; begin
   perform t_assert(r ? 'sales_quality' and jsonb_array_length(r->'sales_quality') = jsonb_array_length(r->'sales'), 'รายงาน: มีเชิงคุณภาพรายคนครบทุกเซลล์');
   perform t_assert(position('0812340099' in r::text) = 0 and position('นามสมมติ' in r::text) = 0, 'รายงานคุณภาพ: ไม่มีชื่อ/เบอร์');
 end $$;
+
+-- รายงานในแอป: เฉพาะ leadership เห็น snapshot / เรียก get_weekly_report
+do $$ declare n int; r jsonb; denied boolean := false; begin
+  insert into crm.report_snapshots(period_days, report, overview_text, person_texts) values (7, '{}'::jsonb, 'x', '{"SA0001":"y"}');
+  perform t_as('10000000-0000-0000-0000-0000000000a1');   -- เซลล์
+  select count(*) into n from crm.report_snapshots;
+  perform t_assert(n = 0, 'snapshot: เซลล์มองไม่เห็นรายงาน');
+  begin perform crm.get_weekly_report(7); exception when others then denied := (sqlerrm = 'forbidden'); end;
+  perform t_assert(denied, 'get_weekly_report: เซลล์ถูกปฏิเสธ');
+  perform t_reset();
+  perform t_as('10000000-0000-0000-0000-0000000000c1');   -- ผู้บริหาร
+  select count(*) into n from crm.report_snapshots;
+  perform t_assert(n = 1, 'snapshot: ผู้บริหารเห็นรายงาน');
+  r := crm.get_weekly_report(7);
+  perform t_assert(r ? 'sales_quality', 'get_weekly_report: ผู้บริหารเรียกได้');
+  perform t_reset();
+end $$;

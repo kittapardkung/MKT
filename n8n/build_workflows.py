@@ -262,7 +262,7 @@ w2.save("02_sales_reply.json")
 # 3) Weekly report: ทุกวันจันทร์ 08:30 (เวลาไทย) -> crm.weekly_report -> OpenAI เขียนรายงาน -> Telegram เจ้าของ
 # =====================================================================================
 w3 = WF("WULING Sale Lead - 03 Weekly Report (Supabase → AI → Telegram)")
-cfg3 = cfg_node(w3, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID", "days": "7"})
+cfg3 = cfg_node(w3, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID", "days": "7", "appUrl": "https://wuling-sales-manager.vercel.app"})
 sch = w3.add("ทุกวันจันทร์ 08:30", "n8n-nodes-base.scheduleTrigger", {"rule": {"interval": [{"field": "cronExpression", "expression": "30 8 * * 1"}]}}, [-1400, 200], 1.2)
 man = w3.add("รันเอง (ทดสอบ)", "n8n-nodes-base.manualTrigger", {}, [-1400, 400], 1)
 w3.link(sch, cfg3); w3.link(man, cfg3)
@@ -322,22 +322,6 @@ ai = w3.add("OpenAI เขียนรายงาน", "n8n-nodes-base.httpRequ
   "authentication": "predefinedCredentialType", "nodeCredentialType": "openAiApi", "sendBody": True, "specifyBody": "json", "jsonBody": "={{ $json.body }}", "options": {"timeout": 120000}},
   [-440, 300], 4.2, OAI_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000)
 w3.link(build, ai)
-SPLIT_JS = r"""// แบ่งข้อความตามขีดจำกัด Telegram (4096) และ escape สำหรับโหมด HTML
-const cfg = $('Config').first().json;
-const res = $input.first().json;
-const content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();
-if (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');
-const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const digest = $('Build prompt').first().json.digest;
-const text = '<b>🧠 วิเคราะห์และข้อเสนอ</b>\n' + esc(content);
-const parts = []; let cur = '';
-for (const l of text.split('\n')) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
-if (cur) parts.push(cur);
-return [digest].concat(parts).map(p => ({ json: { chatId: String(cfg.adminChatId), text: p } }));"""
-split = w3.add("แบ่งข้อความ", "n8n-nodes-base.code", {"jsCode": SPLIT_JS}, [-220, 300], 2)
-w3.link(ai, split, 0)
-send3 = tg_send(w3, "Telegram: ส่งรายงานถึงเจ้าของ", "={{ $json.chatId }}", "={{ $json.text }}", [0, 300])
-w3.link(split, send3)
 err3 = tg_send(w3, "Telegram: รายงานสร้างไม่สำเร็จ", "={{ $('Config').first().json.adminChatId }}",
   "=รายงานรายสัปดาห์สร้างไม่สำเร็จ ดูรายละเอียดที่ n8n แท็บ Executions ของ workflow 03 (ดึงข้อมูลจาก Supabase หรือเรียก OpenAI ไม่ได้) รันซ้ำได้ด้วยปุ่มรันเอง", [-440, 520])
 w3.link(rep, err3, 1); w3.link(ai, err3, 1)
@@ -364,7 +348,7 @@ SYS_PERSON = """คุณคือโค้ชฝ่ายขายของศ�
 ลีดที่ควรติดตามก่อน: lead_code ไม่เกิน 5 รายการจาก risk_leads (ถ้าไม่มีให้เขียน ไม่มี)
 ข้อมูลที่ขาด: ไม่เกิน 2 ข้อ (ถ้าไม่มีให้เขียน ไม่มี)"""
 PERSON_JS = r"""// สร้างรายงานรายคน: ตัวเลขสรุปคำนวณเองในโค้ด + prompt ให้ AI วิเคราะห์เชิงคุณภาพ (ไม่มีชื่อ/เบอร์ลูกค้า)
-const rep = $input.first().json;
+const rep = $('Supabase weekly_report').first().json;
 const cfg = $('Config').first().json;
 const sys = __SYS__;
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -408,32 +392,37 @@ for (const x of S) {
 }
 return out;""".replace("__SYS__", json.dumps(SYS_PERSON, ensure_ascii=False))
 pbuild = w3.add("สร้างรายงานรายคน", "n8n-nodes-base.code", {"jsCode": PERSON_JS}, [-660, -100], 2)
-w3.link(rep, pbuild, 0)
 pai = w3.add("OpenAI วิเคราะห์รายคน", "n8n-nodes-base.httpRequest", {"method": "POST", "url": "https://api.openai.com/v1/chat/completions",
   "authentication": "predefinedCredentialType", "nodeCredentialType": "openAiApi", "sendBody": True, "specifyBody": "json", "jsonBody": "={{ $json.body }}", "options": {"timeout": 120000}},
   [-440, -100], 4.2, OAI_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000)
 w3.link(pbuild, pai)
-PSPLIT_JS = r"""// รวมตัวเลขรายคน + บทวิเคราะห์ AI เป็นข้อความเดียวต่อคน (แบ่งถ้าเกิน 3800 ตัวอักษร)
-const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+w3.link(ai, pbuild, 0)
+
+ASSEMBLE_JS = r"""// ประกอบ snapshot: ตัวเลขรายงาน + บทวิเคราะห์ภาพรวม + บทวิเคราะห์รายคน
+const rep = $('Supabase weekly_report').first().json;
+const text = (r) => String(r && r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content || '').trim();
+const overview = text($('OpenAI เขียนรายงาน').first().json);
 const items = $('สร้างรายงานรายคน').all();
-const res = $input.all();
-const outs = [];
-res.forEach((r, i) => {
+const persons = {};
+$input.all().forEach((r, i) => {
   const pi = r.pairedItem && r.pairedItem.item !== undefined ? r.pairedItem.item : i;
-  const src = items[pi] ? items[pi].json : {};
-  const content = String(r.json.choices && r.json.choices[0] && r.json.choices[0].message && r.json.choices[0].message.content || '').trim();
-  const text = src.digest + '\n\n<b>🧠 วิเคราะห์และข้อเสนอโค้ช</b>\n' + esc(content || 'AI ไม่ส่งบทวิเคราะห์กลับมา (ดูตัวเลขด้านบนได้ตามปกติ)');
-  const parts = []; let cur = '';
-  for (const l of text.split('\n')) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
-  if (cur) parts.push(cur);
-  parts.forEach(p => outs.push({ json: { chatId: src.chatId, text: p } }));
+  const src = items[pi] ? items[pi].json : null;
+  if (src && src.code) persons[src.code] = text(r.json);
 });
-return outs;"""
-psplit = w3.add("จัดข้อความรายคน", "n8n-nodes-base.code", {"jsCode": PSPLIT_JS}, [-220, -100], 2)
-w3.link(pai, psplit, 0)
-psend = tg_send(w3, "Telegram: ส่งรายงานรายคน", "={{ $json.chatId }}", "={{ $json.text }}", [0, -100])
-w3.link(psplit, psend)
-w3.link(pai, err3, 1)
+return [{ json: { period_days: rep.period_days || 7, report: rep, overview_text: overview || null, person_texts: persons } }];"""
+asm = w3.add("ประกอบรายงานลงแอป", "n8n-nodes-base.code", {"jsCode": ASSEMBLE_JS}, [-220, -100], 2)
+w3.link(pai, asm, 0)
+save = w3.add("บันทึกรายงานลงแอป", "n8n-nodes-base.httpRequest", {"method": "POST", "url": "={{ $('Config').first().json.supabaseUrl }}/rest/v1/report_snapshots",
+  "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendHeaders": True,
+  "headerParameters": {"parameters": [{"name": "Content-Profile", "value": "crm"}, {"name": "Content-Type", "value": "application/json"}, {"name": "Prefer", "value": "return=minimal"}]},
+  "sendBody": True, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}", "options": {"timeout": 20000}},
+  [0, -100], 4.2, SUPA_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=1500)
+w3.link(asm, save)
+ping = tg_send(w3, "Telegram: แจ้งว่ารายงานพร้อมในแอป", "={{ $('Config').first().json.adminChatId }}",
+  "=📊 รายงานฝ่ายขายประจำสัปดาห์พร้อมแล้ว เปิดดูในแอป Sale Lead เมนู \"รายงาน\"\n{{ $('Config').first().json.appUrl }}", [220, -100])
+w3.link(save, ping, 0)
+w3.link(save, err3, 1); w3.link(pai, err3, 1)
 
 w3.save("03_weekly_report.json")
 print("ok")

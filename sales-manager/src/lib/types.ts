@@ -71,7 +71,27 @@ export interface ExecSummary {
 
 export interface Funnel { stage: Stage; leads: number }
 
+export interface ReportSales {
+  code: string; name: string; leads_assigned: number; leads_assigned_prev: number; hot_leads_assigned: number;
+  contacted: number; not_contacted: number; avg_hours_to_first_contact: number | null; contact_logs: number; contact_logs_prev: number;
+  overdue_tasks_new?: number; overdue_tasks_legacy?: number; bookings_reported: number; lost_in_period: number; active_leads: number;
+}
+export interface ReportQuality {
+  code: string; first_contact_within_1h: number; first_contact_1_to_4h: number; first_contact_4_to_24h: number; first_contact_over_24h: number;
+  contact_outcomes: Record<string, number>; active_days: number; notes_logged: number; telegram_replies: number;
+  assigned_now_advanced: number; stage_changes: number; active_hot: number; active_warm: number; active_cold: number; active_temp_unset: number;
+  active_with_next_followup: number; active_total: number; models_requested: Array<{ model: string; n: number }>;
+}
+export interface WeeklyReport {
+  generated_at: string; period_days: number; unassigned_leads: number; sales: ReportSales[]; sales_quality: ReportQuality[];
+  risk_leads: Array<{ lead_code: string; sales: string | null; stage: string; temperature: string | null; reason: string }>;
+  leads_by_source: Array<{ source: string; this_period: number; previous_period: number }>;
+}
+export interface ReportSnapshot { id: number; period_days: number; generated_at: string; report: WeeklyReport; overview_text: string | null; person_texts: Record<string, string> }
+
 export interface Api {
+  weeklyReport(days: number): Promise<WeeklyReport | null>;
+  reportSnapshots(): Promise<ReportSnapshot[]>;
   mode: "demo" | "live";
   me(): Promise<Me | null>;
   signIn?(email: string, password: string): Promise<string | null>;

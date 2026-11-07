@@ -1257,11 +1257,40 @@ begin
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN') as open_tasks,
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now()) as overdue_tasks,
         (select count(*) from crm.tasks k where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() - interval '7 days') as overdue_over_7d,
+        (select count(*) from crm.tasks k join crm.leads l on l.id = k.lead_id where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() and l.created_at >= timestamptz '2026-11-03 00:00+07') as overdue_tasks_new,
+        (select count(*) from crm.tasks k join crm.leads l on l.id = k.lead_id where k.assignee_id = s.id and k.status = 'OPEN' and k.due_at < now() and l.created_at < timestamptz '2026-11-03 00:00+07') as overdue_tasks_legacy,
         (select count(*) from crm.deals x join crm.leads l on l.id = x.lead_id where l.owner_id = s.id and x.kind = 'BOOKING' and x.created_at > w0) as bookings_reported,
         (select count(*) from crm.deals x join crm.leads l on l.id = x.lead_id where l.owner_id = s.id and x.kind = 'BOOKING' and x.verified_at is not null) as bookings_verified_total,
         (select count(*) from crm.leads l where l.owner_id = s.id and l.stage = 'WON') as won_total,
         (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'STAGE_CHANGE' and e.evidence->>'to' = 'LOST' and e.occurred_at > w0) as lost_in_period,
         (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant) as active_leads
+      from crm.sales_team s where s.role = 'sales' and s.active) t),
+
+    -- เชิงคุณภาพรายคน: ใช้เฉพาะตัวเลข/หมวดที่นับได้ ไม่ส่งข้อความอิสระ (โน้ต/เหตุผลเสียโอกาส) เพื่อไม่ให้ชื่อ/เบอร์หลุดไปถึง AI
+    'sales_quality', (select coalesce(jsonb_agg(to_jsonb(t) order by t.code), '[]') from (
+      select s.code,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at <= interval '1 hour') as first_contact_within_1h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '1 hour' and l.first_contact_at - l.assigned_at <= interval '4 hours') as first_contact_1_to_4h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '4 hours' and l.first_contact_at - l.assigned_at <= interval '24 hours') as first_contact_4_to_24h,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.first_contact_at >= l.assigned_at and l.first_contact_at - l.assigned_at > interval '24 hours') as first_contact_over_24h,
+        (select coalesce(jsonb_object_agg(o.outcome, o.n), '{}'::jsonb) from (
+           select e.outcome, count(*) as n from crm.lead_events e
+           where e.actor_id = s.id and e.type in ('CONTACT_SUCCESS','CONTACT_ATTEMPT') and e.occurred_at > w0 and e.outcome is not null group by e.outcome) o) as contact_outcomes,
+        (select count(distinct (e.occurred_at at time zone 'Asia/Bangkok')::date) from crm.lead_events e
+           where e.actor_id = s.id and e.type in ('CONTACT_SUCCESS','CONTACT_ATTEMPT','SALES_REPLY') and e.occurred_at > w0) as active_days,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'NOTE' and e.occurred_at > w0) as notes_logged,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'SALES_REPLY' and e.occurred_at > w0) as telegram_replies,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.assigned_at > w0 and l.stage in ('APPOINTMENT','TEST_DRIVE','QUOTATION','NEGOTIATION','BOOKING','FINANCE_PENDING','FINANCE_APPROVED','READY_TO_DELIVER','WON')) as assigned_now_advanced,
+        (select count(*) from crm.lead_events e where e.actor_id = s.id and e.type = 'STAGE_CHANGE' and e.occurred_at > w0) as stage_changes,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'HOT') as active_hot,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'WARM') as active_warm,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature = 'COLD') as active_cold,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.temperature is null) as active_temp_unset,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant and l.next_follow_up_at is not null) as active_with_next_followup,
+        (select count(*) from crm.leads l where l.owner_id = s.id and l.stage not in ('WON','LOST') and not l.dormant) as active_total,
+        (select coalesce(jsonb_agg(jsonb_build_object('model', m.model, 'n', m.n) order by m.n desc), '[]'::jsonb) from (
+           select coalesce(nullif(btrim(l.interested_model), ''), 'ไม่ระบุ') as model, count(*) as n from crm.leads l
+           where l.owner_id = s.id and l.assigned_at > w0 group by 1 order by 2 desc limit 4) m) as models_requested
       from crm.sales_team s where s.role = 'sales' and s.active) t),
 
     'leads_by_source', (select coalesce(jsonb_agg(to_jsonb(t) order by t.this_period desc), '[]') from (
@@ -1314,3 +1343,33 @@ end $$;
 
 revoke all on function crm.weekly_report(int) from public, anon, authenticated;
 grant execute on function crm.weekly_report(int) to service_role;
+-- รายงานรายสัปดาห์ในแอป: n8n (service_role) บันทึกผลลง report_snapshots ทุกครั้งที่สร้างรายงาน
+-- แอปอ่านได้เฉพาะ ผู้จัดการ/ผู้บริหาร/แอดมิน (เซลล์มองไม่เห็น เพราะมีข้อเสนอการโค้ช)
+create table if not exists crm.report_snapshots (
+  id            bigserial primary key,
+  period_days   int not null,
+  generated_at  timestamptz not null default now(),
+  report        jsonb not null,            -- ผล crm.weekly_report (ไม่มีชื่อ/เบอร์ลูกค้า)
+  overview_text text,                      -- บทวิเคราะห์ภาพรวมจาก AI
+  person_texts  jsonb not null default '{}'::jsonb   -- { "SA0001": "บทวิเคราะห์รายคน", ... }
+);
+create index if not exists report_snapshots_gen_idx on crm.report_snapshots(generated_at desc);
+
+alter table crm.report_snapshots enable row level security;
+drop policy if exists p_report_snapshots_sel on crm.report_snapshots;
+create policy p_report_snapshots_sel on crm.report_snapshots for select to authenticated using ((select crm.is_leadership()));
+
+revoke all on crm.report_snapshots from public, anon, authenticated;
+grant select on crm.report_snapshots to authenticated;
+grant all on crm.report_snapshots to service_role;
+grant usage, select on sequence crm.report_snapshots_id_seq to service_role;
+
+-- ตัวเลขสดตอนเปิดหน้ารายงาน (ผู้บริหารเท่านั้น); ครอบ weekly_report ที่จำกัดสิทธิ์ service_role
+create or replace function crm.get_weekly_report(p_days int default 7) returns jsonb
+language plpgsql stable security definer set search_path = crm, pg_temp as $$
+begin
+  if not coalesce(crm.is_leadership(), false) then raise exception 'forbidden'; end if;
+  return crm.weekly_report(p_days);
+end $$;
+revoke all on function crm.get_weekly_report(int) from public, anon;
+grant execute on function crm.get_weekly_report(int) to authenticated, service_role;

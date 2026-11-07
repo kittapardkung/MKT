@@ -42,3 +42,10 @@
 - ตั้งค่าโหนด Config: `supabaseUrl`, `adminChatId`, `days` (7); เลือก credential Supabase (Header Auth), OpenAI, Telegram
 - ทดสอบด้วยปุ่ม "รันเอง (ทดสอบ)" ก่อนเปิด Active
 - หมายเหตุ: ถ้าหลัง Import โหนด AI Agent ในไฟล์ 01/02 ขึ้น "model is not supported in version 2.2" ให้ลบแล้วเพิ่มโหนด AI Agent ใหม่ (รุ่นล่าสุด) ต่อ Chat Model และ Output Parser เดิม
+
+
+### รายงานในแอป (เมนู "รายงาน")
+- รัน `supabase/crm/007_report_snapshots.sql` (หรือ `install_all.sql`) ครั้งเดียว
+- Workflow 03 บันทึกผลลง `crm.report_snapshots` ทุกครั้ง (โหนด "บันทึกรายงานลงแอป") แล้วส่ง Telegram แค่บรรทัดเดียวว่ารายงานพร้อมแล้ว
+- แอปแสดงเมนู "รายงาน" เฉพาะผู้จัดการ/ผู้บริหาร/แอดมิน (เซลล์ไม่เห็น) ดูได้ทั้งตัวเลขสดและรายงานย้อนหลัง
+- Config เพิ่ม `appUrl` (ลิงก์ในข้อความแจ้งเตือน)

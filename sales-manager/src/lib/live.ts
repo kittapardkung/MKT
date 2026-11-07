@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Api, Booking, ExecSummary, Funnel, LeadEvent, LeadRow, Me, SalesPerf, TodayItem } from "./types";
+import type { Api, Booking, ReportSnapshot, WeeklyReport, ExecSummary, Funnel, LeadEvent, LeadRow, Me, SalesPerf, TodayItem } from "./types";
 
 // ใช้ publishable key เท่านั้น — ข้อมูลทั้งหมดคุมด้วย RLS ใน schema crm
 export function createLiveApi(url: string, key: string): Api {
@@ -72,6 +72,14 @@ export function createLiveApi(url: string, key: string): Api {
     async setDeliveryStep(dealId, step, i) { fail((await sb.rpc("set_delivery_step", { p_deal: dealId, p_step: step, p_date: i?.date || null, p_vin: i?.vin || null, p_note: i?.note || null })).error); },
     async updateLeadInfo(leadId, i) { fail((await sb.rpc("update_lead_info", { p_lead: leadId, p_name: i.name, p_phone: i.phone, p_model: i.model, p_profile: i.profile })).error); },
     async setStar(leadId, on, note) { fail((await sb.rpc("set_star", { p_lead: leadId, p_on: on, p_note: note ?? null })).error); },
+    async weeklyReport(days) {
+      const { data, error } = await sb.rpc("get_weekly_report", { p_days: days });
+      fail(error); return (data as WeeklyReport | null) ?? null;
+    },
+    async reportSnapshots() {
+      const { data, error } = await sb.from("report_snapshots").select("*").order("generated_at", { ascending: false }).limit(12);
+      fail(error); return (data ?? []) as ReportSnapshot[];
+    },
     async funnel() {
       const { data, error } = await sb.from("v_funnel").select("*");
       fail(error); return (data ?? []) as Funnel[];
