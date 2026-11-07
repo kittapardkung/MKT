@@ -1,31 +1,57 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { KanbanSquare, Settings, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
-import type { AiOverview, AiPerson, LeadRow, ReportQuality, ReportSales, ReportSnapshot, Stage, WeeklyReport } from "@/lib/types";
+import type { AiOverview, AiPerson, LeadRow, Role, ReportQuality, ReportSales, ReportSnapshot, Stage, WeeklyReport } from "@/lib/types";
 import { friendlyError, STAGE_TH } from "@/lib/format";
 import { Empty } from "./ui";
 import { C, ChartCard, PairBars, SimpleBars, StackBars } from "./ReportCharts";
+import KanbanView from "./KanbanView";
+import InsightsView from "./InsightsView";
+import SlaView from "./SlaView";
 
 const n = (v: unknown) => Number(v) || 0;
 const pct = (a: number, b: number) => (b ? `${Math.round((a * 100) / b)}%` : "—");
 const stamp = (iso: string) => new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 type Light = "ok" | "warn" | "bad";
 const dot: Record<Light, string> = { ok: "bg-ok", warn: "bg-orange-500", bad: "bg-danger" };
-type Tab = "overview" | "people" | "risk" | "soon";
+type Tab = "overview" | "people" | "risk" | "kanban" | "insights" | "sla";
 const STAGE_ORDER = Object.keys(STAGE_TH) as Stage[];
 
+
+// รายงานรุ่นเก่าเก็บเป็นข้อความก้อนเดียว: แยกตามหัวข้อและเลขข้อ "1)" "2)" ให้อ่านเป็น bullet ได้
+function splitSections(text: string, heads: string[]): Record<string, string[]> {
+  const re = new RegExp(`(${heads.map((h) => h.replace(/[/]/g, "\\/")).join("|")})\\s*:?`, "g");
+  const out: Record<string, string[]> = {};
+  const marks = [...text.matchAll(re)];
+  marks.forEach((m, i) => {
+    const body = text.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : undefined).trim();
+    const items = body.split(/\s*\d+\)\s*|\n\s*[-•]\s*/).map((x) => x.trim()).filter(Boolean);
+    out[m[1]] = items.length ? items : body ? [body] : [];
+  });
+  return out;
+}
+function legacyOverview(text: string): AiOverview {
+  const r = splitSections(text, ["สิ่งที่เห็น", "ต้องตัดสินใจสัปดาห์นี้", "ข้อมูลที่ขาด/น่าสงสัย", "ข้อมูลที่ขาดหรือน่าสงสัย"]);
+  const obs = r["สิ่งที่เห็น"] ?? [];
+  if (!obs.length && !r["ต้องตัดสินใจสัปดาห์นี้"]) return { headline: text, observations: [], decisions: [], gaps: [] };
+  return { headline: "", observations: obs, decisions: (r["ต้องตัดสินใจสัปดาห์นี้"] ?? []).map((a) => ({ action: a, owner: "ผู้จัดการ/เจ้าของ" })), gaps: r["ข้อมูลที่ขาด/น่าสงสัย"] ?? r["ข้อมูลที่ขาดหรือน่าสงสัย"] ?? [] };
+}
+function legacyPerson(text: string): AiPerson | string {
+  const r = splitSections(text, ["เชิงปริมาณ", "เชิงคุณภาพ", "จุดเด่น", "จุดที่ควรพัฒนา", "ข้อเสนอการโค้ช", "ลีดที่ควรติดตามก่อน", "ข้อมูลที่ขาด"]);
+  if (!r["เชิงปริมาณ"] && !r["เชิงคุณภาพ"]) return text;
+  return { quant: r["เชิงปริมาณ"] ?? [], quality: r["เชิงคุณภาพ"] ?? [], strengths: r["จุดเด่น"] ?? [], improve: r["จุดที่ควรพัฒนา"] ?? [], coaching: r["ข้อเสนอการโค้ช"] ?? [], follow_leads: (r["ลีดที่ควรติดตามก่อน"] ?? []).join(" ").split(/[\s,]+/).filter((x) => /^\d{8}-\d+$/.test(x)) };
+}
 const asStrs = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 function readOverview(s: ReportSnapshot | null): AiOverview | null {
   if (!s) return null;
   const o = s.person_texts?._overview as Partial<AiOverview> | undefined;
   if (o && typeof o === "object") return { headline: String(o.headline ?? ""), observations: asStrs(o.observations), decisions: Array.isArray(o.decisions) ? o.decisions.map((d) => ({ action: String(d.action), owner: String(d.owner) })) : [], gaps: asStrs(o.gaps) };
-  return s.overview_text ? { headline: s.overview_text, observations: [], decisions: [], gaps: [] } : null;   // รายงานรุ่นเก่า (ข้อความล้วน)
+  return s.overview_text ? legacyOverview(s.overview_text) : null;   // รายงานรุ่นเก่า (ข้อความล้วน) แยกหัวข้อให้อ่านง่าย
 }
 function readPerson(s: ReportSnapshot | null, code: string): AiPerson | string | null {
   const v = s?.person_texts?.[code];
   if (!v) return null;
-  if (typeof v === "string") return v;
+  if (typeof v === "string") return legacyPerson(v);
   const o = v as Partial<AiPerson>;
   return { quant: asStrs(o.quant), quality: asStrs(o.quality), strengths: asStrs(o.strengths), improve: asStrs(o.improve), coaching: asStrs(o.coaching), follow_leads: asStrs(o.follow_leads) };
 }
@@ -137,13 +163,7 @@ function PersonView({ s, q, ai, teamHours, teamLeads, openLead, leadsByCode, ris
   );
 }
 
-const SOON = [
-  { Icon: KanbanSquare, title: "Pipeline Kanban", desc: "ลากการ์ดลีดข้ามสถานะบนกระดานเดียว เห็นทั้งท่อขายในหน้าจอเดียว" },
-  { Icon: Sparkles, title: "AI Insights", desc: "ต่อยอดบทวิเคราะห์ในหน้ารายงานนี้: แจ้งเตือนลีดที่ควรตามก่อนแบบอัตโนมัติ และสรุปแนวโน้มรายสัปดาห์" },
-  { Icon: Settings, title: "ตั้งค่า SLA", desc: "ปรับเป้าเวลาติดต่อครั้งแรกและกติกาแจ้งเตือนได้เองจากหน้าจอ (ตอนนี้ตั้งผ่านฐานข้อมูล)" },
-];
-
-export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen: (leadId: string) => void }) {
+export default function ReportView({ leads, onOpen, onChanged, role }: { leads: LeadRow[]; onOpen: (leadId: string) => void; onChanged: () => Promise<void>; role: Role }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [snaps, setSnaps] = useState<ReportSnapshot[]>([]);
   const [sel, setSel] = useState<number | "live">("live");
@@ -192,7 +212,7 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
   const cur = S.find((x) => x.code === who) ?? S[0];
 
   const outcomes = (q?: ReportQuality) => { const o = q?.contact_outcomes ?? {}; return { ok: n(o.CONNECTED) + n(o.REPLIED), no: n(o.NO_ANSWER), msg: n(o.MESSAGE_SENT), wrong: n(o.WRONG_NUMBER) }; };
-  const tabs: Array<[Tab, string]> = [["overview", "ภาพรวม"], ["people", "รายคน"], ["risk", `ลีดเสี่ยง${report?.risk_leads?.length ? ` (${report.risk_leads.length})` : ""}`], ["soon", "เร็วๆ นี้"]];
+  const tabs: Array<[Tab, string]> = [["overview", "ภาพรวม"], ["people", "รายคน"], ["risk", `ลีดเสี่ยง${report?.risk_leads?.length ? ` (${report.risk_leads.length})` : ""}`], ["kanban", "Pipeline Kanban"], ["insights", "AI Insights"], ["sla", "ตั้งค่า SLA"]];
 
   return (
     <section className="space-y-4">
@@ -201,7 +221,7 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">รายงานสรุปฝ่ายขาย</h1>
           <p className="mt-0.5 text-sm text-muted">เห็นได้เฉพาะผู้จัดการและผู้บริหาร · ไม่ส่งชื่อ/เบอร์ลูกค้าให้ AI</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {tab !== "kanban" && tab !== "sla" && <div className="flex flex-wrap gap-2">
           {snaps.length > 0 && (
             <label className="card flex min-h-11 items-center px-3 text-sm"><span className="sr-only">เลือกรายงาน</span>
               <select value={String(sel)} onChange={(e) => setSel(e.target.value === "live" ? "live" : Number(e.target.value))} className="min-h-11 bg-transparent outline-none">
@@ -219,7 +239,7 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
           )}
           <button onClick={() => setTick((t) => t + 1)} className="card focus-ring min-h-11 px-4 text-sm">รีเฟรช</button>
           <button onClick={() => void analyze()} disabled={aiBusy} className="btn-dark min-h-11 px-4 text-sm disabled:opacity-60">{aiBusy ? "AI กำลังวิเคราะห์… (~30 วินาที)" : "สร้างบทวิเคราะห์ AI"}</button>
-        </div>
+        </div>}
       </div>
 
       <div role="tablist" aria-label="หมวดรายงาน" className="flex gap-1 overflow-x-auto rounded-2xl bg-line p-1">
@@ -232,19 +252,11 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
       {aiMsg && <div className="rounded-xl bg-warn-soft p-3 text-sm text-warn">{aiMsg}</div>}
       {err && <div role="alert" className="rounded-xl bg-danger-soft p-3 text-sm text-danger">โหลดรายงานไม่สำเร็จ: {err}</div>}
 
-      {tab === "soon" && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {SOON.map(({ Icon, title, desc }) => (
-            <div key={title} className="card p-4">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-warn"><Icon size={20} /></span>
-              <h3 className="mt-3 text-sm font-bold">{title} <span className="ml-1 rounded-full bg-line px-2 py-0.5 text-[10px] font-semibold text-muted">เร็วๆ นี้</span></h3>
-              <p className="mt-1 text-sm text-muted">{desc}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === "kanban" && <KanbanView leads={leads} onOpen={onOpen} onChanged={onChanged} />}
+      {tab === "insights" && <InsightsView leads={leads} snaps={snaps} onOpen={onOpen} />}
+      {tab === "sla" && <SlaView role={role} />}
 
-      {tab !== "soon" && !report && !err && <Empty>กำลังโหลดรายงาน…</Empty>}
+      {["overview", "people", "risk"].includes(tab) && !report && !err && <Empty>กำลังโหลดรายงาน…</Empty>}
 
       {report && tab === "overview" && (
         <div className="space-y-4">

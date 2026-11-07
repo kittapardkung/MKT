@@ -92,7 +92,16 @@ export interface AiOverview { headline: string; observations: string[]; decision
 export interface AiPerson { quant: string[]; quality: string[]; strengths: string[]; improve: string[]; coaching: string[]; follow_leads: string[] }
 export interface ReportSnapshot { id: number; period_days: number; generated_at: string; report: WeeklyReport; overview_text: string | null; person_texts: Record<string, unknown> }
 
+export type SlaScope = "NEW" | "HOT" | "WARM" | "COLD";
+export interface SlaRule { scope: SlaScope; minutes: number; business_hours_only: boolean; remind_before_minutes: number; escalate_after_minutes: number }
+export type SlaPatch = Partial<Omit<SlaRule, "scope">>;
+export interface SettingRow { key: string; value: string }
+
 export interface Api {
+  slaRules(): Promise<SlaRule[]>;
+  updateSla(scope: SlaScope, patch: SlaPatch): Promise<void>;
+  settings(): Promise<SettingRow[]>;
+  updateSetting(key: string, value: string): Promise<void>;
   weeklyReport(days: number): Promise<WeeklyReport | null>;
   reportSnapshots(): Promise<ReportSnapshot[]>;
   analyzeReport(days: number): Promise<{ snapshot: ReportSnapshot; cached: boolean }>;

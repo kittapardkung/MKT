@@ -339,3 +339,22 @@ do $$ declare denied boolean := false; v bigint; begin
   perform t_assert(v is not null, 'save_report_snapshot: ผู้จัดการบันทึกได้');
   perform t_reset();
 end $$;
+
+-- ตั้งค่า SLA: แก้ได้เฉพาะ executive/admin (RLS ปฏิเสธ = 0 แถว) และมี audit
+do $$ declare n int; v int; begin
+  perform t_as('10000000-0000-0000-0000-0000000000a1');   -- เซลล์
+  update crm.sla_rules set minutes = 999 where scope = 'HOT'; get diagnostics n = row_count;
+  perform t_assert(n = 0, 'SLA: เซลล์แก้ไม่ได้');
+  perform t_reset();
+  perform t_as('10000000-0000-0000-0000-0000000000b1');   -- ผู้จัดการ
+  update crm.sla_rules set minutes = 999 where scope = 'HOT'; get diagnostics n = row_count;
+  perform t_assert(n = 0, 'SLA: ผู้จัดการแก้ไม่ได้ (เฉพาะผู้บริหาร/แอดมิน)');
+  perform t_reset();
+  perform t_as('10000000-0000-0000-0000-0000000000c1');   -- ผู้บริหาร
+  update crm.sla_rules set minutes = 130 where scope = 'HOT'; get diagnostics n = row_count;
+  perform t_assert(n = 1, 'SLA: ผู้บริหารแก้ได้');
+  perform t_reset();
+  select minutes into v from crm.sla_rules where scope = 'HOT';
+  perform t_assert(v = 130, 'SLA: ค่าถูกบันทึก');
+  update crm.sla_rules set minutes = 120 where scope = 'HOT';   -- คืนค่าเดิม
+end $$;

@@ -199,6 +199,10 @@ export function createDemoApi(): Api {
     },
     async setStar(id, on, note) { const l = leads.find((x) => x.lead_id === id); if (!l) return; l.starred = on; l.star_note = on ? (note ?? l.star_note) : null; },
     async analyzeReport(): Promise<{ snapshot: import("./types").ReportSnapshot; cached: boolean }> { throw new Error("โหมดสาธิตไม่รองรับการสร้างบทวิเคราะห์ AI"); },
+    async slaRules() { return demoSla.map((x) => ({ ...x })); },
+    async updateSla(scope, patch) { const r = demoSla.find((x) => x.scope === scope); if (r) Object.assign(r, patch); },
+    async settings() { return demoSettings.map((x) => ({ ...x })); },
+    async updateSetting(key, value) { const r = demoSettings.find((x) => x.key === key); if (r) r.value = value; },
     async weeklyReport() { return role === "sales" ? null : demoReport(); },
     async reportSnapshots() { return role === "sales" ? [] : [{ id: 1, period_days: 7, generated_at: iso(0), report: demoReport(), overview_text: "ตัวอย่าง: ลีดเพิ่มขึ้น แต่ติดต่อครั้งแรกช้ากว่าเป้า", person_texts: {
       _overview: { headline: "ตัวอย่าง: ลีดเพิ่มขึ้น 83% แต่ติดต่อครั้งแรกช้ากว่าเป้า 4 ชม. ราว 3 เท่า", observations: ["ลีดใหม่ 44 ราย เพิ่มจากช่วงก่อน แบ่งให้ 2 เซลล์เท่ากัน", "ติดต่อครั้งแรกเฉลี่ย 11.8 ชม. เกินเป้าทั้งสองคน แปลว่าเป็นเรื่องของระบบงาน", "ลีดเก่าก่อน 3 พ.ย. ค้าง 156 งาน แยกนับจากไฟสถานะ"], decisions: [{ action: "ตั้งช่วงโทรลีดใหม่รอบเช้า/บ่ายทุกวัน", owner: "ผู้จัดการ" }, { action: "ทบทวนลีดเก่าที่ค้างเพื่อปิดหรือเปิดติดตามใหม่", owner: "เจ้าของ" }, { action: "ให้เซลล์ประเมินระดับความร้อนทุกลีด", owner: "SA0001" }], gaps: ["ยังไม่มีเหตุผลเสียโอกาสแบบหมวดหมู่"] },
@@ -217,3 +221,13 @@ function demoReport(): import("./types").WeeklyReport {
   const s = (code: string, name: string) => ({ code, name, leads_assigned: 22, leads_assigned_prev: 12, hot_leads_assigned: 3, contacted: 15, not_contacted: 4, avg_hours_to_first_contact: 11.6, contact_logs: 20, contact_logs_prev: 10, overdue_tasks_new: 6, overdue_tasks_legacy: 80, bookings_reported: 0, lost_in_period: 2, active_leads: 60 });
   return { generated_at: new Date().toISOString(), period_days: 7, unassigned_leads: 1, sales: [s("SA0001", "วิ"), s("SA0002", "โอ๋")], sales_quality: [q("SA0001", 5, 9), q("SA0002", 6, 7)], funnel_now: [{ stage: "NEW", leads: 14 }, { stage: "CONTACTED", leads: 38 }, { stage: "FOLLOW_UP", leads: 41 }, { stage: "APPOINTMENT", leads: 9 }, { stage: "QUOTATION", leads: 8 }, { stage: "BOOKING", leads: 3 }, { stage: "WON", leads: 6 }], risk_leads: [{ lead_code: "DEMO-000001", sales: "SA0001", stage: "NEW", temperature: "HOT", reason: "HOT_OVERDUE" }], leads_by_source: [{ source: "Facebook Messenger", this_period: 36, previous_period: 24 }, { source: "Call Center", this_period: 8, previous_period: 0 }] };
 }
+
+const demoSla: import("./types").SlaRule[] = [
+  { scope: "NEW", minutes: 15, business_hours_only: true, remind_before_minutes: 5, escalate_after_minutes: 30 },
+  { scope: "HOT", minutes: 120, business_hours_only: true, remind_before_minutes: 15, escalate_after_minutes: 60 },
+  { scope: "WARM", minutes: 1440, business_hours_only: false, remind_before_minutes: 120, escalate_after_minutes: 240 },
+  { scope: "COLD", minutes: 10080, business_hours_only: false, remind_before_minutes: 720, escalate_after_minutes: 1440 },
+];
+const demoSettings: import("./types").SettingRow[] = [
+  { key: "work_start_hour", value: "9" }, { key: "work_end_hour", value: "18" }, { key: "default_temperature", value: "WARM" }, { key: "alerts_enabled", value: "false" },
+];

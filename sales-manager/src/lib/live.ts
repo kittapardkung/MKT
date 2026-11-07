@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Api, Booking, ReportSnapshot, WeeklyReport, ExecSummary, Funnel, LeadEvent, LeadRow, Me, SalesPerf, TodayItem } from "./types";
+import type { Api, Booking, SettingRow, SlaRule, ReportSnapshot, WeeklyReport, ExecSummary, Funnel, LeadEvent, LeadRow, Me, SalesPerf, TodayItem } from "./types";
 
 // ใช้ publishable key เท่านั้น — ข้อมูลทั้งหมดคุมด้วย RLS ใน schema crm
 export function createLiveApi(url: string, key: string): Api {
@@ -88,6 +88,26 @@ export function createLiveApi(url: string, key: string): Api {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? `error ${res.status}`);
       return body as { snapshot: ReportSnapshot; cached: boolean };
+    },
+    async slaRules() {
+      const { data, error } = await sb.from("sla_rules").select("*");
+      fail(error);
+      const order = ["NEW", "HOT", "WARM", "COLD"];
+      return ((data ?? []) as SlaRule[]).sort((a, b) => order.indexOf(a.scope) - order.indexOf(b.scope));
+    },
+    async updateSla(scope, patch) {
+      const { data, error } = await sb.from("sla_rules").update(patch).eq("scope", scope).select();
+      fail(error);
+      if (!data?.length) throw new Error("forbidden: เฉพาะผู้บริหาร/ผู้ดูแลระบบเท่านั้นที่แก้ SLA ได้");   // RLS ปฏิเสธ = 0 แถว ไม่ error
+    },
+    async settings() {
+      const { data, error } = await sb.from("settings").select("key,value");
+      fail(error); return (data ?? []) as SettingRow[];
+    },
+    async updateSetting(key, value) {
+      const { data, error } = await sb.from("settings").update({ value }).eq("key", key).select();
+      fail(error);
+      if (!data?.length) throw new Error("forbidden: เฉพาะผู้บริหาร/ผู้ดูแลระบบเท่านั้นที่แก้การตั้งค่าได้");
     },
     async funnel() {
       const { data, error } = await sb.from("v_funnel").select("*");

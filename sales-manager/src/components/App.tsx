@@ -165,7 +165,7 @@ export default function App() {
           {tab === "leads" && <LeadsView leads={leads} onOpen={setOpenId} showOwner={leadership} q={q} setQ={setQ} onStar={toggleStar} />}
           {tab === "targets" && <TargetsView leads={leads} onOpen={setOpenId} showOwner={leadership} onStar={toggleStar} />}
           {tab === "delivery" && <DeliveryView bookings={bookings} onOpen={setOpenId} onStep={deliveryStep} />}
-          {tab === "report" && leadership && <ReportView leads={leads} onOpen={setOpenId} />}
+          {tab === "report" && leadership && <ReportView leads={leads} onOpen={setOpenId} onChanged={refresh} role={me.role} />}
           {tab === "booked" && <BookedView bookings={bookings} canVerify={leadership} onOpen={setOpenId} onVerify={verifyBooking} />}
         </main>
       </div>
