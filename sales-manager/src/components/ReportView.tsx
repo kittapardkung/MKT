@@ -63,10 +63,12 @@ function PersonCard({ s, q, text, teamAvg }: { s: ReportSales; q?: ReportQuality
           </>) : <p className="text-sm text-muted">ไม่มีข้อมูลเชิงคุณภาพ</p>}
         </div>
       </div>
-      <div className="rounded-xl bg-bg p-3">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">บทวิเคราะห์และข้อเสนอโค้ช (AI — ผู้จัดการพิจารณา)</div>
-        {text ? <p className="whitespace-pre-line text-sm leading-relaxed">{text}</p> : <p className="text-sm text-muted">ยังไม่มีบทวิเคราะห์ AI สำหรับช่วงนี้ (สร้างอัตโนมัติทุกวันจันทร์ 08:30)</p>}
-      </div>
+      {text && (
+        <div className="rounded-xl bg-bg p-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">บทวิเคราะห์และข้อเสนอโค้ช (AI — ผู้จัดการพิจารณา)</div>
+          <p className="whitespace-pre-line text-sm leading-relaxed">{text}</p>
+        </div>
+      )}
     </article>
   );
 }
@@ -120,12 +122,12 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
           <p className="mt-0.5 text-sm text-muted">ตัวเลขรวมและรายคน เชิงปริมาณ + เชิงคุณภาพ · ไม่ส่งชื่อ/เบอร์ลูกค้าให้ AI · เห็นได้เฉพาะผู้จัดการและผู้บริหาร</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <label className="card flex min-h-11 items-center px-3 text-sm"><span className="sr-only">รายงาน</span>
+          {snaps.length > 0 && <label className="card flex min-h-11 items-center px-3 text-sm"><span className="sr-only">รายงาน</span>
             <select value={String(sel)} onChange={(e) => setSel(e.target.value === "live" ? "live" : Number(e.target.value))} className="min-h-11 bg-transparent outline-none">
               <option value="live">ตัวเลขล่าสุดตอนนี้</option>
               {snaps.map((x) => <option key={x.id} value={x.id}>รายงาน {stamp(x.generated_at)} ({x.period_days} วัน)</option>)}
             </select>
-          </label>
+          </label>}
           {sel === "live" && (
             <label className="card flex min-h-11 items-center px-3 text-sm"><span className="sr-only">ช่วงเวลา</span>
               <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="min-h-11 bg-transparent outline-none">
@@ -150,11 +152,12 @@ export default function ReportView({ leads, onOpen }: { leads: LeadRow[]; onOpen
           <Stat label="จอง" value={sum("bookings_reported")} />
         </div>
 
-        <div className="card p-4">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">ภาพรวมจาก AI {aiSrc ? `· รายงาน ${stamp(aiSrc.generated_at)}` : ""}</div>
-          {aiSrc?.overview_text ? <p className="whitespace-pre-line text-sm leading-relaxed">{aiSrc.overview_text}</p> : <p className="text-sm text-muted">ยังไม่มีบทวิเคราะห์ AI (สร้างอัตโนมัติทุกวันจันทร์ 08:30)</p>}
-          {sel === "live" && aiSrc && <p className="mt-2 text-[11px] text-muted">ตัวเลขด้านบนเป็นข้อมูลสด ส่วนบทวิเคราะห์เป็นของรอบที่สร้างล่าสุด</p>}
-        </div>
+        {aiSrc?.overview_text && (
+          <div className="card p-4">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">ภาพรวมจาก AI · รายงาน {stamp(aiSrc.generated_at)}</div>
+            <p className="whitespace-pre-line text-sm leading-relaxed">{aiSrc.overview_text}</p>
+          </div>
+        )}
 
         <div className="space-y-3">
           {S.map((s) => <PersonCard key={s.code} s={s} q={Q.find((x) => x.code === s.code)} text={aiSrc?.person_texts?.[s.code]} teamAvg={teamAvg} />)}
