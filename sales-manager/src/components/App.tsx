@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BookmarkCheck, FileBarChart, ChevronDown, KanbanSquare, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Settings, Sparkles, Star, Truck, UserPlus, Users } from "lucide-react";
+import { Bell, BookmarkCheck, FileBarChart, ChevronDown, LayoutDashboard, ListChecks, LogOut, RefreshCw, Search, Star, Truck, UserPlus, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Booking, DeliveryInput, DeliveryStep, ExecSummary, LeadRow, Me, SalesPerf, TodayItem } from "@/lib/types";
 import { friendlyError } from "@/lib/format";
@@ -105,7 +105,6 @@ export default function App() {
   };
   const deliveryStep = async (dealId: string, step: DeliveryStep, i?: DeliveryInput) => { await api.setDeliveryStep(dealId, step, i); await refresh(); };
   const verifyBooking = async (dealId: string) => { await api.verifyBooking(dealId); await refresh(); };
-  const soon = [{ label: "Pipeline Kanban", Icon: KanbanSquare }, { label: "AI Insights", Icon: Sparkles }, { label: "ตั้งค่า SLA", Icon: Settings }];
   const go = (k: Tab) => setTab(k);
   const logout = async () => { await api.signOut(); await boot(); };
   const stamp = updatedAt ? updatedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }) : "";
@@ -123,8 +122,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="mt-6 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/40">เร็วๆ นี้</div>
-        <ul className="mt-1 space-y-1">{soon.map(({ label, Icon }) => (<li key={label} className="flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm text-white/35"><Icon size={18} />{label}</li>))}</ul>
         <div className="mt-auto rounded-2xl bg-white/5 p-3">
           <div className="text-xs text-white/60">ข้อมูลล่าสุด {stamp || "—"}</div>
           <button onClick={() => void refresh()} className="focus-ring mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-black"><RefreshCw size={15} className={loading ? "animate-spin" : ""} />รีเฟรชข้อมูล</button>

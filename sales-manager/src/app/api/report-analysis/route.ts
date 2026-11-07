@@ -22,28 +22,44 @@ const SYSTEM = `คุณคือที่ปรึกษาฝ่ายขา�
 7. งานค้างลีดเก่า (ก่อน 3 พ.ย. 2026) แยกจากลีดใหม่ ให้ประเมินวินัยจากลีดใหม่เป็นหลัก
 8. ภาษาไทย ประโยคสั้น น้ำเสียงให้เกียรติ ใช้เพื่อพัฒนาคน ไม่ใช้อีโมจิและ markdown
 
-ผลลัพธ์เป็น JSON ตามสคีมา:
-- overview (ไม่เกิน 1,200 ตัวอักษร): "สิ่งที่เห็น" 3 ข้อ, "ต้องตัดสินใจสัปดาห์นี้" 3 ข้อ (ใครควรทำอะไร), "ข้อมูลที่ขาด/น่าสงสัย" ไม่เกิน 2 ข้อ
-- people: เซลล์ละ 1 รายการ (code ตรงกับ sales[].code) ข้อความไม่เกิน 1,400 ตัวอักษร ตามหัวข้อ
-  เชิงปริมาณ: 2-3 ข้อ (เทียบทีมและช่วงก่อนหน้า)
-  เชิงคุณภาพ: 3 ข้อ จาก sales_quality เช่น ความเร็วตอบสนอง สัดส่วนติดต่อสำเร็จต่อไม่รับสาย ความต่อเนื่องรายวัน การตั้งนัดติดตามต่อ การไล่ระดับความร้อนของลีด การเลื่อนสถานะ
-  จุดเด่น: 1-2 ข้อ
-  จุดที่ควรพัฒนา: 1-2 ข้อ
-  ข้อเสนอการโค้ช: 3 ข้อ (สิ่งที่ผู้จัดการควรคุยหรือช่วย ไม่ใช่คำสั่ง)
-  ลีดที่ควรติดตามก่อน: lead_code ไม่เกิน 5 รายการจาก risk_leads ของเซลล์นั้น (ไม่มีให้เขียน "ไม่มี")`;
+รูปแบบคำตอบ: ทุกหัวข้อเป็น bullet สั้น แต่ละข้อ 1 ประโยค ไม่เกิน 110 ตัวอักษร บอก "ข้อเท็จจริง + ความหมาย" พร้อมตัวเลขและหน่วย ห้ามเขียนเป็นย่อหน้ายาว ห้ามซ้ำตัวเลขเดียวกันหลายข้อ
+- overview.headline: 1 ประโยคสรุปสถานการณ์ทีม
+- overview.observations: 4-5 ข้อ "สิ่งที่เห็น"
+- overview.decisions: 3 ข้อ เรียงตามความสำคัญ action = สิ่งที่ควรทำ, owner = ผู้รับผิดชอบ (เช่น "ผู้จัดการ", "เจ้าของ", หรือ code เซลล์)
+- overview.gaps: 0-2 ข้อ ข้อมูลที่ขาดหรือน่าสงสัย (ไม่มีให้ส่งอาร์เรย์ว่าง)
+- people: เซลล์ละ 1 รายการ code ตรงกับ sales[].code
+  quant 3 ข้อ (ปริมาณงานเทียบทีมและช่วงก่อนหน้า) | quality 4 ข้อ จาก sales_quality เช่น ความเร็วตอบสนอง สัดส่วนติดต่อสำเร็จต่อไม่รับสาย ความต่อเนื่องรายวัน การตั้งนัดติดตามต่อ การไล่ระดับความร้อนของลีด การเลื่อนสถานะ
+  strengths 2 ข้อ | improve 2 ข้อ | coaching 3 ข้อ (สิ่งที่ผู้จัดการควรคุยหรือช่วย ไม่ใช่คำสั่ง)
+  follow_leads: lead_code ไม่เกิน 5 รายการจาก risk_leads ของเซลล์นั้น (ไม่มีให้ส่งอาร์เรย์ว่าง)`;
 
+const strs = { type: "array", items: { type: "string" } } as const;
 const SCHEMA = {
   type: "object",
   properties: {
-    overview: { type: "string" },
+    overview: {
+      type: "object",
+      properties: {
+        headline: { type: "string" }, observations: strs,
+        decisions: { type: "array", items: { type: "object", properties: { action: { type: "string" }, owner: { type: "string" } }, required: ["action", "owner"], additionalProperties: false } },
+        gaps: strs,
+      },
+      required: ["headline", "observations", "decisions", "gaps"], additionalProperties: false,
+    },
     people: {
       type: "array",
-      items: { type: "object", properties: { code: { type: "string" }, text: { type: "string" } }, required: ["code", "text"], additionalProperties: false },
+      items: {
+        type: "object",
+        properties: { code: { type: "string" }, quant: strs, quality: strs, strengths: strs, improve: strs, coaching: strs, follow_leads: strs },
+        required: ["code", "quant", "quality", "strengths", "improve", "coaching", "follow_leads"], additionalProperties: false,
+      },
     },
   },
   required: ["overview", "people"],
   additionalProperties: false,
 } as const;
+
+type Parsed = { overview: { headline: string; observations: string[]; decisions: Array<{ action: string; owner: string }>; gaps: string[] }; people: Array<Record<string, unknown> & { code: string }> };
+const list = (v: unknown, n = 8): string[] => (Array.isArray(v) ? v.map((x) => String(x).slice(0, 300)).slice(0, n) : []);
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -70,7 +86,7 @@ export async function POST(req: Request) {
   if (last.data && Date.now() - new Date(last.data.generated_at).getTime() < COOLDOWN_MS && last.data.overview_text) return json({ snapshot: last.data, cached: true });
 
   const anthropic = new Anthropic();
-  let parsed: { overview: string; people: Array<{ code: string; text: string }> };
+  let parsed: Parsed;
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,
@@ -88,11 +104,17 @@ export async function POST(req: Request) {
     return json({ error: m }, 502);
   }
 
-  const known = new Set((report.sales ?? []).map((s) => s.code));
-  const persons: Record<string, string> = {};
-  for (const p of parsed.people ?? []) if (known.has(p.code)) persons[p.code] = String(p.text).slice(0, 4000);
+  const known = new Set((report.sales ?? []).map((x) => x.code));
+  const ov = parsed.overview;
+  // เก็บบทวิเคราะห์เป็นโครงสร้างใน person_texts (jsonb) — คีย์ _overview = ภาพรวม; overview_text = หัวข้อสั้น (ใช้กับรายงานรุ่นเก่า/ค้นหา)
+  const persons: Record<string, unknown> = {
+    _overview: { headline: String(ov.headline ?? "").slice(0, 400), observations: list(ov.observations), decisions: (ov.decisions ?? []).slice(0, 5).map((d) => ({ action: String(d.action).slice(0, 300), owner: String(d.owner).slice(0, 60) })), gaps: list(ov.gaps, 4) },
+  };
+  for (const p of parsed.people ?? []) {
+    if (known.has(p.code)) persons[p.code] = { quant: list(p.quant), quality: list(p.quality), strengths: list(p.strengths, 4), improve: list(p.improve, 4), coaching: list(p.coaching, 5), follow_leads: list(p.follow_leads, 8) };
+  }
 
-  const saved = await sb.rpc("save_report_snapshot", { p_days: days, p_report: report, p_overview: parsed.overview, p_person_texts: persons });
+  const saved = await sb.rpc("save_report_snapshot", { p_days: days, p_report: report, p_overview: String(ov.headline ?? "").slice(0, 400), p_person_texts: persons });
   if (saved.error) return json({ error: saved.error.message }, 500);
   const snap = await sb.from("report_snapshots").select("*").eq("id", saved.data).maybeSingle();
   return json({ snapshot: snap.data, cached: false });

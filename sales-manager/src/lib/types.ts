@@ -86,8 +86,11 @@ export interface WeeklyReport {
   generated_at: string; period_days: number; unassigned_leads: number; sales: ReportSales[]; sales_quality: ReportQuality[];
   risk_leads: Array<{ lead_code: string; sales: string | null; stage: string; temperature: string | null; reason: string }>;
   leads_by_source: Array<{ source: string; this_period: number; previous_period: number }>;
+  funnel_now?: Array<{ stage: string; leads: number }>;
 }
-export interface ReportSnapshot { id: number; period_days: number; generated_at: string; report: WeeklyReport; overview_text: string | null; person_texts: Record<string, string> }
+export interface AiOverview { headline: string; observations: string[]; decisions: Array<{ action: string; owner: string }>; gaps: string[] }
+export interface AiPerson { quant: string[]; quality: string[]; strengths: string[]; improve: string[]; coaching: string[]; follow_leads: string[] }
+export interface ReportSnapshot { id: number; period_days: number; generated_at: string; report: WeeklyReport; overview_text: string | null; person_texts: Record<string, unknown> }
 
 export interface Api {
   weeklyReport(days: number): Promise<WeeklyReport | null>;
