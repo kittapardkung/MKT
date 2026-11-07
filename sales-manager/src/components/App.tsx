@@ -110,8 +110,9 @@ export default function App() {
   const stamp = updatedAt ? updatedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }) : "";
 
   return (
-    <div className="min-h-screen overflow-x-hidden lg:flex">
-      <aside className="hidden w-64 shrink-0 flex-col bg-side p-4 text-white lg:sticky lg:top-0 lg:flex lg:h-screen">
+    <div className="min-h-screen overflow-x-clip lg:flex">
+      <div className="hidden w-64 shrink-0 bg-side lg:block">   {/* พื้นดำยืดเต็มความสูงหน้าเสมอ */}
+      <aside className="flex flex-col p-4 text-white lg:sticky lg:top-0 lg:h-screen">
         <div className="flex items-center gap-3 px-2 py-3"><Logo /><div><div className="text-lg font-bold leading-tight">Sale Lead</div><div className="text-xs text-white/60">WULING CHONBURI</div></div></div>
         <nav className="mt-4 space-y-1" aria-label="เมนูหลัก">
           {nav.map(({ k, label, Icon, badge }) => (
@@ -127,6 +128,7 @@ export default function App() {
           <button onClick={() => void refresh()} className="focus-ring mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-black"><RefreshCw size={15} className={loading ? "animate-spin" : ""} />รีเฟรชข้อมูล</button>
         </div>
       </aside>
+      </div>
 
       <div className="min-w-0 flex-1 pb-24 lg:pb-8">
         {api.mode === "demo" && <div className="bg-warn-soft px-4 py-2 text-center text-xs text-warn">โหมดสาธิต — ข้อมูลตัวอย่าง ไม่ใช่ข้อมูลลูกค้าจริง · ปุ่มออกจากระบบ = สลับมุมมองเซลล์/ผู้จัดการ</div>}
