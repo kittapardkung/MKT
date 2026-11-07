@@ -256,4 +256,74 @@ err2 = tg_send(w2, "Telegram: แจ้งเซลล์ (error)", "={{ $('Pars
   "=⚠️ ระบบบันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้งหรือบันทึกในเว็บแอป\n🆔 {{ $('Parse reply').first().json.lead_code }}", [640, 400])
 w2.link(rec, err2, 1)
 w2.save("02_sales_reply.json")
+
+
+# =====================================================================================
+# 3) Weekly report: ทุกวันจันทร์ 08:30 (เวลาไทย) -> crm.weekly_report -> OpenAI เขียนรายงาน -> Telegram เจ้าของ
+# =====================================================================================
+w3 = WF("WULING Sale Lead - 03 Weekly Report (Supabase → AI → Telegram)")
+cfg3 = cfg_node(w3, {"supabaseUrl": "https://REPLACE_PROJECT_REF.supabase.co", "adminChatId": "REPLACE_ADMIN_TELEGRAM_CHAT_ID", "days": "7"})
+sch = w3.add("ทุกวันจันทร์ 08:30", "n8n-nodes-base.scheduleTrigger", {"rule": {"interval": [{"field": "cronExpression", "expression": "30 8 * * 1"}]}}, [-1400, 200], 1.2)
+man = w3.add("รันเอง (ทดสอบ)", "n8n-nodes-base.manualTrigger", {}, [-1400, 400], 1)
+w3.link(sch, cfg3); w3.link(man, cfg3)
+rep = rpc(w3, "Supabase weekly_report", "weekly_report", "={{ JSON.stringify({ p_days: Number($('Config').first().json.days) || 7 }) }}", [-880, 300])
+w3.link(cfg3, rep)
+
+SYS_REPORT = """คุณคือนักวิเคราะห์ฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนรายงานรายสัปดาห์ให้เจ้าของ
+ข้อมูลที่ได้รับเป็น JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อหรือเบอร์ลูกค้า) เวลาในข้อมูลเป็น UTC เวลาไทย = UTC+7
+
+กติกา
+1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ถ้าข้อมูลไม่พอให้เขียนว่า "ข้อมูลไม่พอ" และบอกว่าขาดอะไร
+2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด การเปลี่ยนเจ้าของลีด การอนุมัติ) ให้เสนอเป็น "ข้อเสนอให้ผู้จัดการพิจารณา" เท่านั้น
+3. ห้ามใส่ชื่อหรือเบอร์โทรลูกค้า อ้างลีดด้วย lead_code เท่านั้น
+4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว ให้เทียบโดยดูจำนวนลีดที่ได้รับ สัดส่วนลีด HOT และช่วงเวลาที่ลีดเข้าประกอบ
+5. จอง สินเชื่อ ส่งมอบ ปิดการขาย นับเฉพาะรายการที่ verified = true ที่ยังไม่ยืนยันให้เรียก "รอตรวจสอบ"
+6. ตัวเลขบันทึกผลติดต่อของเซลล์คือที่บันทึกในระบบ ไม่ใช่จำนวนสายที่โทรจริง ถ้าต่ำให้เขียนว่า "ยังไม่ได้บันทึก" ไม่ใช่ "ไม่ทำงาน"
+7. ข้อมูลก่อน 3 พ.ย. 2026 มาจาก Google Sheet เดิม ไม่มีประวัติเปลี่ยนสถานะละเอียด ให้ระบุข้อจำกัดนี้เมื่อเทียบกับช่วงก่อนหน้าที่คาบเกี่ยววันนี้
+8. ไม่ใช้อีโมจิ ไม่ใช้ markdown (ห้าม ** # ``` และตาราง) ใช้ข้อความธรรมดา ขึ้นหัวข้อด้วยเลขและจุด และขีด - นำหน้ารายการ ภาษาไทย ประโยคสั้น ตัวเลขมีหน่วย
+9. ยาวไม่เกิน 3,500 ตัวอักษร
+
+โครงรายงาน (หัวข้อไหนไม่มีข้อมูลให้เขียนว่า "ไม่มีข้อมูลในสัปดาห์นี้")
+1. สรุปผู้บริหาร (ไม่เกิน 5 บรรทัด)
+2. ภาพรวมลีดเทียบช่วงก่อนหน้า (ลีดใหม่ แหล่งที่มา การกระจายเซลล์ ลีดไม่มีผู้ดูแล)
+3. ความเร็วและวินัยการติดต่อ (เวลาติดต่อครั้งแรก ลีดยังไม่ได้ติดต่อ งานเลยกำหนด)
+4. ผลงานเซลล์รายคน (ตัวเลขสำคัญ จุดเด่น จุดที่ควรพัฒนา ข้อเสนอการโค้ช)
+5. ท่อขายและการเปลี่ยนสถานะ
+6. การจอง สินเชื่อ และส่งมอบ
+7. ลีดเสี่ยงที่ต้องดูแลพิเศษ (lead_code พร้อมเหตุผล)
+8. คุณภาพข้อมูลและสุขภาพระบบ (รายการข้อมูลผิดปกติ ข้อความที่ระบบไม่รับ)
+9. ข้อเสนอและเรื่องที่ผู้จัดการต้องตัดสินใจ (3 เรื่องสำคัญที่สุด)
+10. ข้อมูลที่ขาดหรือน่าสงสัย"""
+BUILD_JS = r"""// ประกอบ prompt + ข้อมูล JSON ส่ง OpenAI (ข้อมูลไม่มีชื่อ/เบอร์ลูกค้า)
+const rep = $input.first().json;
+const sys = %s;
+const days = rep.period_days || 7;
+const user = 'ช่วงรายงาน: ' + days + ' วันล่าสุด (สร้างเมื่อ ' + rep.generated_at + ')\n\nข้อมูล JSON:\n' + JSON.stringify(rep);
+return [{ json: { body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];""" % json.dumps(SYS_REPORT, ensure_ascii=False)
+build = w3.add("Build prompt", "n8n-nodes-base.code", {"jsCode": BUILD_JS}, [-660, 300], 2)
+w3.link(rep, build, 0)
+ai = w3.add("OpenAI เขียนรายงาน", "n8n-nodes-base.httpRequest", {"method": "POST", "url": "https://api.openai.com/v1/chat/completions",
+  "authentication": "predefinedCredentialType", "nodeCredentialType": "openAiApi", "sendBody": True, "specifyBody": "json", "jsonBody": "={{ $json.body }}", "options": {"timeout": 120000}},
+  [-440, 300], 4.2, OAI_CRED, onError="continueErrorOutput", retryOnFail=True, maxTries=2, waitBetweenTries=3000)
+w3.link(build, ai)
+SPLIT_JS = r"""// แบ่งข้อความตามขีดจำกัด Telegram (4096) และ escape สำหรับโหมด HTML
+const cfg = $('Config').first().json;
+const res = $input.first().json;
+const content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();
+if (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');
+const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+const text = 'รายงานรายสัปดาห์ฝ่ายขาย WULING Chonburi (สร้างเมื่อ ' + d + ')\n\n' + content;
+const lines = text.split('\n').map(esc), parts = []; let cur = '';
+for (const l of lines) { if ((cur + '\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\n' + l : l; } }
+if (cur) parts.push(cur);
+return parts.map((p, i) => ({ json: { chatId: String(cfg.adminChatId), text: p + (parts.length > 1 ? '\n\n(' + (i + 1) + '/' + parts.length + ')' : '') } }));"""
+split = w3.add("แบ่งข้อความ", "n8n-nodes-base.code", {"jsCode": SPLIT_JS}, [-220, 300], 2)
+w3.link(ai, split, 0)
+send3 = tg_send(w3, "Telegram: ส่งรายงานถึงเจ้าของ", "={{ $json.chatId }}", "={{ $json.text }}", [0, 300])
+w3.link(split, send3)
+err3 = tg_send(w3, "Telegram: รายงานสร้างไม่สำเร็จ", "={{ $('Config').first().json.adminChatId }}",
+  "=รายงานรายสัปดาห์สร้างไม่สำเร็จ ดูรายละเอียดที่ n8n แท็บ Executions ของ workflow 03 (ดึงข้อมูลจาก Supabase หรือเรียก OpenAI ไม่ได้) รันซ้ำได้ด้วยปุ่มรันเอง", [-440, 520])
+w3.link(rep, err3, 1); w3.link(ai, err3, 1)
+w3.save("03_weekly_report.json")
 print("ok")

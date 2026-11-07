@@ -1,0 +1,329 @@
+{
+  "name": "WULING Sale Lead - 03 Weekly Report (Supabase → AI → Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d26b3387-2216-4e16-b5ce-eb99508ebe31",
+              "name": "supabaseUrl",
+              "value": "https://REPLACE_PROJECT_REF.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "c534b586-fcdb-4b80-8311-f056748a671e",
+              "name": "adminChatId",
+              "value": "REPLACE_ADMIN_TELEGRAM_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "f8988e92-c815-427b-8e2e-b22db08fe73b",
+              "name": "days",
+              "value": "7",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "36727aea-9fe9-4e8f-9e27-b545870d4801",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "32f7f14f-5c1c-4f35-aca3-9c7a8b8c2c49",
+      "name": "ทุกวันจันทร์ 08:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1400,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e27fda09-ba38-43ed-9350-eda852681d01",
+      "name": "รันเอง (ทดสอบ)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabaseUrl }}/rest/v1/rpc/weekly_report",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Profile",
+              "value": "crm"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "crm"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_days: Number($('Config').first().json.days) || 7 }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "5433ac1e-d7b4-4b8e-93ad-1a3edc206f26",
+      "name": "Supabase weekly_report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Supabase service key (crm)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ประกอบ prompt + ข้อมูล JSON ส่ง OpenAI (ข้อมูลไม่มีชื่อ/เบอร์ลูกค้า)\nconst rep = $input.first().json;\nconst sys = \"คุณคือนักวิเคราะห์ฝ่ายขายของศูนย์รถยนต์ไฟฟ้า WULING Chonburi เขียนรายงานรายสัปดาห์ให้เจ้าของ\\nข้อมูลที่ได้รับเป็น JSON ตัวเลขรวมจากระบบ Sale Lead (ไม่มีชื่อหรือเบอร์ลูกค้า) เวลาในข้อมูลเป็น UTC เวลาไทย = UTC+7\\n\\nกติกา\\n1. ใช้เฉพาะตัวเลขใน JSON ห้ามเดา ถ้าข้อมูลไม่พอให้เขียนว่า \\\"ข้อมูลไม่พอ\\\" และบอกว่าขาดอะไร\\n2. ห้ามตัดสินใจเรื่องการค้า (ราคา ส่วนลด การเปลี่ยนเจ้าของลีด การอนุมัติ) ให้เสนอเป็น \\\"ข้อเสนอให้ผู้จัดการพิจารณา\\\" เท่านั้น\\n3. ห้ามใส่ชื่อหรือเบอร์โทรลูกค้า อ้างลีดด้วย lead_code เท่านั้น\\n4. ห้ามสรุปว่าเซลล์คนไหนดีหรือแย่จากตัวเลขเดียว ให้เทียบโดยดูจำนวนลีดที่ได้รับ สัดส่วนลีด HOT และช่วงเวลาที่ลีดเข้าประกอบ\\n5. จอง สินเชื่อ ส่งมอบ ปิดการขาย นับเฉพาะรายการที่ verified = true ที่ยังไม่ยืนยันให้เรียก \\\"รอตรวจสอบ\\\"\\n6. ตัวเลขบันทึกผลติดต่อของเซลล์คือที่บันทึกในระบบ ไม่ใช่จำนวนสายที่โทรจริง ถ้าต่ำให้เขียนว่า \\\"ยังไม่ได้บันทึก\\\" ไม่ใช่ \\\"ไม่ทำงาน\\\"\\n7. ข้อมูลก่อน 3 พ.ย. 2026 มาจาก Google Sheet เดิม ไม่มีประวัติเปลี่ยนสถานะละเอียด ให้ระบุข้อจำกัดนี้เมื่อเทียบกับช่วงก่อนหน้าที่คาบเกี่ยววันนี้\\n8. ไม่ใช้อีโมจิ ไม่ใช้ markdown (ห้าม ** # ``` และตาราง) ใช้ข้อความธรรมดา ขึ้นหัวข้อด้วยเลขและจุด และขีด - นำหน้ารายการ ภาษาไทย ประโยคสั้น ตัวเลขมีหน่วย\\n9. ยาวไม่เกิน 3,500 ตัวอักษร\\n\\nโครงรายงาน (หัวข้อไหนไม่มีข้อมูลให้เขียนว่า \\\"ไม่มีข้อมูลในสัปดาห์นี้\\\")\\n1. สรุปผู้บริหาร (ไม่เกิน 5 บรรทัด)\\n2. ภาพรวมลีดเทียบช่วงก่อนหน้า (ลีดใหม่ แหล่งที่มา การกระจายเซลล์ ลีดไม่มีผู้ดูแล)\\n3. ความเร็วและวินัยการติดต่อ (เวลาติดต่อครั้งแรก ลีดยังไม่ได้ติดต่อ งานเลยกำหนด)\\n4. ผลงานเซลล์รายคน (ตัวเลขสำคัญ จุดเด่น จุดที่ควรพัฒนา ข้อเสนอการโค้ช)\\n5. ท่อขายและการเปลี่ยนสถานะ\\n6. การจอง สินเชื่อ และส่งมอบ\\n7. ลีดเสี่ยงที่ต้องดูแลพิเศษ (lead_code พร้อมเหตุผล)\\n8. คุณภาพข้อมูลและสุขภาพระบบ (รายการข้อมูลผิดปกติ ข้อความที่ระบบไม่รับ)\\n9. ข้อเสนอและเรื่องที่ผู้จัดการต้องตัดสินใจ (3 เรื่องสำคัญที่สุด)\\n10. ข้อมูลที่ขาดหรือน่าสงสัย\";\nconst days = rep.period_days || 7;\nconst user = 'ช่วงรายงาน: ' + days + ' วันล่าสุด (สร้างเมื่อ ' + rep.generated_at + ')\\n\\nข้อมูล JSON:\\n' + JSON.stringify(rep);\nreturn [{ json: { body: JSON.stringify({ model: 'gpt-4.1', temperature: 0.2, messages: [{ role: 'system', content: sys }, { role: 'user', content: user }] }) } }];"
+      },
+      "id": "2eea569c-3ff2-465f-be8c-60a74d1f8031",
+      "name": "Build prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "542ae4b5-0149-4155-b0ff-a2a3441f29ee",
+      "name": "OpenAI เขียนรายงาน",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// แบ่งข้อความตามขีดจำกัด Telegram (4096) และ escape สำหรับโหมด HTML\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst content = String(res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content || '').trim();\nif (!content) throw new Error('AI ไม่ส่งข้อความรายงานกลับมา');\nconst esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst d = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);\nconst text = 'รายงานรายสัปดาห์ฝ่ายขาย WULING Chonburi (สร้างเมื่อ ' + d + ')\\n\\n' + content;\nconst lines = text.split('\\n').map(esc), parts = []; let cur = '';\nfor (const l of lines) { if ((cur + '\\n' + l).length > 3800 && cur) { parts.push(cur); cur = l; } else { cur = cur ? cur + '\\n' + l : l; } }\nif (cur) parts.push(cur);\nreturn parts.map((p, i) => ({ json: { chatId: String(cfg.adminChatId), text: p + (parts.length > 1 ? '\\n\\n(' + (i + 1) + '/' + parts.length + ')' : '') } }));"
+      },
+      "id": "0b2de4d9-80ad-40bd-ad28-eab2a0303820",
+      "name": "แบ่งข้อความ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b0f5475d-5d36-411d-88c7-7e5a98bd89ab",
+      "name": "Telegram: ส่งรายงานถึงเจ้าของ",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram bot: WULING Sale Lead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.adminChatId }}",
+        "text": "=รายงานรายสัปดาห์สร้างไม่สำเร็จ ดูรายละเอียดที่ n8n แท็บ Executions ของ workflow 03 (ดึงข้อมูลจาก Supabase หรือเรียก OpenAI ไม่ได้) รันซ้ำได้ด้วยปุ่มรันเอง",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "4794f763-0408-4d26-b35b-e4751026308e",
+      "name": "Telegram: รายงานสร้างไม่สำเร็จ",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -440,
+        520
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram bot: WULING Sale Lead"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "ทุกวันจันทร์ 08:30": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "รันเอง (ทดสอบ)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Supabase weekly_report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase weekly_report": {
+      "main": [
+        [
+          {
+            "node": "Build prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: รายงานสร้างไม่สำเร็จ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI เขียนรายงาน",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI เขียนรายงาน": {
+      "main": [
+        [
+          {
+            "node": "แบ่งข้อความ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: รายงานสร้างไม่สำเร็จ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "แบ่งข้อความ": {
+      "main": [
+        [
+          {
+            "node": "Telegram: ส่งรายงานถึงเจ้าของ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bangkok"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

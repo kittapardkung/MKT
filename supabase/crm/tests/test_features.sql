@@ -285,3 +285,17 @@ begin
   perform t_assert(crm.normalize_phone('093-729-0211') = '0937290211', 'เบอร์: 093-729-0211 → 0937290211');
   perform t_assert(crm.normalize_phone('+66 0123') is null, 'เบอร์: ผิดรูปแบบยังถูกปฏิเสธ');
 end $$;
+
+-- รายงานรายสัปดาห์: ครบทุกส่วน ไม่มีชื่อ/เบอร์ลูกค้า
+do $$
+declare r jsonb; r2 jsonb; txt text;
+begin
+  perform crm.ingest_message('wk1', 'fbWk1', 'สนใจ 0812340099', 'คุณลับ นามสมมติ', '0812340099', 'Darion');
+  r := crm.weekly_report(7);
+  txt := r::text;
+  perform t_assert(r ? 'sales' and r ? 'funnel_now' and r ? 'risk_leads' and r ? 'bookings_and_delivery' and r ? 'data_quality_open' and r ? 'leads_by_source', 'รายงาน: มีครบทุกส่วน');
+  perform t_assert(jsonb_array_length(r->'sales') >= 1, 'รายงาน: มีเซลล์รายคน');
+  perform t_assert(position('0812340099' in txt) = 0 and position('นามสมมติ' in txt) = 0, 'รายงาน: ไม่มีชื่อ/เบอร์ลูกค้าใน JSON');
+  r2 := crm.weekly_report(500);
+  perform t_assert((r2->>'period_days')::int = 90, 'รายงาน: จำกัดช่วงสูงสุด 90 วัน');
+end $$;

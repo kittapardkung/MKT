@@ -35,3 +35,10 @@
 ## หมายเหตุ
 - โหนด Code ที่ตรวจลายเซ็นใช้ `require('crypto')` — บน n8n แบบ self-host ต้องตั้ง `NODE_FUNCTION_ALLOW_BUILTIN=crypto`
 - ลีดที่ไม่มีเบอร์จะถูกบันทึกแต่ยังไม่มอบหมายเซลล์ (ไม่มีการแจ้ง Telegram) ตามกติกาเดิม
+
+## 03 — รายงานรายสัปดาห์ (ใหม่)
+`03_weekly_report.json`: ทุกวันจันทร์ 08:30 (เวลาไทย) เรียก `crm.weekly_report(7)` (ตัวเลขรวม ไม่มีชื่อ/เบอร์ลูกค้า) → OpenAI (gpt-4.1) เขียนรายงาน 10 หัวข้อ → ส่ง Telegram หาเจ้าของคนเดียว
+- ต้องรัน `supabase/crm/006_weekly_report.sql` (หรือ `install_all.sql` ใหม่) ก่อน
+- ตั้งค่าโหนด Config: `supabaseUrl`, `adminChatId`, `days` (7); เลือก credential Supabase (Header Auth), OpenAI, Telegram
+- ทดสอบด้วยปุ่ม "รันเอง (ทดสอบ)" ก่อนเปิด Active
+- หมายเหตุ: ถ้าหลัง Import โหนด AI Agent ในไฟล์ 01/02 ขึ้น "model is not supported in version 2.2" ให้ลบแล้วเพิ่มโหนด AI Agent ใหม่ (รุ่นล่าสุด) ต่อ Chat Model และ Output Parser เดิม
