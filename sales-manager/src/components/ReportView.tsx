@@ -19,14 +19,30 @@ const STAGE_ORDER = Object.keys(STAGE_TH) as Stage[];
 
 
 // รายงานรุ่นเก่าเก็บเป็นข้อความก้อนเดียว: แยกตามหัวข้อและเลขข้อ "1)" "2)" ให้อ่านเป็น bullet ได้
+// แยกเลขข้อ "1) 2) 3)" แบบเรียงลำดับเท่านั้น — กันตัวเลขในวงเล็บ เช่น "(Facebook 174 จาก 167)" ถูกตัดผิดที่
+function splitItems(body: string): string[] {
+  const marks: Array<{ start: number; end: number }> = [];
+  let pos = 0;
+  for (let k = 1; ; k++) {
+    const re = new RegExp(`(?:^|\\s)${k}\\)\\s`, "g");
+    re.lastIndex = pos;
+    const m = re.exec(body);
+    if (!m) break;
+    marks.push({ start: m.index, end: m.index + m[0].length });
+    pos = m.index + m[0].length;
+  }
+  if (!marks.length) { const t = body.split(/\n\s*[-•]\s*/).map((x) => x.trim()).filter(Boolean); return t.length ? t : body.trim() ? [body.trim()] : []; }
+  const items = marks.map((m, i) => body.slice(m.end, i + 1 < marks.length ? marks[i + 1].start : undefined).trim());
+  const lead = body.slice(0, marks[0].start).trim();
+  return [...(lead ? [lead] : []), ...items].filter(Boolean);
+}
 function splitSections(text: string, heads: string[]): Record<string, string[]> {
   const re = new RegExp(`(${heads.map((h) => h.replace(/[/]/g, "\\/")).join("|")})\\s*:?`, "g");
   const out: Record<string, string[]> = {};
   const marks = [...text.matchAll(re)];
   marks.forEach((m, i) => {
     const body = text.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : undefined).trim();
-    const items = body.split(/\s*\d+\)\s*|\n\s*[-•]\s*/).map((x) => x.trim()).filter(Boolean);
-    out[m[1]] = items.length ? items : body ? [body] : [];
+    out[m[1]] = splitItems(body);
   });
   return out;
 }
