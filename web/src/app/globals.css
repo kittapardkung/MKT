@@ -266,6 +266,7 @@ tr.clickable:hover{background:var(--accent-soft)}
 .agent-spark .agent-badge{background:#d9770e}
 .agent-ads .agent-badge{background:#c2255c}
 .agent-almanac .agent-badge{background:var(--success-dark)}
+.agent-tiktok .agent-badge{background:#111827}
 
 .report-list-wrap{display:flex;flex-direction:column;gap:14px}
 .report-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
