@@ -53,3 +53,6 @@ Claude session)
 - `ads.json` → sync เข้า `agent_reports` (id: `ads-summary`, `ads-creatives`, ...) — ข้อมูลนี้
   Claude ดึงเองจาก Meta Ads API โดยตรง ไม่ได้มาจาก Artifact/Routine
 
+- `tiktok.json` → sync เข้า `agent_reports` (id: `tiktok-summary`, `tiktok-briefs`, ...) — บันทึกการทำงาน
+  TikTok Content Pipeline (สถานะบรีฟ · ลำดับงาน · ICP PORTA · ข้อตกลง) Claude อัปเดตเองจากเอกสารโปรเจกต์
+  ต้องรัน `supabase/migrate_tiktok_agent.sql` ก่อน sync ครั้งแรก · ห้ามใส่ชื่อลูกค้าในไฟล์นี้

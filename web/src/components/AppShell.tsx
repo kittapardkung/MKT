@@ -43,6 +43,7 @@ import {
   ListChecks,
   Megaphone,
   Users,
+  Clapperboard,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
@@ -100,6 +101,7 @@ type PageId =
   | 'compass'
   | 'spark'
   | 'ads'
+  | 'tiktok'
   | 'leadsOverview'
   | 'dashboard'
   | 'timeline'
@@ -142,6 +144,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'ADS · ทีมโฆษณา Meta',
     section: 'AI_TEAM',
     items: [{ id: 'ads', label: 'ภาพรวมโฆษณา', short: 'ADS', icon: Megaphone }],
+  },
+  {
+    id: 'TIKTOK',
+    label: 'TIKTOK · Content Pipeline',
+    section: 'AI_TEAM',
+    items: [{ id: 'tiktok', label: 'บันทึกการทำงาน', short: 'TIKTOK', icon: Clapperboard }],
   },
   {
     id: 'LEADS',
@@ -586,6 +594,8 @@ export default function AppShell() {
           {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
 
           {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
+
+          {page === 'tiktok' && <AgentReportPage agent="TIKTOK" reports={data?.agentReports || []} />}
 
           {page === 'leadsOverview' && <LeadsOverviewPage leads={data?.leads || []} />}
 
