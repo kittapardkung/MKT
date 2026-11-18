@@ -3,7 +3,7 @@
   "generated_at": "2026-11-18T23:00:00+07:00",
   "studio": {
     "title": "ห้องทำงาน AI",
-    "body": "สถานะ ณ 18 พ.ย. 2569 23:00 · Susan (บัญชี B) และ edit (บัญชี frong · คอมปัน) ส่งงานกันผ่าน Google Drive โฟลเดอร์ AI x CONTENT AUTOMATION",
+    "body": "สถานะ ณ 18 พ.ย. 2569 23:00 · Susan (บัญชี B) และ edit (บัญชี frong · คอมปัน) ส่งงานกันผ่าน Google Drive โฟลเดอร์ AI x CONTENT AUTOMATION · ทีม Ads (Alex · Beary) ทำงานในบัญชี B",
     "items": [
       {
         "actor": "pan",
@@ -24,6 +24,20 @@
         "label": "edit",
         "value": "รอเช็กคิว",
         "note": "EDIT-20261118-02: จัด 00_assets · แม่แบบปก 3 แบบ · LUT · อัปเดตดัชนี",
+        "state": "waiting"
+      },
+      {
+        "actor": "alex",
+        "label": "Alex",
+        "value": "รายงานเช้านี้เสร็จ",
+        "note": "พ.ย. ใช้ไป ฿19,044 (42% ของ ฿45,000) · PORTA ฿153/แชท · Darion ฿74/แชท (รอบ 18 พ.ย. 06:50)",
+        "state": "done"
+      },
+      {
+        "actor": "beary",
+        "label": "Beary",
+        "value": "เสนองบ รออนุมัติ",
+        "note": "ข้อเสนอปรับงบอยู่ในหน้า ADS · ปันกดอนุมัติ",
         "state": "waiting"
       },
       {

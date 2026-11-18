@@ -23,6 +23,8 @@ const FALLBACK: StudioItem[] = [
   { actor: 'pan', label: 'ปัน', value: 'รออัดเสียง', note: 'อัด VO บรีฟ TT-20261118-01 (ถังน้ำมัน 200 ลิตร)', state: 'waiting' },
   { actor: 'susan', label: 'Susan', value: 'ออกใบงานแล้ว', note: 'บรีฟ TT-20261118-01 พร้อม · ใบงาน EDIT-20261118-02 อยู่ในคิว', state: 'done' },
   { actor: 'edit', label: 'edit', value: 'รอเช็กคิว', note: 'EDIT-20261118-02: จัด 00_assets · ทำแม่แบบปก · LUT', state: 'waiting' },
+  { actor: 'alex', label: 'Alex', value: 'รายงานเช้านี้เสร็จ', note: 'พ.ย. ใช้ไป ฿19,044 (42% ของ ฿45,000) · PORTA ฿153/แชท · Darion ฿74/แชท', state: 'done' },
+  { actor: 'beary', label: 'Beary', value: 'เสนองบ รออนุมัติ', note: 'ข้อเสนอปรับงบอยู่ในหน้า ADS · ปันกดอนุมัติ', state: 'waiting' },
   { actor: 'queue_todo', label: 'TODO', value: '1' },
   { actor: 'queue_doing', label: 'DOING', value: '0' },
   { actor: 'queue_done', label: 'DONE', value: '1' },
@@ -103,6 +105,52 @@ function Cat() {
   );
 }
 
+function Fox() {
+  return (
+    <g>
+      <g className="st-legs">
+        <rect x="-12" y="-22" width="9" height="22" rx="4" fill="#5b4a3f" stroke={INK} strokeWidth="2.5" />
+        <rect x="3" y="-22" width="9" height="22" rx="4" fill="#5b4a3f" stroke={INK} strokeWidth="2.5" />
+      </g>
+      <path d="M18 -30 Q44 -40 34 -64 Q26 -46 16 -44 Z" fill="#f29b4b" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M34 -64 Q38 -56 32 -50" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+      <rect x="-20" y="-58" width="40" height="40" rx="14" fill="#fff4dc" stroke={INK} strokeWidth="2.5" />
+      <path d="M-6 -58 L0 -40 L6 -58" fill="#5b5bd6" stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+      <path d="M-22 -92 L-18 -116 L-4 -100 Z" fill="#f29b4b" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M22 -92 L18 -116 L4 -100 Z" fill="#f29b4b" stroke={INK} strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="0" cy="-80" r="24" fill="#f29b4b" stroke={INK} strokeWidth="2.5" />
+      <path d="M-18 -72 Q0 -60 18 -72 Q14 -60 0 -57 Q-14 -60 -18 -72 Z" fill="#fff" />
+      <circle cx="-9" cy="-82" r="7" fill="#fff" stroke={INK} strokeWidth="2" />
+      <circle cx="9" cy="-82" r="7" fill="#fff" stroke={INK} strokeWidth="2" />
+      <line x1="-2" y1="-82" x2="2" y2="-82" stroke={INK} strokeWidth="2" />
+      <circle cx="-9" cy="-82" r="2.4" fill={INK} />
+      <circle cx="9" cy="-82" r="2.4" fill={INK} />
+      <circle cx="0" cy="-70" r="2.6" fill={INK} />
+    </g>
+  );
+}
+
+function Bear() {
+  return (
+    <g>
+      <g className="st-legs">
+        <rect x="-13" y="-22" width="10" height="22" rx="4" fill="#3b4256" stroke={INK} strokeWidth="2.5" />
+        <rect x="3" y="-22" width="10" height="22" rx="4" fill="#3b4256" stroke={INK} strokeWidth="2.5" />
+      </g>
+      <rect x="-23" y="-60" width="46" height="42" rx="15" fill="#f3f4f6" stroke={INK} strokeWidth="2.5" />
+      <path d="M-3 -58 L3 -58 L5 -36 L0 -30 L-5 -36 Z" fill="#ef6b6b" stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="-18" cy="-100" r="9" fill="#a8744f" stroke={INK} strokeWidth="2.5" />
+      <circle cx="18" cy="-100" r="9" fill="#a8744f" stroke={INK} strokeWidth="2.5" />
+      <circle cx="0" cy="-80" r="25" fill="#a8744f" stroke={INK} strokeWidth="2.5" />
+      <ellipse cx="0" cy="-71" rx="11" ry="8" fill="#e7c49e" stroke={INK} strokeWidth="2" />
+      <circle cx="0" cy="-74" r="2.8" fill={INK} />
+      <circle cx="-9" cy="-84" r="2.6" fill={INK} />
+      <circle cx="9" cy="-84" r="2.6" fill={INK} />
+      <path d="M-3 -67 Q0 -64 3 -67" fill="none" stroke={INK} strokeWidth="2" strokeLinecap="round" />
+    </g>
+  );
+}
+
 function Person() {
   return (
     <g>
@@ -133,10 +181,10 @@ function Paper({ className, x = 0, y = 0 }: { className: string; x?: number; y?:
   );
 }
 
-function Bubble({ text, tone, dy = -206 }: { text: string; tone: string; dy?: number }) {
+function Bubble({ text, tone, dy = -206, dx = 0 }: { text: string; tone: string; dy?: number; dx?: number }) {
   const w = Math.max(70, Math.min(190, text.length * 8.5 + 20));
   return (
-    <g transform={`translate(0 ${dy})`}>
+    <g transform={`translate(${dx} ${dy})`}>
       <rect x={-w / 2} y="-18" width={w} height="28" rx="14" fill="#fff" stroke={INK} strokeWidth="2" />
       <path d="M-6 10 L0 18 L6 10" fill="#fff" stroke={INK} strokeWidth="2" strokeLinejoin="round" />
       <rect x={-w / 2 + 3} y="9" width={w - 6} height="3" fill="#fff" />
@@ -150,13 +198,13 @@ function Bubble({ text, tone, dy = -206 }: { text: string; tone: string; dy?: nu
 
 /* ---------- ฉาก ---------- */
 
-function Scene({ pan, susan, edit, q }: { pan: StudioItem; susan: StudioItem; edit: StudioItem; q: [string, string, string] }) {
+function Scene({ pan, susan, edit, alex, beary, q }: { pan: StudioItem; susan: StudioItem; edit: StudioItem; alex: StudioItem; beary: StudioItem; q: [string, string, string] }) {
   return (
-    <svg viewBox="0 0 960 520" className="st-svg" role="img" aria-label="ห้องทำงาน AI: Susan ส่งใบงานผ่านตู้ Drive ให้ edit ตัดต่อ แล้วส่งรายงานกลับ">
+    <svg viewBox="0 0 1260 520" className="st-svg" role="img" aria-label="ห้องทำงาน AI: Susan ส่งใบงานผ่านตู้ Drive ให้ edit ตัดต่อ แล้วส่งรายงานกลับ · ทีม Ads Alex ส่งรายงานให้ Beary เสนองบ">
       {/* ผนัง + พื้น */}
-      <rect x="0" y="0" width="960" height="330" fill="#fbfaf6" />
-      <rect x="0" y="330" width="960" height="190" fill="#f3ede1" />
-      <line x1="0" y1="330" x2="960" y2="330" stroke={INK} strokeWidth="2.5" />
+      <rect x="0" y="0" width="1260" height="330" fill="#fbfaf6" />
+      <rect x="0" y="330" width="1260" height="190" fill="#f3ede1" />
+      <line x1="0" y1="330" x2="1260" y2="330" stroke={INK} strokeWidth="2.5" />
 
       {/* หน้าต่าง */}
       <g transform="translate(330 40)">
@@ -271,6 +319,59 @@ function Scene({ pan, susan, edit, q }: { pan: StudioItem; susan: StudioItem; ed
           <text x="0" y="20" fontSize="13" textAnchor="middle" fontWeight="800" fill={INK}>edit</text>
         </g>
       </g>
+      {/* ===== โซนทีม Ads ===== */}
+      <rect x="950" y="0" width="310" height="520" fill="#f5f1ff" opacity=".55" />
+      <line x1="950" y1="0" x2="950" y2="520" stroke={INK} strokeWidth="2.5" strokeDasharray="8 6" />
+      <g transform="translate(975 36)">
+        <rect width="190" height="44" rx="10" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        <text x="16" y="28" fontSize="16" fontWeight="800" fill={INK}>ทีม Ads · Meta</text>
+      </g>
+      {/* กระดานกราฟ */}
+      <g transform="translate(1000 94)">
+        <rect width="220" height="120" rx="8" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        <line x1="20" y1="100" x2="200" y2="100" stroke={INK} strokeWidth="2" />
+        <rect x="34" y="62" width="22" height="38" fill="#c9b8f0" stroke={INK} strokeWidth="2" className="st-bar st-bar1" />
+        <rect x="74" y="44" width="22" height="56" fill="#8fc3ea" stroke={INK} strokeWidth="2" className="st-bar st-bar2" />
+        <rect x="114" y="30" width="22" height="70" fill="#8bc542" stroke={INK} strokeWidth="2" className="st-bar st-bar3" />
+        <rect x="154" y="50" width="22" height="50" fill="#f2a33a" stroke={INK} strokeWidth="2" className="st-bar st-bar4" />
+        <text x="110" y="20" fontSize="12" textAnchor="middle" fontWeight="700" fill="#6b7280">฿/แชท · เบอร์ · งบ</text>
+      </g>
+      {/* โต๊ะทีม Ads */}
+      <g transform="translate(985 300)">
+        <rect x="0" y="40" width="250" height="16" rx="4" fill="#e8d3b5" stroke={INK} strokeWidth="2.5" />
+        <rect x="10" y="56" width="12" height="60" fill="#e8d3b5" stroke={INK} strokeWidth="2.5" />
+        <rect x="228" y="56" width="12" height="60" fill="#e8d3b5" stroke={INK} strokeWidth="2.5" />
+        <rect x="24" y="8" width="60" height="32" rx="4" fill="#2f3550" stroke={INK} strokeWidth="2.5" />
+        <path d="M32 32 L44 22 L54 28 L72 14" fill="none" stroke="#8bc542" strokeWidth="3" strokeLinecap="round" />
+        <rect x="170" y="18" width="40" height="22" rx="3" fill="#fff" stroke={INK} strokeWidth="2" />
+        <text x="190" y="34" fontSize="11" textAnchor="middle" fontWeight="800" fill={INK}>฿</text>
+      </g>
+
+      {/* Alex (จิ้งจอก · วิเคราะห์) → เดินเอารายงานให้ Beary */}
+      <g transform="translate(1010 468)">
+        <g className="st-walk-alex">
+          <g className="st-bob">
+            <g transform="scale(1.3)">
+              <Fox />
+              <Paper className="st-carry-alex" x={24} y={-40} />
+            </g>
+          </g>
+          <Bubble text={short(alex.value, 18)} tone={alex.state || 'idle'} dy={-232} dx={20} />
+          <text x="0" y="20" fontSize="13" textAnchor="middle" fontWeight="800" fill={INK}>Alex</text>
+        </g>
+      </g>
+
+      {/* Beary (หมี · วางงบ) */}
+      <g transform="translate(1188 468)">
+        <g className="st-bob st-bob-edit">
+          <g transform="scale(1.3)">
+            <Bear />
+            <Paper className="st-hold-beary" x={-28} y={-40} />
+          </g>
+        </g>
+        <Bubble text={short(beary.value, 18)} tone={beary.state || 'idle'} dy={-178} dx={-30} />
+        <text x="0" y="20" fontSize="13" textAnchor="middle" fontWeight="800" fill={INK}>Beary</text>
+      </g>
     </svg>
   );
 }
@@ -279,7 +380,7 @@ const CSS = `
 .st-wrap{display:grid;gap:16px}
 .st-stage{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
 .st-svg{display:block;width:100%;height:auto}
-.st-hand,.st-ping,.st-progress{transform-box:fill-box}
+.st-hand,.st-ping,.st-progress,.st-bar{transform-box:fill-box}
 .st-dot-working{fill:#38bdf8}.st-dot-waiting{fill:#f59e0b}.st-dot-done{fill:#22c55e}.st-dot-blocked{fill:#ef4444}.st-dot-idle{fill:#9ca3af}
 .st-phone-screen{fill:#e5e7eb}
 @media (prefers-reduced-motion: no-preference){
@@ -297,9 +398,14 @@ const CSS = `
   .st-progress{transform-origin:0 50%;animation:st-progress 30s linear infinite}
   .st-ping{transform-origin:center;animation:st-ping 30s linear infinite}
   .st-phone-screen{animation:st-screen 30s linear infinite}
+  .st-walk-alex{animation:st-alex 30s linear infinite}
+  .st-carry-alex{animation:st-carry-alex 30s linear infinite}
+  .st-hold-beary{animation:st-hold-beary 30s linear infinite}
+  .st-bar{transform-origin:50% 100%;animation:st-bar 3s ease-in-out infinite alternate}
+  .st-bar2{animation-delay:.4s}.st-bar3{animation-delay:.8s}.st-bar4{animation-delay:1.2s}
 }
 @media (prefers-reduced-motion: reduce){
-  .st-carry-susan,.st-carry-edit,.st-tray-done,.st-ping{opacity:0}
+  .st-carry-susan,.st-carry-edit,.st-tray-done,.st-ping,.st-carry-alex{opacity:0}
 }
 @keyframes st-bob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
 @keyframes st-cloud{from{transform:translateX(0)}to{transform:translateX(70px)}}
@@ -315,6 +421,11 @@ const CSS = `
 @keyframes st-tray-done{0%,78.2%{opacity:0}78.3%,89.9%{opacity:1}90%,100%{opacity:0}}
 @keyframes st-progress{0%,56.7%{transform:scaleX(0)}70%,100%{transform:scaleX(1)}}
 @keyframes st-ping{0%,96.9%{opacity:0;transform:scale(.6)}97%{opacity:1;transform:scale(.6)}100%{opacity:0;transform:scale(2.2)}}
+/* Alex: ดูกราฟ 0–20% · เดินเอารายงานให้ Beary 20–35% · ส่ง 35–40% · กลับ 40–55% */
+@keyframes st-alex{0%,20%{transform:translateX(0)}35%,40%{transform:translateX(80px)}55%,100%{transform:translateX(0)}}
+@keyframes st-carry-alex{0%,19.9%{opacity:0}20%,37.4%{opacity:1}37.5%,100%{opacity:0}}
+@keyframes st-hold-beary{0%,37.4%{opacity:0}37.5%,95%{opacity:1}95.1%,100%{opacity:0}}
+@keyframes st-bar{from{transform:scaleY(.75)}to{transform:scaleY(1)}}
 @keyframes st-screen{0%,96.9%{fill:#e5e7eb}97%,100%{fill:#8bc542}}
 .st-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--muted);padding:10px 16px;border-top:1px solid var(--line);background:var(--bg)}
 .st-legend b{color:var(--navy)}
@@ -338,6 +449,8 @@ const ROLES: Record<string, string> = {
   pan: 'เจ้าของงาน · อัดเสียง · อนุมัติ',
   susan: 'บรีฟ · ออกใบงาน · สรุปผล (บัญชี B)',
   edit: 'ดัชนี · ตัดต่อ · ปก · โพสต์ (คอมปัน)',
+  alex: 'วิเคราะห์ Meta Ads ทุกเช้า',
+  beary: 'วางงบ · เสนอปรับโฆษณา (รอปันอนุมัติ)',
 };
 
 export default function StudioPage({ reports }: { reports: AgentReport[] }) {
@@ -350,18 +463,21 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
   const pan = get('pan');
   const susan = get('susan');
   const edit = get('edit');
+  const alex = get('alex');
+  const beary = get('beary');
   const q: [string, string, string] = [get('queue_todo').value, get('queue_doing').value, get('queue_done').value];
 
   return (
     <div className="st-wrap">
       <style>{CSS}</style>
       <div className="st-stage">
-        <Scene pan={pan} susan={susan} edit={edit} q={q} />
+        <Scene pan={pan} susan={susan} edit={edit} alex={alex} beary={beary} q={q} />
         <div className="st-legend">
           <span><b>1</b> Susan เขียนบรีฟ + ใบงาน → วางในตู้ TODO</span>
           <span><b>2</b> edit เช็กคิวทุก :00 → หยิบงานไปทำบนคอม</span>
           <span><b>3</b> edit ส่งรายงานเข้า DONE</span>
           <span><b>4</b> Susan เช็กทุก :30 → สรุปเข้ามือถือปัน</span>
+          <span><b>Ads</b> Alex วิเคราะห์ Meta ทุกเช้า → Beary เสนองบ → ปันอนุมัติ · คลิป TikTok ที่ดูจบสูง → Beary ทำโฆษณา</span>
         </div>
       </div>
 
@@ -370,6 +486,8 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
           ['pan', pan],
           ['susan', susan],
           ['edit', edit],
+          ['alex', alex],
+          ['beary', beary],
         ].map(([key, it]) => {
           const item = it as StudioItem;
           const st = STATE_LABEL[item.state || 'idle'] || STATE_LABEL.idle;
