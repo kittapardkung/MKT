@@ -44,9 +44,11 @@ import {
   Megaphone,
   Users,
   Clapperboard,
+  Building2,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
+import StudioPage from '@/components/StudioPage';
 import SparkPage from '@/components/SparkPage';
 import TimelinePage from '@/components/TimelinePage';
 import LeadsOverviewPage from '@/components/LeadsOverviewPage';
@@ -102,6 +104,7 @@ type PageId =
   | 'spark'
   | 'ads'
   | 'tiktok'
+  | 'tiktokStudio'
   | 'leadsOverview'
   | 'dashboard'
   | 'timeline'
@@ -149,7 +152,10 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'TIKTOK',
     label: 'TIKTOK · Content Pipeline',
     section: 'AI_TEAM',
-    items: [{ id: 'tiktok', label: 'บันทึกการทำงาน', short: 'TIKTOK', icon: Clapperboard }],
+    items: [
+      { id: 'tiktokStudio', label: 'ห้องทำงาน AI', short: 'STUDIO', icon: Building2 },
+      { id: 'tiktok', label: 'บันทึกการทำงาน', short: 'TIKTOK', icon: Clapperboard },
+    ],
   },
   {
     id: 'LEADS',
@@ -596,6 +602,8 @@ export default function AppShell() {
           {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
 
           {page === 'tiktok' && <AgentReportPage agent="TIKTOK" reports={data?.agentReports || []} />}
+
+          {page === 'tiktokStudio' && <StudioPage reports={data?.agentReports || []} />}
 
           {page === 'leadsOverview' && <LeadsOverviewPage leads={data?.leads || []} />}
 

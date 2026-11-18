@@ -1,6 +1,48 @@
 {
   "agent": "TIKTOK",
-  "generated_at": "2026-11-16T18:00:00+07:00",
+  "generated_at": "2026-11-18T23:00:00+07:00",
+  "studio": {
+    "title": "ห้องทำงาน AI",
+    "body": "สถานะ ณ 18 พ.ย. 2569 23:00 · Susan (บัญชี B) และ edit (บัญชี frong · คอมปัน) ส่งงานกันผ่าน Google Drive โฟลเดอร์ AI x CONTENT AUTOMATION",
+    "items": [
+      {
+        "actor": "pan",
+        "label": "ปัน",
+        "value": "รออัดเสียง",
+        "note": "อัด VO บรีฟ TT-20261118-01 (ถังน้ำมัน 200 ลิตร) ลง 00_vo",
+        "state": "waiting"
+      },
+      {
+        "actor": "susan",
+        "label": "Susan",
+        "value": "ออกใบงานแล้ว",
+        "note": "บรีฟ TT-20261118-01 พร้อม (Pull · Pin Post proof) · ใบงาน EDIT-20261118-02 อยู่ในคิว",
+        "state": "done"
+      },
+      {
+        "actor": "edit",
+        "label": "edit",
+        "value": "รอเช็กคิว",
+        "note": "EDIT-20261118-02: จัด 00_assets · แม่แบบปก 3 แบบ · LUT · อัปเดตดัชนี",
+        "state": "waiting"
+      },
+      {
+        "actor": "queue_todo",
+        "label": "TODO",
+        "value": "1"
+      },
+      {
+        "actor": "queue_doing",
+        "label": "DOING",
+        "value": "0"
+      },
+      {
+        "actor": "queue_done",
+        "label": "DONE",
+        "value": "1"
+      }
+    ]
+  },
   "summary": {
     "title": "สถานะ TikTok Content Pipeline (ปัน · Susan · AI ตัดต่อ)",
     "body": "ระบบผลิตคลิปสั้นลง TikTok + Facebook Reels โดยมีปัน (เจ้าของศูนย์) เป็นหน้าหลักของช่อง — Susan เขียนบรีฟจากข้อมูลจริง, AI ตัดต่อทำคลิปจากคลิปยาวในคอมของปัน, AI อัปโหลดผ่าน Chrome บนคอม (10 คลิปแรกปันอนุมัติก่อนโพสต์) · ข้อมูล ณ 16 พ.ย. 2569: ยังไม่ได้ตั้งโฟลเดอร์บนคอม จึงยังไม่มีคลิปที่ตัดหรือโพสต์จากระบบนี้",
