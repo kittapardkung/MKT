@@ -3,7 +3,7 @@
   "generated_at": "2026-11-18T23:00:00+07:00",
   "studio": {
     "title": "ห้องทำงาน AI",
-    "body": "สถานะ ณ 18 พ.ย. 2569 23:00 · Susan (บัญชี B) และ edit (บัญชี frong · คอมปัน) ส่งงานกันผ่าน Google Drive โฟลเดอร์ AI x CONTENT AUTOMATION · ทีม Ads (Alex · Beary) ทำงานในบัญชี B",
+    "body": "สถานะ ณ 19 พ.ย. 2569 23:50 · Susan (บัญชี B) และ edit (บัญชี frong · คอมปัน) ส่งงานกันผ่าน Google Drive โฟลเดอร์ AI x CONTENT AUTOMATION · ทีม Ads (Alex · Beary) ทำงานในบัญชี B",
     "items": [
       {
         "actor": "pan",
@@ -15,16 +15,16 @@
       {
         "actor": "susan",
         "label": "Susan",
-        "value": "ออกใบงานแล้ว",
-        "note": "บรีฟ TT-20261118-01 พร้อม (Pull · Pin Post proof) · ใบงาน EDIT-20261118-02 อยู่ในคิว",
-        "state": "done"
+        "value": "เตรียมบรีฟถัดไป",
+        "note": "บรีฟ TT-20261118-01 พร้อม (Pull) · บรีฟถัดไปเป็น Push (สัดส่วนตอนนี้ Push 25%)",
+        "state": "working"
       },
       {
         "actor": "edit",
         "label": "edit",
-        "value": "รอเช็กคิว",
-        "note": "EDIT-20261118-02: จัด 00_assets · แม่แบบปก 3 แบบ · LUT · อัปเดตดัชนี",
-        "state": "waiting"
+        "value": "ส่งงานครบแล้ว",
+        "note": "EDIT-02 (จัด 00_assets · ปก · LUT) และ EDIT-03 (ภาพห้องทำงาน AI) เสร็จ · คิวว่าง",
+        "state": "done"
       },
       {
         "actor": "alex",
@@ -43,7 +43,7 @@
       {
         "actor": "queue_todo",
         "label": "TODO",
-        "value": "1"
+        "value": "0"
       },
       {
         "actor": "queue_doing",
@@ -53,7 +53,7 @@
       {
         "actor": "queue_done",
         "label": "DONE",
-        "value": "1"
+        "value": "3"
       }
     ]
   },
