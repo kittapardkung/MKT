@@ -1,14 +1,15 @@
 'use client';
 
 import type { AgentReport } from '@/lib/types';
-import { displayDateTime } from '@/lib/date-utils';
+import type { ReactNode } from 'react';
+import { displayDateTime, formatDateTH } from '@/lib/date-utils';
 
 /* ===================================================================
-   ห้องทำงาน AI — ภาพเคลื่อนไหวของ TikTok Content Pipeline
-   Susan (กระต่าย · ศูนย์สั่งงาน) → ตู้ Google Drive → edit (แมว · คอมปัน)
-   → รายงานกลับ → Susan → สรุปเข้ามือถือปัน
+   ห้องทำงาน AI — ทีม AI 4 แผนก + ห้องปันตรงกลาง
+   ข่าวกรองคู่แข่ง (SCOUT) · กลยุทธ์ & คอนเทนต์ (Susan + edit) · [ปัน]
+   · โฆษณา Meta (Alex + Beary) · วางแผน & โพสต์ (ALMANAC — ยังไม่เริ่มงาน)
    ข้อมูลสถานะอ่านจาก agent_reports (agent TIKTOK · section "studio")
-   ถ้ายังไม่มี จะใช้ค่าตั้งต้น FALLBACK ด้านล่าง
+   ถ้ายังไม่มี จะใช้ค่าตั้งต้น FALLBACK ด้านล่าง · SCOUT ใช้วันที่ของรายงาน SCOUT ล่าสุด
    =================================================================== */
 
 type StudioItem = {
@@ -23,8 +24,9 @@ const FALLBACK: StudioItem[] = [
   { actor: 'pan', label: 'ปัน', value: 'รออัดเสียง', note: 'อัด VO บรีฟ TT-20261118-01 (ถังน้ำมัน 200 ลิตร)', state: 'waiting' },
   { actor: 'susan', label: 'Susan', value: 'ออกใบงานแล้ว', note: 'บรีฟ TT-20261118-01 พร้อม · ใบงาน EDIT-20261118-02 อยู่ในคิว', state: 'done' },
   { actor: 'edit', label: 'edit', value: 'รอเช็กคิว', note: 'EDIT-20261118-02: จัด 00_assets · ทำแม่แบบปก · LUT', state: 'waiting' },
-  { actor: 'alex', label: 'Alex', value: 'รายงานเช้านี้เสร็จ', note: 'พ.ย. ใช้ไป ฿19,044 (42% ของ ฿45,000) · PORTA ฿153/แชท · Darion ฿74/แชท', state: 'done' },
+  { actor: 'alex', label: 'Alex', value: 'รายงานเช้านี้เสร็จ', note: 'ผลวิเคราะห์ Meta Ads อยู่ในหน้า ADS', state: 'done' },
   { actor: 'beary', label: 'Beary', value: 'เสนองบ รออนุมัติ', note: 'ข้อเสนอปรับงบอยู่ในหน้า ADS · ปันกดอนุมัติ', state: 'waiting' },
+  { actor: 'almanac', label: 'ALMANAC', value: 'รอเริ่มงาน', note: 'เริ่มเมื่องาน Susan + edit ผ่าน · จะคิดแคปชั่น โพสต์ และยิงโฆษณา', state: 'idle' },
   { actor: 'queue_todo', label: 'TODO', value: '1' },
   { actor: 'queue_doing', label: 'DOING', value: '0' },
   { actor: 'queue_done', label: 'DONE', value: '1' },
@@ -43,10 +45,11 @@ function short(s: string | undefined, n: number) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
-/* ---------- ฉาก (ภาพจาก Higgsfield · Nano Banana Pro · เตรียมโดย edit EDIT-20261118-03) ----------
-   ฉากหลัง bg.webp 2520×1069 → viewBox 1260×535 (สเกล ½) · เส้นพื้น y≈415
+/* ---------- ตัวละคร (ภาพจาก Higgsfield · Nano Banana Pro · เตรียมโดย edit EDIT-20261118-03) ----------
    ตัวละครสูง 480 px → แสดงสูง H · เท้าอยู่ที่ (0,0) ของแต่ละกลุ่ม
-   ท่า idle / walk สลับกันด้วย opacity ตาม keyframes · เดินกลับซ้ายใช้ภาพเดียวกันกลับด้าน */
+   ท่า idle / walk สลับกันด้วย opacity ตาม keyframes · เดินกลับซ้ายใช้ภาพเดียวกันกลับด้าน
+   SCOUT / ALMANAC ยังไม่มีภาพ → ใช้หุ่นชั่วคราว (Stand-in) จนกว่า edit จะส่ง scout_idle.png / almanac_idle.png
+   ได้ภาพแล้วให้เพิ่มขนาดภาพลง SPRITE ด้านล่าง ฉากจะสลับไปใช้ภาพจริงเอง */
 
 const INK = '#2b2d3a';
 const SRC = '/studio/';
@@ -67,6 +70,34 @@ function Sprite({ name, h = H, flip = false, className }: { name: string; h?: nu
       <g transform={flip ? 'scale(-1 1)' : undefined}>
         <image href={`${SRC}${name}.png`} x={-w / 2} y={-h} width={w} height={h} preserveAspectRatio="xMidYMax meet" />
       </g>
+    </g>
+  );
+}
+
+/* หุ่นชั่วคราวสไตล์เดียวกับฉาก (เส้นหมึกหนา สีพาสเทล) */
+function StandIn({ color, prop }: { color: string; prop: 'binoculars' | 'clipboard' }) {
+  return (
+    <g>
+      <rect x="-22" y="-14" width="16" height="14" rx="4" fill={INK} />
+      <rect x="6" y="-14" width="16" height="14" rx="4" fill={INK} />
+      <rect x="-32" y="-82" width="64" height="72" rx="18" fill={color} stroke={INK} strokeWidth="3" />
+      <rect x="-38" y="-138" width="76" height="58" rx="20" fill="#fff" stroke={INK} strokeWidth="3" />
+      <circle cx="-14" cy="-110" r="5.5" fill={INK} />
+      <circle cx="14" cy="-110" r="5.5" fill={INK} />
+      <path d="M-7 -96 Q0 -90 7 -96" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="0" y1="-138" x2="0" y2="-152" stroke={INK} strokeWidth="3" />
+      <circle cx="0" cy="-156" r="6" fill={color} stroke={INK} strokeWidth="2.5" />
+      {prop === 'binoculars' ? (
+        <g transform="translate(26 -62)">
+          <rect x="-4" y="-10" width="12" height="18" rx="4" fill="#475569" stroke={INK} strokeWidth="2.5" />
+          <rect x="10" y="-10" width="12" height="18" rx="4" fill="#475569" stroke={INK} strokeWidth="2.5" />
+        </g>
+      ) : (
+        <g transform="translate(24 -66)">
+          <rect x="0" y="-14" width="26" height="34" rx="3" fill="#fff" stroke={INK} strokeWidth="2.5" />
+          <path d="M5 -4 H21 M5 3 H21 M5 10 H15" stroke="#9aa0b4" strokeWidth="2" />
+        </g>
+      )}
     </g>
   );
 }
@@ -105,59 +136,216 @@ function Tag({ x, y, text, w }: { x: number; y: number; text: string; w?: number
   );
 }
 
-function Scene({ pan, susan, edit, alex, beary, q }: { pan: StudioItem; susan: StudioItem; edit: StudioItem; alex: StudioItem; beary: StudioItem; q: [string, string, string] }) {
-  const FEET = 508;
+/* ---------- ฉากแบ่งแผนก (วาดด้วย SVG) · viewBox 1600×560 · ผนัง 40–430 · พื้น 430 ---------- */
+
+const W = 1600;
+const VH = 560;
+const FLOOR = 430;
+const FEET = 522;
+
+type Room = { x: number; w: number; wall: string; title: string; sub: string };
+const ROOMS: Room[] = [
+  { x: 0, w: 270, wall: '#dbeafe', title: 'ข่าวกรองคู่แข่ง', sub: 'SCOUT' },
+  { x: 270, w: 530, wall: '#ede9fe', title: 'กลยุทธ์ & คอนเทนต์', sub: 'Susan · edit' },
+  { x: 800, w: 200, wall: '#fef3c7', title: 'ห้องปัน', sub: 'รับรายงาน · อนุมัติ' },
+  { x: 1000, w: 360, wall: '#fce7f3', title: 'โฆษณา Meta', sub: 'Alex · Beary' },
+  { x: 1360, w: 240, wall: '#dcfce7', title: 'วางแผน & โพสต์', sub: 'ALMANAC · เร็วๆ นี้' },
+];
+
+function Desk({ x, w }: { x: number; w: number }) {
   return (
-    <svg viewBox="0 0 1260 535" className="st-svg" role="img" aria-label="ห้องทำงาน AI: Susan ส่งใบงานผ่านตู้ Drive ให้ edit ตัดต่อ แล้วส่งรายงานกลับ · ทีม Ads Alex ส่งรายงานให้ Beary เสนองบ">
-      <image href={`${SRC}bg.webp`} x="0" y="0" width="1260" height="535" preserveAspectRatio="none" />
+    <g>
+      <rect x={x + 10} y={366} width={w - 20} height={FLOOR - 366} fill="#c98a55" stroke={INK} strokeWidth="2.5" />
+      <rect x={x} y={352} width={w} height={16} rx="3" fill="#e5a873" stroke={INK} strokeWidth="2.5" />
+    </g>
+  );
+}
 
-      {/* ป้าย */}
-      <g transform="translate(16 14)">
-        <rect width="250" height="34" rx="10" fill="#fff" stroke={INK} strokeWidth="2.5" />
-        <text x="14" y="23" fontSize="14" fontWeight="800" fill={INK}>WULING CHONBURI · AI Studio</text>
+function Monitor({ cx, w = 96, h = 64, children }: { cx: number; w?: number; h?: number; children?: ReactNode }) {
+  const x = cx - w / 2;
+  const y = 352 - 18 - h;
+  return (
+    <g>
+      <rect x={cx - 6} y={352 - 20} width="12" height="20" fill="#cbd5e1" stroke={INK} strokeWidth="2" />
+      <rect x={cx - 22} y={348} width="44" height="6" rx="3" fill="#cbd5e1" stroke={INK} strokeWidth="2" />
+      <rect x={x} y={y} width={w} height={h} rx="6" fill="#334155" stroke={INK} strokeWidth="2.5" />
+      <g transform={`translate(${x + 5} ${y + 5})`}>
+        <rect width={w - 10} height={h - 10} rx="3" fill="#e2e8f0" />
+        {children}
       </g>
-      <g transform="translate(1000 14)">
-        <rect width="150" height="34" rx="10" fill="#fff" stroke={INK} strokeWidth="2.5" />
-        <text x="14" y="23" fontSize="14" fontWeight="800" fill={INK}>ทีม Ads · Meta</text>
+    </g>
+  );
+}
+
+function Backdrop({ q }: { q: [string, string, string] }) {
+  return (
+    <g>
+      {ROOMS.map((r) => (
+        <rect key={r.title} x={r.x} y={0} width={r.w} height={FLOOR} fill={r.wall} />
+      ))}
+      {/* เพดาน + ชื่อสตูดิโอ */}
+      <rect x="0" y="0" width={W} height="36" fill="#f8fafc" stroke={INK} strokeWidth="2.5" />
+      <text x="16" y="24" fontSize="14" fontWeight="800" fill={INK}>WULING CHONBURI · AI Studio · ทีม AI 4 แผนก</text>
+      {/* พื้น */}
+      <rect x="0" y={FLOOR} width={W} height={VH - FLOOR} fill="#f6dcb4" />
+      <rect x="0" y={FLOOR - 10} width={W} height="10" fill="#cbd5e1" />
+      <line x1="0" y1={FLOOR} x2={W} y2={FLOOR} stroke={INK} strokeWidth="3" />
+      {/* เสากั้นแผนก */}
+      {ROOMS.slice(1).map((r) => (
+        <rect key={r.title} x={r.x - 6} y="36" width="12" height={FLOOR - 36} fill="#fff" stroke={INK} strokeWidth="2.5" />
+      ))}
+      {/* ป้ายแผนก */}
+      {ROOMS.map((r) => {
+        const sw = Math.min(r.w - 36, 220);
+        return (
+          <g key={r.title} transform={`translate(${r.x + r.w / 2} 52)`}>
+            <rect x={-sw / 2} y="0" width={sw} height="48" rx="12" fill="#fff" stroke={INK} strokeWidth="2.5" />
+            <text x="0" y="21" fontSize="15" fontWeight="800" textAnchor="middle" fill={INK}>{r.title}</text>
+            <text x="0" y="38" fontSize="11.5" fontWeight="600" textAnchor="middle" fill="#64748b">{r.sub}</text>
+          </g>
+        );
+      })}
+
+      {/* ---- SCOUT: แผนที่คู่แข่งบนผนัง + จอเรดาร์ ---- */}
+      <g transform="translate(40 128)">
+        <rect width="190" height="110" rx="8" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        <path d="M14 80 Q50 40 90 62 T176 36" fill="none" stroke="#93c5fd" strokeWidth="6" strokeLinecap="round" />
+        {[[40, 56, '#ef4444'], [96, 64, '#f59e0b'], [140, 44, '#8b5cf6'], [62, 88, '#22c55e']].map(([x, y, c]) => (
+          <circle key={`${x}-${y}`} cx={x as number} cy={y as number} r="7" fill={c as string} stroke={INK} strokeWidth="2" />
+        ))}
+        <text x="95" y="22" fontSize="11.5" fontWeight="700" textAnchor="middle" fill={INK}>โฆษณาคู่แข่ง ชลบุรี·ระยอง</text>
+      </g>
+      <Desk x={36} w={200} />
+      <Monitor cx={196} w={70} h={56}>
+        <circle cx="30" cy="23" r="19" fill="#dcfce7" stroke="#16a34a" strokeWidth="2" />
+        <circle cx="30" cy="23" r="9" fill="none" stroke="#16a34a" strokeWidth="1.5" />
+        <g className="st-radar" style={{ transformOrigin: '30px 23px' }}>
+          <line x1="30" y1="23" x2="30" y2="5" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+        </g>
+      </Monitor>
+
+      {/* ---- กลยุทธ์ & คอนเทนต์: ศูนย์สั่งงาน Susan · ตู้ Drive · คอมตัดต่อ edit ---- */}
+      <Desk x={282} w={130} />
+      <g transform="translate(300 312)">
+        <rect width="60" height="40" rx="4" fill="#94a3b8" stroke={INK} strokeWidth="2.5" />
+        <circle cx="30" cy="20" r="5" fill="#fff" />
+      </g>
+      <g transform="translate(372 326)">
+        <rect width="22" height="26" rx="5" fill="#bae6fd" stroke={INK} strokeWidth="2.5" />
+      </g>
+      <Tag x={347} y={244} text="ศูนย์สั่งงาน · Susan" />
+
+      <g transform="translate(455 214)">
+        <rect width="120" height={FLOOR - 214} rx="6" fill="#a7f3d0" stroke={INK} strokeWidth="2.5" />
+        {[0, 1, 2].map((i) => (
+          <rect key={i} x="12" y={16 + i * 70} width="96" height="56" rx="6" fill="#d1fae5" stroke={INK} strokeWidth="2.5" />
+        ))}
+      </g>
+      <Tag x={515} y={200} text="Google Drive" />
+      <Tag x={515} y={258} text={`TODO ${q[0]}`} w={86} />
+      <Tag x={515} y={328} text={`DOING ${q[1]}`} w={86} />
+      <Tag x={515} y={398} text={`DONE ${q[2]}`} w={86} />
+      <Paper className="st-tray-todo" x={540} y={242} />
+      <Paper className="st-tray-done" x={540} y={382} />
+
+      <Desk x={650} w={140} />
+      <Monitor cx={720} w={110} h={72}>
+        <rect x="6" y="6" width="34" height="24" rx="2" fill="#c4b5fd" />
+        <polygon points="18,12 18,24 28,18" fill="#fff" />
+        <rect x="46" y="8" width="46" height="5" rx="2" fill="#94a3b8" />
+        <rect x="46" y="18" width="34" height="5" rx="2" fill="#94a3b8" />
+        <rect x="6" y="40" width="88" height="6" rx="3" fill="#1d2133" />
+        <rect x="6" y="40" width="88" height="6" rx="3" fill="#8bc542" className="st-progress" />
+      </Monitor>
+      <Tag x={720} y={248} text="คอมปัน · edit" />
+
+      {/* ---- ห้องปัน: โต๊ะ + มือถือรับสรุป ---- */}
+      <Desk x={826} w={148} />
+      <g transform="translate(884 316)">
+        <rect width="22" height="36" rx="5" fill="#1e293b" stroke={INK} strokeWidth="2.5" />
+        <rect x="4" y="5" width="14" height="22" rx="2" fill="#a5f3fc" className="st-phone" />
+      </g>
+      <g transform="translate(838 140)">
+        <rect width="124" height="80" rx="8" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        <text x="62" y="24" fontSize="12" fontWeight="800" textAnchor="middle" fill={INK}>รออนุมัติ</text>
+        <path d="M18 40 h88 M18 54 h70 M18 68 h80" stroke="#cbd5e1" strokeWidth="5" strokeLinecap="round" />
       </g>
 
-      {/* ตู้ Drive: ป้ายคิว + กระดาษในถาด */}
-      <Tag x={409} y={118} text="Google Drive" />
-      <Tag x={409} y={198} text={`TODO ${q[0]}`} w={86} />
-      <Tag x={409} y={284} text={`DOING ${q[1]}`} w={86} />
-      <Tag x={409} y={370} text={`DONE ${q[2]}`} w={86} />
-      <Paper className="st-tray-todo" x={430} y={160} />
-      <Paper className="st-tray-done" x={430} y={332} />
+      {/* ---- โฆษณา Meta: กราฟบนผนัง · โต๊ะ Alex · โต๊ะ Beary ---- */}
+      <g transform="translate(1120 128)">
+        <rect width="200" height="108" rx="8" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        {[[22, 50], [58, 34], [94, 62], [130, 46], [166, 78]].map(([x, h]) => (
+          <rect key={x} x={x} y={92 - h} width="22" height={h} rx="3" fill="#f9a8d4" stroke={INK} strokeWidth="2" />
+        ))}
+        <text x="100" y="20" fontSize="11.5" fontWeight="700" textAnchor="middle" fill={INK}>งบ vs ลีด · Meta</text>
+      </g>
+      <Desk x={1018} w={130} />
+      <Monitor cx={1083} w={84} h={58}>
+        <circle cx="22" cy="24" r="15" fill="#fbcfe8" />
+        <path d="M22 24 L22 9 A15 15 0 0 1 36 28 Z" fill="#ec4899" />
+        <rect x="44" y="12" width="26" height="5" rx="2" fill="#94a3b8" />
+        <rect x="44" y="24" width="20" height="5" rx="2" fill="#94a3b8" />
+      </Monitor>
+      <Desk x={1220} w={128} />
+      <g transform="translate(1250 320)">
+        <rect width="36" height="32" rx="3" fill="#fde68a" stroke={INK} strokeWidth="2.5" />
+        <text x="18" y="22" fontSize="14" fontWeight="800" textAnchor="middle" fill={INK}>฿</text>
+      </g>
 
-      {/* แถบความคืบหน้าบนจอตัดต่อ */}
-      <rect x="606" y="262" width="104" height="6" rx="3" fill="#1d2133" />
-      <rect x="606" y="262" width="104" height="6" rx="3" fill="#8bc542" className="st-progress" />
-      <Tag x={652} y={150} text="คอมปัน · edit" />
-      <Tag x={155} y={235} text="ศูนย์สั่งงาน · Susan" />
+      {/* ---- วางแผน & โพสต์: ปฏิทินบนผนัง (ยังไม่เริ่มงาน) ---- */}
+      <g transform="translate(1400 124)">
+        <rect width="160" height="120" rx="8" fill="#fff" stroke={INK} strokeWidth="2.5" />
+        <rect width="160" height="26" rx="8" fill="#86efac" stroke={INK} strokeWidth="2.5" />
+        {Array.from({ length: 12 }, (_, i) => (
+          <rect key={i} x={14 + (i % 4) * 34} y={38 + Math.floor(i / 4) * 26} width="26" height="18" rx="3" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1.5" />
+        ))}
+      </g>
+      <Desk x={1386} w={188} />
+      <rect x={1366} y={36} width={234} height={VH - 36} fill="#fff" opacity="0.38" />
+      <Tag x={1480} y={290} text="เริ่มงานหลัง Susan + edit ผ่าน" />
+    </g>
+  );
+}
 
-      {/* ปัน */}
-      <g transform={`translate(48 ${FEET})`}>
-        <Sprite name="pan_idle" h={140} className="st-pan-idle" />
-        <Sprite name="pan_notify" h={140} className="st-pan-notify" />
-        <Bubble text={short(pan.value, 18)} tone={pan.state || 'idle'} dy={-208} dx={40} />
-        <Tag x={0} y={16} text="ปัน" />
+function Scene({
+  pan, susan, edit, alex, beary, scout, almanac, q,
+}: {
+  pan: StudioItem; susan: StudioItem; edit: StudioItem; alex: StudioItem; beary: StudioItem;
+  scout: StudioItem; almanac: StudioItem; q: [string, string, string];
+}) {
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${VH}`}
+      className="st-svg"
+      role="img"
+      aria-label="ห้องทำงาน AI 4 แผนก: SCOUT ข่าวกรองคู่แข่ง · Susan ส่งใบงานผ่านตู้ Drive ให้ edit ตัดต่อ · ปันรับรายงานและอนุมัติ · Alex ส่งรายงานให้ Beary เสนองบ · ALMANAC รอเริ่มงาน"
+    >
+      <Backdrop q={q} />
+
+      {/* SCOUT */}
+      <g transform={`translate(110 ${FEET})`}>
+        <g className="st-bob">
+          {SPRITE.scout_idle ? <Sprite name="scout_idle" /> : <StandIn color="#93c5fd" prop="binoculars" />}
+        </g>
+        <Bubble text={short(scout.value, 18)} tone={scout.state || 'idle'} dx={20} />
+        <Tag x={0} y={16} text="SCOUT" />
       </g>
 
       {/* Susan: เดินไปตู้ Drive (+140) */}
-      <g transform={`translate(190 ${FEET})`}>
+      <g transform={`translate(295 ${FEET})`}>
         <g className="st-walk-susan">
           <g className="st-bob">
             <Sprite name="susan_idle" className="st-susan-idle" />
             <Sprite name="susan_walk" className="st-susan-right" />
             <Sprite name="susan_walk" flip className="st-susan-left" />
           </g>
-          <Bubble text={short(susan.value, 18)} tone={susan.state || 'idle'} />
+          <Bubble text={short(susan.value, 18)} tone={susan.state || 'idle'} dx={30} />
           <Tag x={0} y={16} text="Susan" />
         </g>
       </g>
 
       {/* edit: เดินไปตู้ Drive (−150) · นั่งตัดต่อ */}
-      <g transform={`translate(660 ${FEET})`}>
+      <g transform={`translate(745 ${FEET})`}>
         <g className="st-walk-edit">
           <g className="st-bob st-bob-edit">
             <Sprite name="edit_idle" className="st-edit-idle" />
@@ -165,31 +353,46 @@ function Scene({ pan, susan, edit, alex, beary, q }: { pan: StudioItem; susan: S
             <Sprite name="edit_walk" className="st-edit-right" />
             <Sprite name="edit_work" className="st-edit-work" />
           </g>
-          <Bubble text={short(edit.value, 18)} tone={edit.state || 'idle'} />
+          <Bubble text={short(edit.value, 18)} tone={edit.state || 'idle'} dx={-20} />
           <Tag x={0} y={16} text="edit" />
         </g>
       </g>
 
+      {/* ปัน */}
+      <g transform={`translate(900 ${FEET})`}>
+        <Sprite name="pan_idle" h={140} className="st-pan-idle" />
+        <Sprite name="pan_notify" h={140} className="st-pan-notify" />
+        <Bubble text={short(pan.value, 18)} tone={pan.state || 'idle'} dy={-170} />
+        <Tag x={0} y={16} text="ปัน" />
+      </g>
+
       {/* Alex: เดินเอารายงานให้ Beary (+110) */}
-      <g transform={`translate(985 ${FEET})`}>
+      <g transform={`translate(1075 ${FEET})`}>
         <g className="st-walk-alex">
           <g className="st-bob">
             <Sprite name="alex_idle" className="st-alex-idle" />
             <Sprite name="alex_walk" className="st-alex-right" />
             <Sprite name="alex_walk" flip className="st-alex-left" />
           </g>
-          <Bubble text={short(alex.value, 18)} tone={alex.state || 'idle'} dx={20} />
+          <Bubble text={short(alex.value, 18)} tone={alex.state || 'idle'} dx={10} />
           <Tag x={0} y={16} text="Alex" />
         </g>
       </g>
 
       {/* Beary */}
-      <g transform={`translate(1180 ${FEET})`}>
+      <g transform={`translate(1290 ${FEET})`}>
         <g className="st-bob st-bob-edit">
           <Sprite name="beary_idle" />
         </g>
-        <Bubble text={short(beary.value, 18)} tone={beary.state || 'idle'} dy={-H - 62} dx={-40} />
+        <Bubble text={short(beary.value, 18)} tone={beary.state || 'idle'} dy={-H - 62} dx={-10} />
         <Tag x={0} y={16} text="Beary" />
+      </g>
+
+      {/* ALMANAC (ยังไม่เริ่มงาน) */}
+      <g transform={`translate(1480 ${FEET})`} opacity="0.75">
+        {SPRITE.almanac_idle ? <Sprite name="almanac_idle" /> : <StandIn color="#86efac" prop="clipboard" />}
+        <Bubble text={short(almanac.value, 18)} tone={almanac.state || 'idle'} dy={-H - 30} />
+        <Tag x={0} y={16} text="ALMANAC" />
       </g>
     </svg>
   );
@@ -234,7 +437,8 @@ const SPRITE_CLS = ['susan-idle', 'susan-right', 'susan-left', 'edit-idle', 'edi
 const CSS = `
 .st-wrap{display:grid;gap:16px}
 .st-stage{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
-.st-svg{display:block;width:100%;height:auto}
+.st-scroll{overflow-x:auto}
+.st-svg{display:block;width:100%;min-width:900px;height:auto}
 .st-progress{transform-box:fill-box}
 .st-dot-working{fill:#38bdf8}.st-dot-waiting{fill:#f59e0b}.st-dot-done{fill:#22c55e}.st-dot-blocked{fill:#ef4444}.st-dot-idle{fill:#9ca3af}
 /* ค่าตั้งต้นเมื่อไม่มีแอนิเมชัน: แสดงท่ายืน */
@@ -248,12 +452,16 @@ const CSS = `
   .st-tray-todo{animation:st-tray-todo 30s linear infinite}
   .st-tray-done{animation:st-tray-done 30s linear infinite}
   .st-progress{transform-origin:0 50%;animation:st-progress 30s linear infinite}
+  .st-radar{animation:st-radar 3s linear infinite}
+  .st-phone{animation:st-phone 30s linear infinite}
   ${SPRITE_CLS.map((c) => `.st-${c}{animation:st-${c} 30s linear infinite}`).join('\n  ')}
 }
 @media (prefers-reduced-motion: reduce){
   .st-tray-done{opacity:0}
 }
 @keyframes st-bob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+@keyframes st-radar{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes st-phone{0%,96.8%{fill:#a5f3fc}97%,100%{fill:#fde047}}
 /* Susan: พิมพ์ 0–10% · เดินไปตู้ 10–20% · วางงาน 20–23% · กลับ 23–33% · รอ · ไปรับรายงาน 80–88% · กลับ 90–98% */
 @keyframes st-susan{0%,10%{transform:translateX(0)}20%,23.3%{transform:translateX(140px)}33.3%,80%{transform:translateX(0)}88.3%,90%{transform:translateX(140px)}98%,100%{transform:translateX(0)}}
 /* edit: รอ 0–33% · เดินไปตู้ 33–43% · หยิบ 43–47% · กลับ 47–57% · ตัดต่อ 57–70% · ไปส่ง 70–77% · วาง 77–80% · กลับ 80–87% */
@@ -266,10 +474,14 @@ const CSS = `
 ${SPRITE_KF}
 .st-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--muted);padding:10px 16px;border-top:1px solid var(--line);background:var(--bg)}
 .st-legend b{color:var(--navy)}
-.st-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.st-depts{display:grid;gap:14px}
+.st-dept-head{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}
+.st-dept-head h3{margin:0;font-size:15px;color:var(--navy)}
+.st-dept-head span{font-size:12px;color:var(--muted)}
+.st-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .st-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
 .st-card-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.st-card-head img{width:40px;height:52px;object-fit:contain;flex:none}
+.st-card-head img,.st-card-head svg{width:40px;height:52px;object-fit:contain;flex:none}
 .st-card-head .st-card-id{flex:1;min-width:0}
 .st-card-name{font-weight:800;color:var(--navy)}
 .st-card-role{font-size:11.5px;color:var(--muted)}
@@ -286,11 +498,36 @@ ${SPRITE_KF}
 
 const ROLES: Record<string, string> = {
   pan: 'เจ้าของงาน · อัดเสียง · อนุมัติ',
-  susan: 'บรีฟ · ออกใบงาน · สรุปผล (บัญชี B)',
+  scout: 'สแกนโฆษณาคู่แข่ง จ./พ./ศ. 03:00 · ส่งข้อมูลให้ Susan',
+  susan: 'กลยุทธ์ · คลัง Hook · บรีฟ · ออกใบงาน (บัญชี B)',
   edit: 'ดัชนี · ตัดต่อ · ปก · โพสต์ (คอมปัน)',
   alex: 'วิเคราะห์ Meta Ads ทุกเช้า',
   beary: 'วางงบ · เสนอปรับโฆษณา (รอปันอนุมัติ)',
+  almanac: 'อนาคต: คิดแคปชั่น · โพสต์ · ยิงโฆษณา',
 };
+
+const DEPTS: { title: string; sub: string; members: string[] }[] = [
+  { title: 'ห้องปัน', sub: 'รับรายงานจากทุกแผนก · อนุมัติ', members: ['pan'] },
+  { title: 'ข่าวกรองคู่แข่ง', sub: 'ดูว่าคู่แข่งยิงโฆษณาอะไร', members: ['scout'] },
+  { title: 'กลยุทธ์ & คอนเทนต์', sub: 'วางแผน PPS → บรีฟ → ตัดต่อคลิป', members: ['susan', 'edit'] },
+  { title: 'โฆษณา Meta', sub: 'วิเคราะห์ผล → เสนองบ → ปันอนุมัติ', members: ['alex', 'beary'] },
+  { title: 'วางแผน & โพสต์', sub: 'ยังไม่เริ่มงาน — รอให้งาน Susan + edit ผ่านก่อน', members: ['almanac'] },
+];
+
+function MiniStandIn({ color, prop }: { color: string; prop: 'binoculars' | 'clipboard' }) {
+  return (
+    <svg viewBox="-45 -165 90 170" aria-hidden="true">
+      <StandIn color={color} prop={prop} />
+    </svg>
+  );
+}
+
+function Avatar({ actor }: { actor: string }) {
+  if (actor === 'scout' && !SPRITE.scout_idle) return <MiniStandIn color="#93c5fd" prop="binoculars" />;
+  if (actor === 'almanac' && !SPRITE.almanac_idle) return <MiniStandIn color="#86efac" prop="clipboard" />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`${SRC}${actor}_idle.png`} alt="" />;
+}
 
 export default function StudioPage({ reports }: { reports: AgentReport[] }) {
   const report = reports.find((r) => r.agent === 'TIKTOK' && r.section === 'studio');
@@ -299,54 +536,76 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
   const get = (actor: string): StudioItem =>
     items.find((i) => i.actor === actor) || FALLBACK.find((i) => i.actor === actor) || { label: actor, value: '—' };
 
-  const pan = get('pan');
-  const susan = get('susan');
-  const edit = get('edit');
-  const alex = get('alex');
-  const beary = get('beary');
+  const scoutReport = reports
+    .filter((r) => r.agent === 'SCOUT')
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+  const scout: StudioItem =
+    items.find((i) => i.actor === 'scout') ||
+    (scoutReport
+      ? {
+          actor: 'scout',
+          label: 'SCOUT',
+          value: `สแกนรอบ ${formatDateTH(new Date(scoutReport.updated_at))}`,
+          note: 'ผลสแกนคู่แข่งอยู่ในหน้า SCOUT · ส่งต่อให้ Susan ใช้วางกลยุทธ์',
+          state: 'done',
+        }
+      : { actor: 'scout', label: 'SCOUT', value: 'รอรอบสแกนถัดไป', state: 'idle' });
+
+  const byActor: Record<string, StudioItem> = {
+    pan: get('pan'),
+    scout,
+    susan: get('susan'),
+    edit: get('edit'),
+    alex: get('alex'),
+    beary: get('beary'),
+    almanac: get('almanac'),
+  };
   const q: [string, string, string] = [get('queue_todo').value, get('queue_doing').value, get('queue_done').value];
 
   return (
     <div className="st-wrap">
       <style>{CSS}</style>
       <div className="st-stage">
-        <Scene pan={pan} susan={susan} edit={edit} alex={alex} beary={beary} q={q} />
+        <div className="st-scroll">
+          <Scene {...(byActor as Record<'pan' | 'scout' | 'susan' | 'edit' | 'alex' | 'beary' | 'almanac', StudioItem>)} q={q} />
+        </div>
         <div className="st-legend">
-          <span><b>1</b> Susan เขียนบรีฟ + ใบงาน → วางในตู้ TODO</span>
-          <span><b>2</b> edit เช็กคิวทุก :00 → หยิบงานไปทำบนคอม</span>
-          <span><b>3</b> edit ส่งรายงานเข้า DONE</span>
-          <span><b>4</b> Susan เช็กทุก :30 → สรุปเข้ามือถือปัน</span>
-          <span><b>:00</b> edit · <b>:30</b> Susan</span>
-          <span><b>Ads</b> Alex วิเคราะห์ Meta ทุกเช้า → Beary เสนองบ → ปันอนุมัติ · คลิป TikTok ที่ดูจบสูง → Beary ทำโฆษณา</span>
+          <span><b>ข่าวกรอง</b> SCOUT สแกนคู่แข่ง จ./พ./ศ. → ส่งให้ Susan</span>
+          <span><b>คอนเทนต์</b> Susan วางบรีฟในตู้ TODO → edit หยิบไปตัดต่อ (:00) → ส่งเข้า DONE → Susan สรุปเข้ามือถือปัน (:30)</span>
+          <span><b>โฆษณา</b> Alex วิเคราะห์ Meta ทุกเช้า → Beary เสนองบ → ปันอนุมัติ</span>
+          <span><b>วางแผน & โพสต์</b> ALMANAC เริ่มเมื่องาน Susan + edit ผ่าน</span>
         </div>
       </div>
 
-      <div className="st-cards">
-        {[
-          ['pan', pan],
-          ['susan', susan],
-          ['edit', edit],
-          ['alex', alex],
-          ['beary', beary],
-        ].map(([key, it]) => {
-          const item = it as StudioItem;
-          const st = STATE_LABEL[item.state || 'idle'] || STATE_LABEL.idle;
-          return (
-            <div className="st-card" key={key as string}>
-              <div className="st-card-head">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`${SRC}${key}_idle.png`} alt="" />
-                <div className="st-card-id">
-                  <div className="st-card-name">{item.label}</div>
-                  <div className="st-card-role">{ROLES[key as string]}</div>
-                </div>
-                <span className={`st-pill ${st.cls}`}>{st.text}</span>
-              </div>
-              <div className="st-card-value">{item.value}</div>
-              {item.note && <div className="st-card-note">{item.note}</div>}
+      <div className="st-depts">
+        {DEPTS.map((d) => (
+          <section key={d.title}>
+            <div className="st-dept-head">
+              <h3>{d.title}</h3>
+              <span>{d.sub}</span>
             </div>
-          );
-        })}
+            <div className="st-cards">
+              {d.members.map((key) => {
+                const item = byActor[key];
+                const st = STATE_LABEL[item.state || 'idle'] || STATE_LABEL.idle;
+                return (
+                  <div className="st-card" key={key}>
+                    <div className="st-card-head">
+                      <Avatar actor={key} />
+                      <div className="st-card-id">
+                        <div className="st-card-name">{item.label}</div>
+                        <div className="st-card-role">{ROLES[key]}</div>
+                      </div>
+                      <span className={`st-pill ${st.cls}`}>{st.text}</span>
+                    </div>
+                    <div className="st-card-value">{item.value}</div>
+                    {item.note && <div className="st-card-note">{item.note}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <div className="st-meta">

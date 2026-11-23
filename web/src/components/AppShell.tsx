@@ -123,6 +123,12 @@ const SECTIONS: { id: SectionId; label: string }[] = [
 
 const NAV_GROUPS: NavGroup[] = [
   {
+    id: 'STUDIO',
+    label: 'ทีม AI · 4 แผนก',
+    section: 'AI_TEAM',
+    items: [{ id: 'tiktokStudio', label: 'ห้องทำงาน AI', short: 'STUDIO', icon: Building2 }],
+  },
+  {
     id: 'SCOUT',
     label: 'SCOUT · วิเคราะห์คู่แข่ง',
     section: 'AI_TEAM',
@@ -144,10 +150,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'TIKTOK',
     label: 'TIKTOK · Content Pipeline',
     section: 'AI_TEAM',
-    items: [
-      { id: 'tiktokStudio', label: 'ห้องทำงาน AI', short: 'STUDIO', icon: Building2 },
-      { id: 'tiktok', label: 'บันทึกการทำงาน', short: 'TIKTOK', icon: Clapperboard },
-    ],
+    items: [{ id: 'tiktok', label: 'บันทึกการทำงาน', short: 'TIKTOK', icon: Clapperboard }],
   },
   {
     id: 'LEADS',
