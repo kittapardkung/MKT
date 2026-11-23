@@ -297,17 +297,30 @@ function DailySpendChart({
 const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
   SUSAN: { tagline: 'นักกลยุทธ์การตลาดออนไลน์', className: 'agent-susan' },
-  ADS: { tagline: 'ทีมโฆษณา Meta Ads — เป้า 100 เบอร์/เดือน ใต้งบ ฿45,000', className: 'agent-ads' },
+  ADS: { tagline: 'ทีมโฆษณา Meta Ads — Alex วิเคราะห์ผล · Beary วางงบและเสนอปรับโฆษณา (รอปันอนุมัติ)', className: 'agent-ads' },
   ALMANAC: { tagline: 'AI Content Planner', className: 'agent-almanac' },
   TIKTOK: { tagline: 'TikTok Content Pipeline — ปัน · Susan · AI ตัดต่อ', className: 'agent-tiktok' },
 };
 
+const ACTORS: Record<string, { label: string; role: string }> = {
+  alex: { label: 'Alex', role: 'วิเคราะห์ผล' },
+  beary: { label: 'Beary', role: 'วางงบ' },
+};
+
 export function ReportCard({ report, leads }: { report: AgentReport; leads: Lead[] }) {
   const data = report.data;
+  const actor = data?.by ? ACTORS[data.by] : undefined;
   return (
-    <div className="card report-card">
+    <div className={`card report-card${actor ? ` report-card-${data!.by}` : ''}`}>
       <div className="report-card-head">
-        <h2 style={{ margin: 0 }}>{report.title}</h2>
+        <h2 style={{ margin: 0 }}>
+          {actor && (
+            <span className={`actor-badge actor-${data!.by}`} title={actor.role}>
+              {actor.label}
+            </span>
+          )}
+          {report.title}
+        </h2>
         <span className="meta">อัปเดต {displayDateTime(report.updated_at)}</span>
       </div>
       {report.body && <p className="report-body">{report.body}</p>}

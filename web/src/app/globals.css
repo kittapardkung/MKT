@@ -268,6 +268,14 @@ tr.clickable:hover{background:var(--accent-soft)}
 .agent-tiktok .agent-badge{background:#111827}
 
 .report-list-wrap{display:flex;flex-direction:column;gap:14px}
+.actor-badge{
+  display:inline-block;vertical-align:middle;margin-right:10px;padding:3px 10px;border-radius:999px;
+  font-size:12px;font-weight:700;letter-spacing:.02em;color:#fff;position:relative;top:-2px
+}
+.actor-alex{background:#2563eb}
+.actor-beary{background:#b45309}
+.report-card-alex{border-left:4px solid #2563eb}
+.report-card-beary{border-left:4px solid #b45309}
 .report-card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .report-body{font-size:13px;color:var(--text);line-height:1.7;margin:0 0 10px;white-space:pre-wrap}
 

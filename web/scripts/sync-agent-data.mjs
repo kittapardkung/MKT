@@ -34,19 +34,8 @@ function readJsonIfExists(path) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-async function syncReport(supabase, agent, idPrefix, doc) {
-  const rows = [];
-  let sortOrder = 1;
-  for (const [section, block] of Object.entries(doc)) {
-    if (section === 'agent' || section === 'generated_at') continue;
-    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
-    rows.push({
-      id: `${idPrefix}-${section}`,
-      agent,
-      section,
-      title: block.title || section,
-      body: block.body || '',
-      data: block.columns
+function blockData(block) {
+  const data = block.columns
         ? block.groups
           ? { kind: 'table', columns: block.columns, groups: block.groups }
           : block.rows?.[0] && !Array.isArray(block.rows[0])
@@ -66,7 +55,25 @@ async function syncReport(supabase, agent, idPrefix, doc) {
             }
           : block.rows
             ? { kind: 'scorecard', rows: block.rows }
-            : null,
+            : null;
+  // block.by = คนในทีมที่เขียนการ์ดนี้ (เช่น alex / beary) — หน้าเว็บแสดงเป็นป้ายชื่อบนการ์ด
+  return data && block.by ? { ...data, by: block.by } : data;
+}
+
+// pruneStale: ลบการ์ดของ agent นี้ที่ไม่มีในไฟล์ JSON แล้ว (ใช้กับไฟล์ที่เป็นต้นฉบับทั้งหน้า)
+async function syncReport(supabase, agent, idPrefix, doc, { pruneStale = false } = {}) {
+  const rows = [];
+  let sortOrder = 1;
+  for (const [section, block] of Object.entries(doc)) {
+    if (section === 'agent' || section === 'generated_at') continue;
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+    rows.push({
+      id: `${idPrefix}-${section}`,
+      agent,
+      section,
+      title: block.title || section,
+      body: block.body || '',
+      data: blockData(block),
       sort_order: sortOrder++,
       updated_at: new Date().toISOString(),
     });
@@ -74,6 +81,15 @@ async function syncReport(supabase, agent, idPrefix, doc) {
   if (!rows.length) return 0;
   const { error } = await supabase.from('agent_reports').upsert(rows, { onConflict: 'id' });
   if (error) throw error;
+  if (pruneStale) {
+    const keep = rows.map((r) => `"${r.id}"`).join(',');
+    const { error: delErr } = await supabase
+      .from('agent_reports')
+      .delete()
+      .eq('agent', agent)
+      .not('id', 'in', `(${keep})`);
+    if (delErr) throw delErr;
+  }
   return rows.length;
 }
 
@@ -126,7 +142,7 @@ async function main() {
     console.log(`SUSAN: sync ${await syncReport(supabase, 'SUSAN', 'susan', susan)} rows`);
     console.log(`SUSAN: sync ${await syncSusanHooks(supabase, susan)} hooks`);
   }
-  if (ads) console.log(`ADS: sync ${await syncReport(supabase, 'ADS', 'ads', ads)} rows`);
+  if (ads) console.log(`ADS: sync ${await syncReport(supabase, 'ADS', 'ads', ads, { pruneStale: true })} rows`);
   if (almanac) console.log(`ALMANAC: sync ${await syncReport(supabase, 'ALMANAC', 'almanac', almanac)} rows`);
   if (tiktok) console.log(`TIKTOK: sync ${await syncReport(supabase, 'TIKTOK', 'tiktok', tiktok)} rows`);
 

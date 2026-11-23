@@ -54,7 +54,7 @@ export type Idea = {
 // บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/SUSAN/ADS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
 export type DrilldownRow = { cells: string[]; children?: DrilldownRow[] };
 
-export type AgentReportData =
+export type AgentReportData = (
   | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
   | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
   | { kind: 'list'; items: string[] }
@@ -62,7 +62,8 @@ export type AgentReportData =
   | { kind: 'table'; columns: string[]; groups: { label: string; rows: string[][] }[] }
   | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] }
   | { kind: 'drilldown'; columns: string[]; rows: DrilldownRow[] }
-  | { kind: 'todo'; items: { label: string; goal: string; tasks: string[] }[] };
+  | { kind: 'todo'; items: { label: string; goal: string; tasks: string[] }[] }
+) & { by?: string };
 
 export type AgentReport = {
   id: string;
