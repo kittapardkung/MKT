@@ -1,4 +1,4 @@
-name: Sync SCOUT/COMPASS/SPARK data from Artifacts
+name: Sync agent data (SCOUT · SUSAN · ADS · ALMANAC · TIKTOK)
 
 on:
   push:

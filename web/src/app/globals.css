@@ -255,15 +255,14 @@ tr.clickable:hover{background:var(--accent-soft)}
 .login-divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted-soft);font-size:12px}
 .login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--line)}
 
-/* agent dashboards (SCOUT / COMPASS / SPARK / ALMANAC) */
+/* agent dashboards (SCOUT / SUSAN / ADS / ALMANAC / TIKTOK) */
 .agent-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
 .agent-badge{
   display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;
   font-family:ui-monospace,'SFMono-Regular',Consolas,monospace;font-weight:800;font-size:13px;letter-spacing:.04em;color:#fff;flex-shrink:0
 }
 .agent-scout .agent-badge{background:#0f172a}
-.agent-compass .agent-badge{background:var(--accent)}
-.agent-spark .agent-badge{background:#d9770e}
+.agent-susan .agent-badge{background:#d9770e}
 .agent-ads .agent-badge{background:#c2255c}
 .agent-almanac .agent-badge{background:var(--success-dark)}
 .agent-tiktok .agent-badge{background:#111827}
@@ -423,3 +422,25 @@ tr.clickable:hover{background:var(--accent-soft)}
   .modal-grid{grid-template-columns:1fr}
   .btn,.control{min-height:44px}
 }
+
+/* SUSAN · นักกลยุทธ์การตลาดออนไลน์ */
+.susan-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:22px;counter-reset:step}
+.susan-step{position:relative;border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface)}
+.susan-step:not(:last-child)::after{content:'→';position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--muted-soft);font-weight:700;background:var(--bg);width:12px;text-align:center}
+.susan-step.active{border-color:#d9770e;box-shadow:0 0 0 1px #d9770e inset}
+.susan-step-n{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:#d9770e;color:#fff;font-size:12px;font-weight:800}
+.susan-step-title{font-size:12.5px;font-weight:700;color:var(--navy);margin-top:8px}
+.susan-step-value{font-family:ui-monospace,'SFMono-Regular',Consolas,monospace;font-size:20px;font-weight:800;color:var(--navy);margin:4px 0 2px}
+.susan-step-note{font-size:11px;color:var(--muted);line-height:1.5}
+.susan-section-title{display:flex;align-items:center;gap:10px;margin:24px 0 12px}
+.susan-section-n{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:var(--navy);color:#fff;font-weight:800;flex-shrink:0}
+.susan-formula{font-size:11.5px;color:#b45309;font-weight:600;margin-bottom:3px}
+.susan-meta-live{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--navy);background:var(--accent-soft);border-radius:7px;padding:3px 8px;margin-bottom:4px}
+.susan-meta-live span{font-size:10px;color:var(--muted);text-transform:uppercase}
+.susan-hook-table td:nth-child(3){white-space:normal;min-width:280px}
+.susan-hook-table td:nth-child(4){white-space:normal;min-width:200px}
+@media (max-width:860px){
+  .susan-flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .susan-step::after{display:none}
+}
+.susan-page .report-table td{white-space:normal;min-width:110px;vertical-align:top}

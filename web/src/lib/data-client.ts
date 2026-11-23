@@ -223,7 +223,7 @@ export async function addIdea(input: {
   const { error } = await supabase.from('ideas').insert({
     id,
     ...input,
-    agent: input.agent || 'SPARK',
+    agent: input.agent || 'SUSAN',
     suggested_date: input.suggested_date || null,
     suggested_channel: input.suggested_channel || null,
     suggested_format: input.suggested_format || null,
@@ -240,7 +240,7 @@ export async function setIdeaInterest(id: string, interest: IdeaInterest): Promi
 
 export async function promoteIdea(
   idea: Idea,
-  input: { date: string; time: string; channel: string; format: string },
+  input: { date: string; time: string; channel: string; format: string; caption?: string; tags?: string },
   who: string
 ): Promise<void> {
   const supabase = createClient();
@@ -255,8 +255,8 @@ export async function promoteIdea(
     format: input.format || 'ภาพ',
     status: 'DRAFT',
     owner: who,
-    caption: '',
-    tags: idea.category || '',
+    caption: input.caption || '',
+    tags: input.tags || idea.category || '',
     src_link: '',
     final_link: '',
     approved_by: '',

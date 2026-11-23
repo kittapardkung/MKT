@@ -3,7 +3,8 @@ export type Format = 'ภาพ' | 'วิดีโอ';
 export type Role = 'editor' | 'creative';
 // PPS Content System: Push (Awareness) / Pull (Authority) / Sell (ปิดการขาย) / Event (Test Drive/กิจกรรม)
 export type ContentType = 'Push' | 'Pull' | 'Sell' | 'Event';
-export type AgentId = 'SCOUT' | 'COMPASS' | 'SPARK' | 'ADS' | 'ALMANAC' | 'TIKTOK';
+// COMPASS + SPARK ถูกรวมเข้า SUSAN (นักกลยุทธ์การตลาดออนไลน์) แล้ว
+export type AgentId = 'SCOUT' | 'SUSAN' | 'ADS' | 'ALMANAC' | 'TIKTOK';
 
 export type Post = {
   id: string;
@@ -50,7 +51,7 @@ export type Idea = {
   interest?: IdeaInterest | null;
 };
 
-// บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/COMPASS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
+// บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/SUSAN/ADS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
 export type DrilldownRow = { cells: string[]; children?: DrilldownRow[] };
 
 export type AgentReportData =
