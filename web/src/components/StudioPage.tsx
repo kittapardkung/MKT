@@ -48,8 +48,7 @@ function short(s: string | undefined, n: number) {
 /* ---------- ตัวละคร (ภาพจาก Higgsfield · Nano Banana Pro · เตรียมโดย edit EDIT-20261118-03) ----------
    ตัวละครสูง 480 px → แสดงสูง H · เท้าอยู่ที่ (0,0) ของแต่ละกลุ่ม
    ท่า idle / walk สลับกันด้วย opacity ตาม keyframes · เดินกลับซ้ายใช้ภาพเดียวกันกลับด้าน
-   SCOUT / ALMANAC ยังไม่มีภาพ → ใช้หุ่นชั่วคราว (Stand-in) จนกว่า edit จะส่ง scout_idle.png / almanac_idle.png
-   ได้ภาพแล้วให้เพิ่มขนาดภาพลง SPRITE ด้านล่าง ฉากจะสลับไปใช้ภาพจริงเอง */
+   SCOUT (เมียร์แคท) / ALMANAC (นกฮูก) เพิ่ม 23 พ.ย. 2569 จาก Drive โฟลเดอร์ 07_STUDIO ASSETS */
 
 const INK = '#2b2d3a';
 const SRC = '/studio/';
@@ -60,6 +59,8 @@ const SPRITE: Record<string, [number, number]> = {
   edit_idle: [281, 480], edit_walk: [358, 480], edit_work: [397, 480],
   alex_idle: [286, 480], alex_walk: [356, 480],
   beary_idle: [271, 480], pan_idle: [231, 480], pan_notify: [229, 480],
+  scout_idle: [309, 480], scout_walk: [327, 480],
+  almanac_idle: [343, 480], almanac_walk: [343, 480],
 };
 
 function Sprite({ name, h = H, flip = false, className }: { name: string; h?: number; flip?: boolean; className?: string }) {
@@ -70,34 +71,6 @@ function Sprite({ name, h = H, flip = false, className }: { name: string; h?: nu
       <g transform={flip ? 'scale(-1 1)' : undefined}>
         <image href={`${SRC}${name}.png`} x={-w / 2} y={-h} width={w} height={h} preserveAspectRatio="xMidYMax meet" />
       </g>
-    </g>
-  );
-}
-
-/* หุ่นชั่วคราวสไตล์เดียวกับฉาก (เส้นหมึกหนา สีพาสเทล) */
-function StandIn({ color, prop }: { color: string; prop: 'binoculars' | 'clipboard' }) {
-  return (
-    <g>
-      <rect x="-22" y="-14" width="16" height="14" rx="4" fill={INK} />
-      <rect x="6" y="-14" width="16" height="14" rx="4" fill={INK} />
-      <rect x="-32" y="-82" width="64" height="72" rx="18" fill={color} stroke={INK} strokeWidth="3" />
-      <rect x="-38" y="-138" width="76" height="58" rx="20" fill="#fff" stroke={INK} strokeWidth="3" />
-      <circle cx="-14" cy="-110" r="5.5" fill={INK} />
-      <circle cx="14" cy="-110" r="5.5" fill={INK} />
-      <path d="M-7 -96 Q0 -90 7 -96" fill="none" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="0" y1="-138" x2="0" y2="-152" stroke={INK} strokeWidth="3" />
-      <circle cx="0" cy="-156" r="6" fill={color} stroke={INK} strokeWidth="2.5" />
-      {prop === 'binoculars' ? (
-        <g transform="translate(26 -62)">
-          <rect x="-4" y="-10" width="12" height="18" rx="4" fill="#475569" stroke={INK} strokeWidth="2.5" />
-          <rect x="10" y="-10" width="12" height="18" rx="4" fill="#475569" stroke={INK} strokeWidth="2.5" />
-        </g>
-      ) : (
-        <g transform="translate(24 -66)">
-          <rect x="0" y="-14" width="26" height="34" rx="3" fill="#fff" stroke={INK} strokeWidth="2.5" />
-          <path d="M5 -4 H21 M5 3 H21 M5 10 H15" stroke="#9aa0b4" strokeWidth="2" />
-        </g>
-      )}
     </g>
   );
 }
@@ -324,11 +297,16 @@ function Scene({
 
       {/* SCOUT */}
       <g transform={`translate(110 ${FEET})`}>
-        <g className="st-bob">
-          {SPRITE.scout_idle ? <Sprite name="scout_idle" /> : <StandIn color="#93c5fd" prop="binoculars" />}
+        <g className="st-walk-scout">
+          <g className="st-bob">
+            <Sprite name="scout_idle" className="st-scout-idle" />
+            <Sprite name="scout_walk" className="st-scout-right" />
+            <Sprite name="scout_walk" flip className="st-scout-left" />
+          </g>
+          <Paper className="st-scout-paper" x={34} y={-70} />
+          <Tag x={0} y={16} text="SCOUT" />
         </g>
         <Bubble text={short(scout.value, 18)} tone={scout.state || 'idle'} dx={20} />
-        <Tag x={0} y={16} text="SCOUT" />
       </g>
 
       {/* Susan: เดินไปตู้ Drive (+140) */}
@@ -390,7 +368,7 @@ function Scene({
 
       {/* ALMANAC (ยังไม่เริ่มงาน) */}
       <g transform={`translate(1480 ${FEET})`} opacity="0.75">
-        {SPRITE.almanac_idle ? <Sprite name="almanac_idle" /> : <StandIn color="#86efac" prop="clipboard" />}
+        <Sprite name="almanac_idle" />
         <Bubble text={short(almanac.value, 18)} tone={almanac.state || 'idle'} dy={-H - 30} />
         <Tag x={0} y={16} text="ALMANAC" />
       </g>
@@ -422,6 +400,9 @@ const EDIT_I: [number, number][] = [[0, 33.3], [43.3, 46.7], [76.7, 80], [86.7, 
 const ALEX_R: [number, number][] = [[20, 35]];
 const ALEX_L: [number, number][] = [[40, 55]];
 const ALEX_I: [number, number][] = [[0, 20], [35, 40], [55, 100]];
+const SCOUT_R: [number, number][] = [[60, 68]];
+const SCOUT_L: [number, number][] = [[72, 80]];
+const SCOUT_I: [number, number][] = [[0, 60], [68, 72], [80, 100]];
 const PAN_N: [number, number][] = [[96.9, 100]];
 const PAN_I: [number, number][] = [[0, 96.9]];
 
@@ -429,10 +410,11 @@ const SPRITE_KF = [
   showKF('st-susan-idle', SUSAN_I), showKF('st-susan-right', SUSAN_R), showKF('st-susan-left', SUSAN_L),
   showKF('st-edit-idle', EDIT_I), showKF('st-edit-left', EDIT_L), showKF('st-edit-right', EDIT_R), showKF('st-edit-work', EDIT_W),
   showKF('st-alex-idle', ALEX_I), showKF('st-alex-right', ALEX_R), showKF('st-alex-left', ALEX_L),
+  showKF('st-scout-idle', SCOUT_I), showKF('st-scout-right', SCOUT_R), showKF('st-scout-left', SCOUT_L),
   showKF('st-pan-idle', PAN_I), showKF('st-pan-notify', PAN_N),
 ].join('\n');
 
-const SPRITE_CLS = ['susan-idle', 'susan-right', 'susan-left', 'edit-idle', 'edit-left', 'edit-right', 'edit-work', 'alex-idle', 'alex-right', 'alex-left', 'pan-idle', 'pan-notify'];
+const SPRITE_CLS = ['susan-idle', 'susan-right', 'susan-left', 'edit-idle', 'edit-left', 'edit-right', 'edit-work', 'alex-idle', 'alex-right', 'alex-left', 'scout-idle', 'scout-right', 'scout-left', 'pan-idle', 'pan-notify'];
 
 const CSS = `
 .st-wrap{display:grid;gap:16px}
@@ -442,13 +424,15 @@ const CSS = `
 .st-progress{transform-box:fill-box}
 .st-dot-working{fill:#38bdf8}.st-dot-waiting{fill:#f59e0b}.st-dot-done{fill:#22c55e}.st-dot-blocked{fill:#ef4444}.st-dot-idle{fill:#9ca3af}
 /* ค่าตั้งต้นเมื่อไม่มีแอนิเมชัน: แสดงท่ายืน */
-.st-susan-right,.st-susan-left,.st-edit-left,.st-edit-right,.st-edit-work,.st-alex-right,.st-alex-left,.st-pan-notify{opacity:0}
+.st-susan-right,.st-susan-left,.st-edit-left,.st-edit-right,.st-edit-work,.st-alex-right,.st-alex-left,.st-scout-right,.st-scout-left,.st-scout-paper,.st-pan-notify{opacity:0}
 @media (prefers-reduced-motion: no-preference){
   .st-bob{animation:st-bob .5s ease-in-out infinite alternate}
   .st-bob-edit{animation-delay:.25s}
   .st-walk-susan{animation:st-susan 30s linear infinite}
   .st-walk-edit{animation:st-edit 30s linear infinite}
   .st-walk-alex{animation:st-alex 30s linear infinite}
+  .st-walk-scout{animation:st-scout 30s linear infinite}
+  .st-scout-paper{animation:st-scout-paper 30s linear infinite}
   .st-tray-todo{animation:st-tray-todo 30s linear infinite}
   .st-tray-done{animation:st-tray-done 30s linear infinite}
   .st-progress{transform-origin:0 50%;animation:st-progress 30s linear infinite}
@@ -468,6 +452,9 @@ const CSS = `
 @keyframes st-edit{0%,33.3%{transform:translateX(0)}43.3%,46.7%{transform:translateX(-150px)}56.7%,70%{transform:translateX(0)}76.7%,80%{transform:translateX(-150px)}86.7%,100%{transform:translateX(0)}}
 /* Alex: ดูกราฟ 0–20% · เดินเอารายงานให้ Beary 20–35% · ส่ง 35–40% · กลับ 40–55% */
 @keyframes st-alex{0%,20%{transform:translateX(0)}35%,40%{transform:translateX(110px)}55%,100%{transform:translateX(0)}}
+/* SCOUT: ดูเรดาร์ 0–60% · เดินเอาผลสแกนไปส่งให้ Susan 60–68% · ส่ง 68–72% · กลับ 72–80% */
+@keyframes st-scout{0%,60%{transform:translateX(0)}68%,72%{transform:translateX(95px)}80%,100%{transform:translateX(0)}}
+@keyframes st-scout-paper{0%,59.9%{opacity:0}60%,70.9%{opacity:1}71%,100%{opacity:0}}
 @keyframes st-tray-todo{0%,21.6%{opacity:0}21.7%,44.9%{opacity:1}45%,100%{opacity:0}}
 @keyframes st-tray-done{0%,78.2%{opacity:0}78.3%,89.9%{opacity:1}90%,100%{opacity:0}}
 @keyframes st-progress{0%,56.7%{transform:scaleX(0)}70%,100%{transform:scaleX(1)}}
@@ -514,17 +501,7 @@ const DEPTS: { title: string; sub: string; members: string[] }[] = [
   { title: 'วางแผน & โพสต์', sub: 'ยังไม่เริ่มงาน — รอให้งาน Susan + edit ผ่านก่อน', members: ['almanac'] },
 ];
 
-function MiniStandIn({ color, prop }: { color: string; prop: 'binoculars' | 'clipboard' }) {
-  return (
-    <svg viewBox="-45 -165 90 170" aria-hidden="true">
-      <StandIn color={color} prop={prop} />
-    </svg>
-  );
-}
-
 function Avatar({ actor }: { actor: string }) {
-  if (actor === 'scout' && !SPRITE.scout_idle) return <MiniStandIn color="#93c5fd" prop="binoculars" />;
-  if (actor === 'almanac' && !SPRITE.almanac_idle) return <MiniStandIn color="#86efac" prop="clipboard" />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={`${SRC}${actor}_idle.png`} alt="" />;
 }
