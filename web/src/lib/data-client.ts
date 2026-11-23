@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
+import { createCrmClient } from '@/lib/supabase/crm-client';
 import type { AgentId, Bootstrap, Idea, IdeaInterest, Lead, Post, PostStatus, Role, Tag } from '@/lib/types';
 
 function newId(prefix: string) {
@@ -24,6 +25,8 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
   // TODO(auth-testing-bypass): ยังไม่ได้ล็อกอิน (ปิดบังคับล็อกอินไว้ชั่วคราว) — สมมติเป็น editor เพื่อทดสอบปุ่มอนุมัติได้
   const me = user?.email || 'ทดสอบระบบ (ยังไม่ได้ล็อกอิน)';
 
+  const crm = createCrmClient();
+
   const [role, postsRes, tagsRes, ideasRes, eventsRes, targetsRes, leadsRes, reportsRes] = await Promise.all([
     user ? getRole(me) : Promise.resolve<Role>('editor'),
     supabase.from('posts').select('*').order('date', { ascending: true }),
@@ -31,11 +34,12 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
     supabase.from('ideas').select('*').order('created_at', { ascending: false }),
     supabase.from('events').select('date, name'),
     supabase.from('targets').select('key, label, target, period'),
-    // ตาราง leads อาจยังไม่ถูกสร้าง (ต้องรัน schema_leads.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
-    supabase
-      .from('leads')
+    // ลีดย้ายไปบันทึกใน CRM (โปรเจกต์ wuling-service-management) แล้ว — อ่านผ่าน view
+    // สาธารณะ public.leads_compat ที่ map มาจาก crm.leads ของโปรเจกต์นั้นแทนตาราง leads เดิม
+    crm
+      .from('leads_compat')
       .select(
-        'lead_id, created_date, customer_name, phone_number, interested_model, source, assigned_sales, lead_status, lead_temperature, sales_reply, follow_up_note'
+        'lead_id, created_date, created_time, customer_name, phone_number, interested_model, source, assigned_sales, lead_status, lead_temperature, sales_reply, follow_up_note'
       ),
     // ตาราง agent_reports อาจยังไม่ถูกสร้าง (ต้องรัน migrate_agent_workflow.sql ก่อน) — ไม่ให้ล้มทั้งหน้าถ้ายังไม่มี
     supabase.from('agent_reports').select('*').order('agent').order('sort_order'),
@@ -46,6 +50,7 @@ export async function fetchBootstrap(): Promise<Bootstrap> {
   if (ideasRes.error) throw ideasRes.error;
   if (eventsRes.error) throw eventsRes.error;
   if (targetsRes.error) throw targetsRes.error;
+  if (leadsRes.error) throw leadsRes.error;
 
   return {
     me,
