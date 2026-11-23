@@ -1,4 +1,7 @@
-# Agent sync data (SCOUT / COMPASS / SPARK / ALMANAC)
+# Agent sync data (SCOUT / SUSAN / ADS / ALMANAC / TIKTOK)
+
+> **พ.ย. 2569:** ยกเลิก agent COMPASS + SPARK แล้ว — งานกลยุทธ์และคลัง Hook ย้ายไปรวมที่ **SUSAN**
+> (นักกลยุทธ์การตลาดออนไลน์) ไฟล์เดียว `susan.json` · ไม่ต้องอ่าน Artifact ของ COMPASS/SPARK อีก
 
 ไฟล์ในโฟลเดอร์นี้คือ snapshot ข้อมูลที่ดึงมาจาก Artifact ของทีม 4-agent workflow
 (เรดาร์คู่แข่ง, กลยุทธ์การตลาด, คลัง Hook วิดีโอ, แผนคอนเทนต์) เพื่อ sync เข้า Supabase ให้แอป
@@ -11,8 +14,6 @@ MKT Content Manager แสดงผล
 โดยไม่ต้องขอให้ส่งซ้ำ:
 
 - SCOUT (เรดาร์คู่แข่ง): https://claude.ai/artifact/UnAcD64FcaG8HB9R45n1MF
-- COMPASS (กลยุทธ์การตลาด): https://claude.ai/artifact/JxfvDqncTQCdpAV5knmwKm
-- SPARK (คลัง Hook วิดีโอ): https://claude.ai/artifact/14MjfxWPiEFJoFDFDSMJyK
 - ALMANAC (แผนคอนเทนต์): https://claude.ai/artifact/YWbFDvHwUiQUA1s6rBSaAW
 
 ถ้าอ่านแล้วเนื้อหาดู "เก่า" ไม่ตรงกับที่ผู้ใช้บอกว่าเพิ่งรัน ให้ถามผู้ใช้ว่าลิงก์เปลี่ยนไปหรือไม่
@@ -46,9 +47,13 @@ Claude session)
 ## โครงสร้างไฟล์
 
 - `scout.json` → sync เข้า `agent_reports` (id: `scout-summary`, `scout-scorecard`, `scout-findings`, ...)
-- `compass.json` → sync เข้า `agent_reports` (id: `compass-positioning`, `compass-pps`, `compass-roadmap`)
-- `spark.json` → sync เข้า `ideas` (id: `spark-<content-code>` เช่น `spark-SPK-PU01`) — รัน upsert
-  ซ้ำด้วย code เดิมจะอัปเดตทับแถวเดิม ไม่สร้างซ้ำ
+- `susan.json` → SUSAN นักกลยุทธ์การตลาดออนไลน์ (รวม COMPASS + SPARK เดิม) — Claude อัปเดตเอง
+  - `signals` / `positioning` / `pps` / `roadmap` / `video_orders` → `agent_reports` (id: `susan-<section>`)
+  - `hooks` → ตาราง `ideas` (id: `susan-<code>` เช่น `susan-SUS-PU01`) ทุก hook ต้องมี `evidence`
+    อ้างรหัสสัญญาณ Meta Ads (M1, M2, …) ใน `signals` · upsert ซ้ำไม่ทับสถานะ สนใจ/ไม่สนใจ ที่กดในแอป
+  - ลำดับงาน: อ่าน `ads.json` (ผล Meta จาก Alex/Beary) → เขียน `signals` → ปรับกลยุทธ์ → เติม/ตัด hook
+    → จับคู่ hook กับบรีฟ TikTok ใน `video_orders`
+  - ต้องรัน `supabase/migrate_susan_agent.sql` ก่อน sync ครั้งแรก
 - `almanac.json` → sync เข้า `agent_reports` (id: `almanac-summary`, `almanac-insights`, ...)
 - `ads.json` → sync เข้า `agent_reports` (id: `ads-summary`, `ads-creatives`, ...) — ข้อมูลนี้
   Claude ดึงเองจาก Meta Ads API โดยตรง ไม่ได้มาจาก Artifact/Routine

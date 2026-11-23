@@ -296,14 +296,13 @@ function DailySpendChart({
 
 const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
-  COMPASS: { tagline: 'AI นักกลยุทธ์การตลาด', className: 'agent-compass' },
-  SPARK: { tagline: 'AI Content Creator', className: 'agent-spark' },
+  SUSAN: { tagline: 'นักกลยุทธ์การตลาดออนไลน์', className: 'agent-susan' },
   ADS: { tagline: 'ทีมโฆษณา Meta Ads — เป้า 100 เบอร์/เดือน ใต้งบ ฿45,000', className: 'agent-ads' },
   ALMANAC: { tagline: 'AI Content Planner', className: 'agent-almanac' },
   TIKTOK: { tagline: 'TikTok Content Pipeline — ปัน · Susan · AI ตัดต่อ', className: 'agent-tiktok' },
 };
 
-function ReportCard({ report, leads }: { report: AgentReport; leads: Lead[] }) {
+export function ReportCard({ report, leads }: { report: AgentReport; leads: Lead[] }) {
   const data = report.data;
   return (
     <div className="card report-card">

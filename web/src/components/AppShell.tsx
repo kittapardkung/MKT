@@ -38,7 +38,6 @@ import {
   Plus,
   LogOut,
   Radar,
-  Compass,
   Sparkles,
   ListChecks,
   Megaphone,
@@ -49,7 +48,7 @@ import {
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
 import StudioPage from '@/components/StudioPage';
-import SparkPage from '@/components/SparkPage';
+import SusanPage from '@/components/SusanPage';
 import TimelinePage from '@/components/TimelinePage';
 import LeadsOverviewPage from '@/components/LeadsOverviewPage';
 
@@ -100,8 +99,7 @@ function attrUrl(url: string) {
 
 type PageId =
   | 'scout'
-  | 'compass'
-  | 'spark'
+  | 'susan'
   | 'ads'
   | 'tiktok'
   | 'tiktokStudio'
@@ -131,16 +129,10 @@ const NAV_GROUPS: NavGroup[] = [
     items: [{ id: 'scout', label: 'ภาพรวมคู่แข่ง', short: 'SCOUT', icon: Radar }],
   },
   {
-    id: 'COMPASS',
-    label: 'COMPASS · กลยุทธ์การตลาด',
+    id: 'SUSAN',
+    label: 'SUSAN · นักกลยุทธ์การตลาดออนไลน์',
     section: 'AI_TEAM',
-    items: [{ id: 'compass', label: 'ภาพรวมกลยุทธ์', short: 'COMPASS', icon: Compass }],
-  },
-  {
-    id: 'SPARK',
-    label: 'SPARK · Content Creator',
-    section: 'AI_TEAM',
-    items: [{ id: 'spark', label: 'คลังไอเดีย/Hook', short: 'SPARK', icon: Sparkles }],
+    items: [{ id: 'susan', label: 'กลยุทธ์ · คลัง Hook · สั่งวิดีโอ', short: 'SUSAN', icon: Sparkles }],
   },
   {
     id: 'ADS',
@@ -265,6 +257,8 @@ export default function AppShell() {
 
   const [promoteModalOpen, setPromoteModalOpen] = useState(false);
   const [promoteIdeaTarget, setPromoteIdeaTarget] = useState<Idea | null>(null);
+  // 'video' = สั่งทำวิดีโอจากคลัง Hook ของ SUSAN (ใส่บรีฟลงแคปชันให้อัตโนมัติ)
+  const [promoteMode, setPromoteMode] = useState<'calendar' | 'video'>('calendar');
   const [promoteForm, setPromoteForm] = useState({
     title: '',
     date: ymd(new Date()),
@@ -424,8 +418,22 @@ export default function AppShell() {
     runAction(() => deletePost(id, data?.me || ''));
   }
 
+  function openOrderVideo(idea: Idea) {
+    setPromoteIdeaTarget(idea);
+    setPromoteMode('video');
+    setPromoteForm({
+      title: idea.title,
+      date: idea.suggested_date || ymd(addDays(new Date(), 3)),
+      time: '18:00',
+      channel: 'TikTok',
+      format: 'วิดีโอ',
+    });
+    setPromoteModalOpen(true);
+  }
+
   function openPromoteIdea(idea: Idea) {
     setPromoteIdeaTarget(idea);
+    setPromoteMode('calendar');
     setPromoteForm({
       title: idea.title,
       date: idea.suggested_date || ymd(new Date()),
@@ -439,12 +447,28 @@ export default function AppShell() {
   function confirmPromote() {
     if (!promoteIdeaTarget) return;
     if (!promoteForm.date) return alert('กรุณาเลือกวันที่');
-    runAction(() => promoteIdea(promoteIdeaTarget, promoteForm, data?.me || ''));
+    const idea = promoteIdeaTarget;
+    const extra =
+      promoteMode === 'video'
+        ? {
+            caption: [
+              `ใบสั่งวิดีโอจากคลัง Hook ของ SUSAN${idea.code ? ` (${idea.code})` : ''}`,
+              `Hook: ${idea.title}`,
+              idea.formula ? `สูตร: ${idea.formula}` : '',
+              idea.note || '',
+              'ตัวเลขราคา/ค่างวด/สเปกต้องให้ปันหรือทีมขายยืนยันก่อนเรนเดอร์',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            tags: ['SUSAN', 'วิดีโอ', idea.type || '', idea.product || ''].filter(Boolean).join(', '),
+          }
+        : {};
+    runAction(() => promoteIdea(idea, { ...promoteForm, ...extra }, data?.me || ''));
   }
 
   function rejectPromote() {
     if (!promoteIdeaTarget) return;
-    if (!confirm('ไม่อนุมัติไอเดียนี้? จะถูกย้ายไปหน้า "ไม่สนใจ" ในหน้า SPARK')) return;
+    if (!confirm('ไม่อนุมัติไอเดียนี้? จะถูกย้ายไปแท็บ "ไม่สนใจ" ในคลัง Hook ของ SUSAN')) return;
     runAction(() => setIdeaInterest(promoteIdeaTarget.id, 'not_interested'));
   }
 
@@ -456,7 +480,7 @@ export default function AppShell() {
         category: ideaForm.category.trim(),
         score: Number(ideaForm.score || 0),
         note: ideaForm.note,
-        agent: 'SPARK' as AgentId,
+        agent: 'SUSAN' as AgentId,
         suggested_date: ideaForm.suggested_date || null,
         suggested_channel: ideaForm.suggested_channel || null,
         suggested_format: ideaForm.suggested_format || null,
@@ -597,8 +621,6 @@ export default function AppShell() {
 
           {page === 'scout' && <AgentReportPage agent="SCOUT" reports={data?.agentReports || []} />}
 
-          {page === 'compass' && <AgentReportPage agent="COMPASS" reports={data?.agentReports || []} />}
-
           {page === 'ads' && <AgentReportPage agent="ADS" reports={data?.agentReports || []} leads={data?.leads || []} />}
 
           {page === 'tiktok' && <AgentReportPage agent="TIKTOK" reports={data?.agentReports || []} />}
@@ -607,11 +629,14 @@ export default function AppShell() {
 
           {page === 'leadsOverview' && <LeadsOverviewPage leads={data?.leads || []} />}
 
-          {page === 'spark' && (
-            <SparkPage
+          {page === 'susan' && (
+            <SusanPage
               ideas={data?.ideas || []}
+              posts={data?.posts || []}
               reports={data?.agentReports || []}
               onSetInterest={doSetInterest}
+              onOrderVideo={openOrderVideo}
+              onOpenPost={openPost}
               onAddIdea={() => {
                 setIdeaForm({
                   title: '',
@@ -701,6 +726,7 @@ export default function AppShell() {
           onClose={() => setPromoteModalOpen(false)}
           onConfirm={confirmPromote}
           onReject={rejectPromote}
+          mode={promoteMode}
         />
       )}
 
@@ -2095,8 +2121,10 @@ function PromoteModal({
   onClose,
   onConfirm,
   onReject,
+  mode = 'calendar',
 }: {
   idea: Idea;
+  mode?: 'calendar' | 'video';
   form: { title: string; date: string; time: string; channel: string; format: string };
   setForm: Dispatch<SetStateAction<{ title: string; date: string; time: string; channel: string; format: string }>>;
   saving: boolean;
@@ -2109,7 +2137,7 @@ function PromoteModal({
     <div className="modal show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ width: 'min(560px,100%)' }}>
         <div className="toolbar">
-          <h2 style={{ margin: 0 }}>ส่งไอเดียเข้าปฏิทิน</h2>
+          <h2 style={{ margin: 0 }}>{mode === 'video' ? 'สั่งทำวิดีโอจาก Hook (SUSAN)' : 'ส่งไอเดียเข้าปฏิทิน'}</h2>
           <button className="btn" onClick={onClose}>ปิด</button>
         </div>
         {idea.note && (
@@ -2133,8 +2161,12 @@ function PromoteModal({
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn danger" disabled={saving} onClick={onReject} style={{ marginRight: 'auto' }}>ไม่อนุมัติ</button>
-          <button className="btn primary" disabled={saving} onClick={onConfirm}>{saving ? 'กำลังบันทึก...' : 'สร้างเป็นร่าง'}</button>
+          {mode === 'calendar' && (
+            <button className="btn danger" disabled={saving} onClick={onReject} style={{ marginRight: 'auto' }}>ไม่อนุมัติ</button>
+          )}
+          <button className="btn primary" disabled={saving} onClick={onConfirm}>
+            {saving ? 'กำลังบันทึก...' : mode === 'video' ? 'ส่งใบสั่งวิดีโอ (ร่างในปฏิทิน)' : 'สร้างเป็นร่าง'}
+          </button>
         </div>
       </div>
     </div>
@@ -2169,7 +2201,7 @@ function IdeaModal({
     <div className="modal show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-card" style={{ width: 'min(560px,100%)' }}>
         <div className="toolbar">
-          <h2 style={{ margin: 0 }}>เสนอไอเดีย/Hook ใหม่ (SPARK)</h2>
+          <h2 style={{ margin: 0 }}>เพิ่ม Hook ใหม่เข้าคลัง (SUSAN)</h2>
           <button className="btn" onClick={onClose}>ปิด</button>
         </div>
         <div className="field"><label>ชื่อไอเดีย</label><input value={form.title} onChange={(e) => set('title', e.target.value)} /></div>
