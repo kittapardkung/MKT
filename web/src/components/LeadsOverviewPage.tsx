@@ -381,7 +381,7 @@ export default function LeadsOverviewPage({ leads }: { leads: Lead[] }) {
         </div>
       </div>
 
-      <div className="two-col" style={{ gridTemplateColumns: '1fr 1fr', marginTop: 0 }}>
+      <div className="two-col two-col-even" style={{ marginTop: 0 }}>
         <DonutCard title="สัดส่วนตามสถานะ (Lead Status)" slices={statusSlices} total={total} totalLabel="ลีดทั้งหมด" />
         <DonutCard title="สัดส่วนตามระดับความสนใจ (Lead Temperature)" slices={tempSlices} total={total} totalLabel="ลีดทั้งหมด" />
       </div>

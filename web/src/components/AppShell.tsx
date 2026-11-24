@@ -44,6 +44,8 @@ import {
   Users,
   Clapperboard,
   Building2,
+  SlidersHorizontal,
+  Bot,
   type LucideIcon,
 } from 'lucide-react';
 import AgentReportPage from '@/components/AgentReportPage';
@@ -115,11 +117,14 @@ type NavItem = { id: PageId; label: string; short: string; icon: LucideIcon };
 type SectionId = 'AI_TEAM' | 'MARKETING' | 'LEAD';
 type NavGroup = { id: string; label: string; section: SectionId; items: NavItem[] };
 
-const SECTIONS: { id: SectionId; label: string }[] = [
-  { id: 'AI_TEAM', label: 'AI TEAM' },
-  { id: 'MARKETING', label: 'MARKETING' },
-  { id: 'LEAD', label: 'LEAD' },
+const SECTIONS: { id: SectionId; label: string; mobileLabel: string; icon: LucideIcon }[] = [
+  { id: 'AI_TEAM', label: 'AI TEAM', mobileLabel: 'ทีม AI', icon: Bot },
+  { id: 'MARKETING', label: 'MARKETING', mobileLabel: 'คอนเทนต์', icon: CalendarDays },
+  { id: 'LEAD', label: 'LEAD', mobileLabel: 'ลีด', icon: Users },
 ];
+
+// หน้าที่ใช้ตัวกรองบน topbar (ค้นหา/ช่วงวันที่/ช่องทาง) — หน้าอื่นบนมือถือซ่อน topbar เพื่อประหยัดพื้นที่
+const FILTER_PAGES: PageId[] = ['calendarPage', 'board', 'tablePage'];
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -240,6 +245,12 @@ export default function AppShell() {
   }
 
   const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // มือถือ: เลื่อนชิปหน้าที่เลือกให้อยู่ในจอ
+  useEffect(() => {
+    document.querySelector('.mobile-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [page, navSection]);
   const [channelFilter, setChannelFilter] = useState('');
   const [rangePreset, setRangePreset] = useState<RangeValue>('month');
   const [dateFrom, setDateFrom] = useState('');
@@ -574,28 +585,72 @@ export default function AppShell() {
       </aside>
 
       <main className="main">
-        <div className="mobile-nav">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              className={`nav-btn ${page === n.id ? 'active' : ''}`}
-              onClick={() => setPage(n.id)}
-            >
-              <span className="icon"><n.icon size={16} /></span>
-              {n.short}
-            </button>
-          ))}
+        {/* มือถือ: หัวบนแสดงชื่อหน้า + ชิปหน้าย่อยของแผนกที่เลือก · แท็บล่างสลับแผนก */}
+        <div className="mobile-header">
+          <div className="mobile-header-row">
+            <span className="mobile-brand"><Zap size={15} fill="currentColor" /></span>
+            <div className="mobile-title">{NAV.find((n) => n.id === page)?.label}</div>
+            <form action={signOut}>
+              <button className="mobile-icon-btn" type="submit" aria-label="ออกจากระบบ" title="ออกจากระบบ">
+                <LogOut size={18} />
+              </button>
+            </form>
+          </div>
+          {NAV_GROUPS.filter((g) => g.section === navSection).flatMap((g) => g.items).length > 1 && (
+            <div className="mobile-pages">
+              {NAV_GROUPS.filter((g) => g.section === navSection)
+                .flatMap((g) => g.items)
+                .map((n) => (
+                  <button
+                    key={n.id}
+                    data-page={n.id}
+                    className={`mobile-chip ${page === n.id ? 'active' : ''}`}
+                    onClick={() => setPage(n.id)}
+                  >
+                    <n.icon size={15} />
+                    {n.short}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
 
-        <div className="topbar">
+        <nav className="mobile-tabbar">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              data-section={s.id}
+              className={`mobile-tab ${navSection === s.id ? 'active' : ''}`}
+              onClick={() => selectSection(s.id)}
+            >
+              <s.icon size={21} />
+              <span>{s.mobileLabel}</span>
+            </button>
+          ))}
+        </nav>
+
+        {navSection === 'MARKETING' && (
+          <button className="mobile-fab" onClick={openNewPost} aria-label="คอนเทนต์ใหม่">
+            <Plus size={24} />
+          </button>
+        )}
+
+        <div className={`topbar ${FILTER_PAGES.includes(page) ? '' : 'topbar-optional'} ${filtersOpen ? 'filters-open' : ''}`}>
           <input
             className="control search"
             placeholder="ค้นหาหัวเรื่อง แคปชัน แท็ก"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button
+            className={`btn filter-toggle ${filtersOpen || channelFilter || rangePreset !== 'month' ? 'on' : ''}`}
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-label="ตัวกรอง"
+          >
+            <SlidersHorizontal size={17} />
+          </button>
 
-          <select className="control" value={rangePreset} onChange={(e) => setRangePreset(e.target.value as RangeValue)}>
+          <select className="control topbar-filter" value={rangePreset} onChange={(e) => setRangePreset(e.target.value as RangeValue)}>
             <option value="month">เดือนนี้</option>
             <option value="today">วันนี้</option>
             <option value="week">สัปดาห์นี้</option>
@@ -609,14 +664,14 @@ export default function AppShell() {
             <input type="date" className="control" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
 
-          <select className="control" value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)}>
+          <select className="control topbar-filter" value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)}>
             <option value="">ทุกช่องทาง</option>
             {CHANNELS.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
 
-          <button className="btn primary" onClick={openNewPost}><Plus size={16} /> คอนเทนต์ใหม่</button>
+          <button className="btn primary topbar-new" onClick={openNewPost}><Plus size={16} /> คอนเทนต์ใหม่</button>
         </div>
 
         <div className="content">
@@ -1766,6 +1821,15 @@ function CalendarPage({
     if (i >= 34 && d >= last && d.getDay() === 6) break;
   }
 
+  const todayKey = ymd(new Date());
+  const agendaDays: { date: Date; items: Post[] }[] = [];
+  for (let day = 1; day <= last.getDate(); day++) {
+    const date = new Date(year, month, day);
+    const key = ymd(date);
+    const items = posts.filter((p) => ymd(parseDate(p.date)) === key).sort(sortPostDate);
+    if (items.length || key === todayKey) agendaDays.push({ date, items });
+  }
+
   return (
     <>
       <div className="calendar-head">
@@ -1785,11 +1849,47 @@ function CalendarPage({
             <option value="Sell">Sell (ปิดการขาย)</option>
             <option value="Event">Event / Test Drive</option>
           </select>
-          <button className="btn" onClick={() => onMove(-1)}>ก่อนหน้า</button>
-          <button className="btn" onClick={onToday}>เดือนนี้</button>
-          <button className="btn" onClick={() => onMove(1)}>ถัดไป</button>
+          <div className="calendar-nav">
+            <button className="btn" onClick={() => onMove(-1)}>ก่อนหน้า</button>
+            <button className="btn" onClick={onToday}>เดือนนี้</button>
+            <button className="btn" onClick={() => onMove(1)}>ถัดไป</button>
+          </div>
         </div>
       </div>
+
+      {/* มือถือ: แสดงเป็นรายการตามวัน (agenda) แทนตาราง 7 ช่องที่แคบเกินอ่าน */}
+      <div className="agenda">
+        {agendaDays.length ? (
+          agendaDays.map(({ date, items }) => {
+            const key = ymd(date);
+            return (
+              <div className={`agenda-day ${key === todayKey ? 'today' : ''}`} key={key}>
+                <div className="agenda-date">
+                  <span className="agenda-dow">{dayNames[date.getDay()]}</span>
+                  <span className="agenda-num">{date.getDate()}</span>
+                </div>
+                <div className="agenda-items">
+                  {items.length ? (
+                    items.map((p) => (
+                      <button className={`agenda-item ${formatChipClass(p.format)}`} key={p.id} onClick={() => onOpenPost(p)}>
+                        <span className="dot" style={{ background: statusDotColor(p.status) }} />
+                        <span className="agenda-time">{p.time}</span>
+                        <span className="agenda-title">{p.title}</span>
+                        <span className="agenda-meta">{p.channel} · {statusLabel(p.status)}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="agenda-empty">วันนี้ยังไม่มีคอนเทนต์</div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="card"><Empty text="เดือนนี้ยังไม่มีคอนเทนต์" /></div>
+        )}
+      </div>
+
       <div className="card calendar-wrap">
         <div className="calendar">
           {dayNames.map((d) => <div className="day-name" key={d}>{d}</div>)}
@@ -1854,7 +1954,25 @@ function TablePage({ posts, onOpenPost }: { posts: Post[]; onOpenPost: (p: Post)
   return (
     <>
       <h1>ตารางคอนเทนต์</h1>
-      <div className="card" style={{ overflow: 'auto' }}>
+      {/* มือถือ: การ์ดทีละรายการแทนตาราง 10 คอลัมน์ */}
+      <div className="post-cards">
+        {rows.length === 0 && <div className="card"><Empty text="ไม่มีคอนเทนต์ในช่วงนี้" /></div>}
+        {rows.map((p) => (
+          <button className="post-card" key={p.id} onClick={() => onOpenPost(p)}>
+            <div className="post-card-top">
+              <span className="post-card-date">{displayDate(p.date)} {p.time}</span>
+              <StatusBadge status={p.status} />
+            </div>
+            <div className="post-card-title">{p.title}</div>
+            <div className="post-card-meta">
+              <span className={`channel-tag ${channelClass(p.channel)}`}>{p.channel}</span>
+              <span>{p.format}</span>
+              {p.owner && <span>· {p.owner}</span>}
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="card table-card" style={{ overflow: 'auto' }}>
         <table>
           <thead>
             <tr>
