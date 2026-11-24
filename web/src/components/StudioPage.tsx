@@ -18,6 +18,7 @@ type StudioItem = {
   note?: string;
   actor?: string;
   state?: string;
+  at?: string;
 };
 
 const FALLBACK: StudioItem[] = [
@@ -467,6 +468,8 @@ ${SPRITE_KF}
 .st-dept-head span{font-size:12px;color:var(--muted)}
 .st-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .st-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.st-card-upd{margin-top:8px;font-size:11.5px;color:var(--muted,#6b7280)}
+.st-card-stale{color:#b45309;font-weight:600}
 .st-card-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .st-card-head img,.st-card-head svg{width:40px;height:52px;object-fit:contain;flex:none}
 .st-card-head .st-card-id{flex:1;min-width:0}
@@ -513,30 +516,61 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
   const get = (actor: string): StudioItem =>
     items.find((i) => i.actor === actor) || FALLBACK.find((i) => i.actor === actor) || { label: actor, value: '—' };
 
-  const scoutReport = reports
-    .filter((r) => r.agent === 'SCOUT')
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
-  const scout: StudioItem =
-    items.find((i) => i.actor === 'scout') ||
-    (scoutReport
-      ? {
-          actor: 'scout',
-          label: 'SCOUT',
-          value: `สแกนรอบ ${formatDateTH(new Date(scoutReport.updated_at))}`,
-          note: 'ผลสแกนคู่แข่งอยู่ในหน้า SCOUT · ส่งต่อให้ Susan ใช้วางกลยุทธ์',
-          state: 'done',
-        }
-      : { actor: 'scout', label: 'SCOUT', value: 'รอรอบสแกนถัดไป', state: 'idle' });
+  /* สถานะแต่ละตัวอ่านจากรายงานล่าสุดของทีมนั้นเอง (อัปเดตทุกคืนผ่าน sync) แทนการพึ่งการ์ด studio ที่เขียนมือ
+     ตัวไหนไม่มีรายงานของตัวเอง (edit) จะใช้การ์ด studio + แสดงวันที่ ถ้าเก่ากว่า 2 วันจะขึ้น "ข้อมูลเก่า" */
+  const latest = (agent: string, section?: string) =>
+    reports
+      .filter((r) => r.agent === agent && (!section || r.section === section))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+  const studioAt = report?.updated_at;
+  const withAt = (i: StudioItem, at?: string): StudioItem => ({ ...i, at: at ?? i.at ?? studioAt });
+  const itemsOf = (r?: AgentReport): string[] =>
+    r?.data && 'items' in r.data && Array.isArray(r.data.items)
+      ? (r.data.items as unknown[]).map((x) => (typeof x === 'string' ? x : (x as { label?: string; value?: string }).label + ' ' + ((x as { value?: string }).value ?? '')))
+      : [];
+  const rowsOf = (r?: AgentReport): number =>
+    r?.data && 'rows' in r.data && Array.isArray(r.data.rows) ? r.data.rows.length : 0;
+
+  const scoutReport = latest('SCOUT');
+  const scout: StudioItem = scoutReport
+    ? { actor: 'scout', label: 'SCOUT', value: `สแกนรอบ ${formatDateTH(new Date(scoutReport.updated_at))}`, note: 'ผลสแกนคู่แข่งอยู่ในหน้า SCOUT · ส่งต่อให้ Susan ใช้วางกลยุทธ์', state: 'done', at: scoutReport.updated_at }
+    : withAt(get('scout'));
+
+  const alexR = latest('ADS', 'alex');
+  const alex: StudioItem = alexR
+    ? { actor: 'alex', label: 'Alex', value: short(alexR.title.replace(/^วิเคราะห์ผล Meta Ads ประจำวัน\s*/, 'รายงานเสร็จ '), 40), note: short(alexR.body, 150), state: 'done', at: alexR.updated_at }
+    : withAt(get('alex'));
+
+  const bearyR = latest('ADS', 'beary');
+  const nProp = rowsOf(bearyR);
+  const beary: StudioItem = bearyR
+    ? { actor: 'beary', label: 'Beary', value: nProp ? `เสนอ ${nProp} เรื่อง รอปันอนุมัติ` : 'ไม่มีข้อเสนอค้าง', note: short(bearyR.body, 150), state: nProp ? 'waiting' : 'done', at: bearyR.updated_at }
+    : withAt(get('beary'));
+
+  const todoR = latest('ADS', 'pan_todo');
+  const todos = itemsOf(todoR);
+  const panStudio = get('pan');
+  const pan: StudioItem = todos.length
+    ? { actor: 'pan', label: 'ปัน', value: `มีงานรอ ${todos.length} เรื่อง`, note: short(todos[0], 150), state: 'waiting', at: todoR!.updated_at }
+    : withAt(panStudio);
+
+  const susanR = latest('SUSAN');
+  const susan: StudioItem = susanR
+    ? { actor: 'susan', label: 'Susan', value: `อัปเดตกลยุทธ์ ${formatDateTH(new Date(susanR.updated_at))}`, note: 'สัญญาณ · PPS · คลัง Hook · สั่งทำวิดีโอ อยู่ในหน้า SUSAN', state: 'done', at: susanR.updated_at }
+    : withAt(get('susan'));
 
   const byActor: Record<string, StudioItem> = {
-    pan: get('pan'),
+    pan,
     scout,
-    susan: get('susan'),
-    edit: get('edit'),
-    alex: get('alex'),
-    beary: get('beary'),
-    almanac: get('almanac'),
+    susan,
+    edit: withAt(get('edit')),
+    alex,
+    beary,
+    almanac: { ...get('almanac'), at: undefined }, // ยังไม่เริ่มงาน — ไม่ต้องเตือนข้อมูลเก่า
   };
+  // เทียบกับรายงานใหม่สุดในระบบ (รอบ sync ล่าสุด) — ถ้าเก่ากว่านั้นเกิน 2 วันถือว่าข้อมูลเก่า
+  const newest = reports.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), '');
+  const isStale = (at?: string) => !!at && !!newest && new Date(newest).getTime() - new Date(at).getTime() > 2 * 86400000;
   const q: [string, string, string] = [get('queue_todo').value, get('queue_doing').value, get('queue_done').value];
 
   return (
@@ -577,6 +611,11 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
                     </div>
                     <div className="st-card-value">{item.value}</div>
                     {item.note && <div className="st-card-note">{item.note}</div>}
+                    {item.at && (
+                      <div className={`st-card-upd${isStale(item.at) ? ' st-card-stale' : ''}`}>
+                        {isStale(item.at) ? '⚠ ข้อมูลเก่า · ' : ''}อัปเดต {displayDateTime(item.at)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -587,7 +626,7 @@ export default function StudioPage({ reports }: { reports: AgentReport[] }) {
 
       <div className="st-meta">
         {report
-          ? `อัปเดตล่าสุด ${displayDateTime(report.updated_at)}${report.body ? ' · ' + report.body : ''}`
+          ? `ตัวละครแต่ละตัวอ่านสถานะจากรายงานล่าสุดของทีมตัวเอง · การ์ด studio (edit/คิวงาน) อัปเดต ${displayDateTime(report.updated_at)}`
           : 'ยังไม่มีข้อมูล studio ใน Supabase — แสดงสถานะตั้งต้น (18 พ.ย. 2569)'}
       </div>
     </div>
