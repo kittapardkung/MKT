@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import RegisterSW from "@/components/RegisterSW";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 
@@ -11,12 +12,24 @@ const prompt = Prompt({
 export const metadata: Metadata = {
   title: "MKT Content Manager",
   description: "ระบบจัดการคอนเทนต์การตลาด",
+  applicationName: "MKT",
+  appleWebApp: { capable: true, title: "MKT", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="th" className={prompt.variable}>
-      <body>{children}</body>
+      <body>
+        <RegisterSW />
+        {children}
+      </body>
     </html>
   );
 }
