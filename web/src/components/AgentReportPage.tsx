@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { AgentId, AgentReport, DrilldownRow, Lead } from '@/lib/types';
+import type { AgentId, AgentReport, DrilldownRow, Lead, MixGroup } from '@/lib/types';
 import { displayDateTime, parseDate, ymd } from '@/lib/date-utils';
 
 function Empty({ text }: { text: string }) {
@@ -294,6 +294,64 @@ function DailySpendChart({
   );
 }
 
+
+// แดชบอร์ดสัดส่วนคอนเทนต์: เทียบ % ในแผนกับ % เป้า · เส้นตั้ง = เป้า · ห่างเกิน 5 จุด = เตือน
+function mixStatus(actual: number, target: number) {
+  const diff = actual - target;
+  if (Math.abs(diff) <= 5) return { cls: 'mix-ok', text: 'ตรงเป้า' };
+  return diff > 0 ? { cls: 'mix-over', text: `เกิน ${Math.round(diff)}%` } : { cls: 'mix-under', text: `ขาด ${Math.round(-diff)}%` };
+}
+
+function MixDashboard({ groups }: { groups: MixGroup[] }) {
+  return (
+    <div className="mix-grid">
+      {groups.map((g, gi) => {
+        const total = g.items.reduce((s, i) => s + i.count, 0);
+        const done = g.items.reduce((s, i) => s + (i.done || 0), 0);
+        return (
+          <div className="mix-box" key={gi}>
+            <div className="mix-box-head">
+              <span className="mix-box-title">{g.title}</span>
+              <span className="meta">
+                {total} คลิปในแผน · เสร็จ {done}
+              </span>
+            </div>
+            {g.note && <div className="mix-box-note">{g.note}</div>}
+            {g.items.map((item, i) => {
+              const actual = total ? (item.count / total) * 100 : 0;
+              const st = mixStatus(actual, item.target);
+              return (
+                <div className="mix-row" key={i}>
+                  <div className="mix-row-top">
+                    <span className="mix-label">{item.label}</span>
+                    <span className="mix-nums">
+                      {item.count} คลิป · {Math.round(actual)}% <span className="meta">/ เป้า {item.target}%</span>
+                    </span>
+                    <span className={`mix-status ${st.cls}`}>{st.text}</span>
+                  </div>
+                  <div className="mix-track" title={`แผน ${Math.round(actual)}% · เป้า ${item.target}%`}>
+                    <div className="mix-fill" style={{ width: `${Math.min(actual, 100)}%` }} />
+                    {item.done ? (
+                      <div className="mix-fill-done" style={{ width: `${Math.min(total ? (item.done / total) * 100 : 0, 100)}%` }} />
+                    ) : null}
+                    <div className="mix-target" style={{ left: `${Math.min(item.target, 100)}%` }} />
+                  </div>
+                  {item.note && <div className="mix-row-note">{item.note}</div>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      <div className="mix-legend meta">
+        <span><span className="mix-swatch mix-swatch-plan" /> ในแผน</span>
+        <span><span className="mix-swatch mix-swatch-done" /> ผลิตเสร็จ</span>
+        <span><span className="mix-swatch mix-swatch-target" /> เป้า</span>
+      </div>
+    </div>
+  );
+}
+
 const AGENT_META: Record<AgentId, { tagline: string; className: string }> = {
   SCOUT: { tagline: 'ทีมวิเคราะห์คู่แข่ง WULING CHONBURI', className: 'agent-scout' },
   SUSAN: { tagline: 'นักกลยุทธ์การตลาดออนไลน์', className: 'agent-susan' },
@@ -418,6 +476,8 @@ export function ReportCard({ report, leads }: { report: AgentReport; leads: Lead
       {data?.kind === 'drilldown' && <DrilldownTable columns={data.columns} rows={data.rows} />}
 
       {data?.kind === 'todo' && <TodoList items={data.items} />}
+
+      {data?.kind === 'mix' && <MixDashboard groups={data.groups} />}
     </div>
   );
 }

@@ -35,7 +35,10 @@ function readJsonIfExists(path) {
 }
 
 function blockData(block) {
-  const data = block.columns
+  // block.mix = แดชบอร์ดสัดส่วนคอนเทนต์ (PPS / รุ่น / หมวด) ของ TIKTOK
+  const data = block.mix
+    ? { kind: 'mix', groups: block.mix }
+    : block.columns
         ? block.groups
           ? { kind: 'table', columns: block.columns, groups: block.groups }
           : block.rows?.[0] && !Array.isArray(block.rows[0])

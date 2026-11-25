@@ -54,6 +54,10 @@ export type Idea = {
 // บล็อกเนื้อหาในหน้าแดชบอร์ดของแต่ละ agent (SCOUT/SUSAN/ADS เป็นหลัก) — หนึ่งแถวต่อหนึ่งการ์ด
 export type DrilldownRow = { cells: string[]; children?: DrilldownRow[] };
 
+// แดชบอร์ดสัดส่วนคอนเทนต์ (TIKTOK) — count = จำนวนคลิปในแผน, done = ผลิตเสร็จแล้ว, target = % เป้า
+export type MixItem = { label: string; target: number; count: number; done?: number; note?: string };
+export type MixGroup = { title: string; note?: string; items: MixItem[] };
+
 export type AgentReportData = (
   | { kind: 'kpi'; items: { label: string; value: string; note?: string }[] }
   | { kind: 'scorecard'; rows: { label: string; value: string; highlight?: boolean }[] }
@@ -63,6 +67,7 @@ export type AgentReportData = (
   | { kind: 'bar'; items: { label: string; value: number; highlight?: boolean }[] }
   | { kind: 'drilldown'; columns: string[]; rows: DrilldownRow[] }
   | { kind: 'todo'; items: { label: string; goal: string; tasks: string[] }[] }
+  | { kind: 'mix'; groups: MixGroup[] }
 ) & { by?: string };
 
 export type AgentReport = {
